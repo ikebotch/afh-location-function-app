@@ -1,0 +1,53 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": "",
+
+    "Auth:TenantId": "<tenant-id>",
+    "Auth:Audience": "<api-app-id-uri-or-client-id>",
+
+    "Maps:Azure:Key": "<azure-maps-key>",
+    "Maps:Google:ApiKey": "<google-maps-key>",
+
+    "SharePointGraph:TenantId": "<tenant-id>",
+    "SharePointGraph:ClientId": "<client-id>",
+    "SharePointGraph:ClientSecret": "<client-secret>",
+
+    "CalendarService:BaseUrl": "http://localhost:7071",
+    "CalendarService:FunctionKey": "<calendar-functions-key>",
+
+    "SharePoint:Advisers:SiteId": "<site-id>",
+    "SharePoint:Advisers:ListId": "<list-id>",
+    "SharePoint:Advisers:AdviserIdField": "field_3",
+    "SharePoint:Advisers:NameField": "Title",
+    "SharePoint:Advisers:SkillsField": "License",
+    "SharePoint:Advisers:RegionField": "Region",
+    "SharePoint:Advisers:PostcodeField": "field_13",
+    "SharePoint:Advisers:RatingField": "Rating",
+    "SharePoint:Advisers:DefaultRating": "0",
+
+    "LocationSearch:Coverage:DefaultRadiusMiles": "100",
+    "LocationSearch:Coverage:AdviserRadiusMiles:ADV-001": "120",
+    "LocationSearch:Coverage:RegionRadiusMiles:West Midlands": "100",
+    "LocationSearch:Coverage:RegionRadiusMiles:North West": "130",
+    "LocationSearch:Coverage:OfficeRadiusMiles:OFF-BROMS": "100",
+
+    "LocationSearch:Availability:DefaultBufferMinutes": "15",
+    "LocationSearch:Availability:MaxBufferMinutes": "180",
+
+    "LocationSearch:Ranking:AvailablePenalty": "0",
+    "LocationSearch:Ranking:AvailableLaterPenalty": "20",
+    "LocationSearch:Ranking:BusyPenalty": "100",
+    "LocationSearch:Ranking:EtaMinuteWeight": "1.0",
+    "LocationSearch:Ranking:DistanceMileWeight": "0.5",
+    "LocationSearch:Ranking:PreferredBonus": "10",
+    "LocationSearch:Ranking:LowConfidencePenalty": "15",
+    "LocationSearch:Ranking:RegionMatchBonus": "5",
+    "LocationSearch:Ranking:CoverageFailPenalty": "250",
+    "LocationSearch:Ranking:RatingWeight": "5",
+    "LocationSearch:Ranking:DefaultMinAdviserRating": "0",
+    "LocationSearch:Ranking:MaxEligibleScore": "500"
+  }
+}

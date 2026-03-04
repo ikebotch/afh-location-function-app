@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "AFH.Location.Service.Api": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7264",
+      "launchBrowser": false
+    }
+  }
+}
