@@ -25,27 +25,30 @@ public interface ICalendarServiceClient
 
 public sealed class CreateCalendarAppointmentRequest
 {
-    public string AdviserId { get; init; } = string.Empty;
+    public string UserId { get; init; } = string.Empty;
     public string BookingId { get; init; } = string.Empty;
     public string Subject { get; init; } = string.Empty;
     public DateTime StartUtc { get; init; }
     public DateTime EndUtc { get; init; }
-    public string? Notes { get; init; }
+    public string Timezone { get; init; } = "UTC";
+    public string? Body { get; init; }
 }
 
 public sealed class UpdateCalendarAppointmentRequest
 {
     public string AppointmentId { get; init; } = string.Empty;
+    public string UserId { get; init; } = string.Empty;
     public string Subject { get; init; } = string.Empty;
     public DateTime StartUtc { get; init; }
     public DateTime EndUtc { get; init; }
-    public string? Notes { get; init; }
+    public string Timezone { get; init; } = "UTC";
+    public string? Body { get; init; }
 }
 
 public sealed class CancelCalendarAppointmentRequest
 {
     public string AppointmentId { get; init; } = string.Empty;
-    public string? Reason { get; init; }
+    public string UserId { get; init; } = string.Empty;
 }
 
 public sealed class CalendarAppointmentResult

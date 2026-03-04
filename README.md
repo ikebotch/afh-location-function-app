@@ -5,32 +5,37 @@
 ### Location Service (this repo)
 - Owns adviser discovery and search inputs.
 - Reads advisers from SharePoint (region, skills, rating, home postcode).
-- Reads adviser availability from Booking Service `getSchedule`.
+- Reads adviser availability from Calendar Service schedule endpoint.
 - Returns ranked advisers with coverage and travel outputs.
 
 ### Booking Service (separate repo)
 - Owns booking lifecycle: create/confirm/cancel.
-- Owns calendar write operations for booked events.
-- Owns booking/calendar webhook processing.
+- Persists booking state and exposes booking APIs.
+- Integrates with Calendar Service for appointment create/cancel when booking state changes.
+
+### Calendar Service (separate repo)
+- Owns all direct calendar-provider integration.
+- Owns webhook/subscription flows.
+- Exposes schedule and appointment APIs consumed by booking/location.
 
 ## Why This Split
 - Avoids duplicated calendar integration logic.
-- Keeps a single source of truth for booking and event state.
+- Keeps booking and event ownership clear.
 - Reduces config/auth drift across services.
 
-## Integration Contract (Location -> Booking)
-- Endpoint: `GET /api/v1/calendar/advisers/{adviserId}/schedule`
+## Integration Contract (Location -> Calendar Service)
+- Endpoint: `GET /api/v1/calendar/users/{userId}/schedule`
 - Query:
   - `startUtc`
   - `endUtc`
 - Auth:
-  - `x-functions-key` header via `BookingCalendar:FunctionKey` (when required)
+  - `x-functions-key` header via `CalendarService:FunctionKey` (when required)
 
 ## Required Local Config (Location)
 - `SharePointGraph:*`
 - `SharePoint:Advisers:*`
-- `BookingCalendar:BaseUrl`
-- `BookingCalendar:FunctionKey`
+- `CalendarService:BaseUrl`
+- `CalendarService:FunctionKey`
 - `LocationSearch:*`
 
 ## API Docs

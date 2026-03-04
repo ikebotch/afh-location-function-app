@@ -39,7 +39,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         var endUtc = window.RequestedStartUtc.AddMinutes(Math.Max(1, window.SearchHorizonMinutes + window.DurationMinutes));
 
         var url =
-            $"{_options.BaseUrl.TrimEnd('/')}/api/v1/calendar/advisers/{Uri.EscapeDataString(adviserId)}/schedule" +
+            $"{_options.BaseUrl.TrimEnd('/')}/api/v1/calendar/users/{Uri.EscapeDataString(adviserId)}/schedule" +
             $"?startUtc={Uri.EscapeDataString(startUtc.ToString("O"))}" +
             $"&endUtc={Uri.EscapeDataString(endUtc.ToString("O"))}";
 
@@ -134,11 +134,12 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         EnsureBaseUrl();
         if (string.IsNullOrWhiteSpace(request.AppointmentId))
             throw new ArgumentException("AppointmentId is required.", nameof(request));
+        if (string.IsNullOrWhiteSpace(request.UserId))
+            throw new ArgumentException("UserId is required.", nameof(request));
 
-        var query = string.IsNullOrWhiteSpace(request.Reason)
-            ? string.Empty
-            : $"?reason={Uri.EscapeDataString(request.Reason)}";
-        var url = $"{_options.BaseUrl.TrimEnd('/')}/api/v1/calendar/appointments/{Uri.EscapeDataString(request.AppointmentId)}{query}";
+        var url =
+            $"{_options.BaseUrl.TrimEnd('/')}/api/v1/calendar/appointments/{Uri.EscapeDataString(request.AppointmentId)}" +
+            $"?userId={Uri.EscapeDataString(request.UserId)}";
 
         using var httpRequest = new HttpRequestMessage(HttpMethod.Delete, url);
         AddAuth(httpRequest);
