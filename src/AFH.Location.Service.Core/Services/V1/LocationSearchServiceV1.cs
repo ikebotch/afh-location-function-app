@@ -186,6 +186,9 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             if (!ctx.AdviserOrigins.TryGetValue(c.Adviser.AdviserId, out var origin))
                 continue;
 
+            if (!IsCalendarRoutingEligible(ctx, c.Adviser.AdviserId))
+                continue;
+
             if (IsWithinCoverage(ctx, c.Adviser.AdviserId, c.Adviser.Region))
                 withinCoverage[c.Adviser.AdviserId] = origin;
         }
@@ -235,13 +238,26 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             AddBaseReasons(ctx, c, reasons);
 
             var (availStatus, proposedStartUtc) = EvaluateAvailability(ctx, c, reasons);
+            var unavailableForRouting =
+                string.Equals(availStatus, "Unavailable", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(availStatus, "Busy", StringComparison.OrdinalIgnoreCase);
 
-            var withinCoverageByRadius = AddCoverageReasons(ctx, c, reasons);
+            var withinCoverageByRadius = !unavailableForRouting && AddCoverageReasons(ctx, c, reasons);
 
             var maxTravelTimeMinutes = GetMaxTravelTimeMinutes(ctx, c.Adviser.AdviserId, c.Adviser.Region);
             reasons.Add($"MAX_TRAVEL_TIME_{maxTravelTimeMinutes}");
 
-            var travelToClient = await BuildTravelToClient(ctx, c, withinCoverageByRadius, reasons, ct);
+            TravelToClient travelToClient;
+            if (unavailableForRouting)
+            {
+                reasons.Add("SKIP_ROUTING_UNAVAILABLE");
+                travelToClient = new TravelToClient { EtaMinutes = 0, DistanceMiles = 0, Confidence = "Low" };
+            }
+            else
+            {
+                travelToClient = await BuildTravelToClient(ctx, c, withinCoverageByRadius, reasons, ct);
+            }
+
             var withinCoverageByTravelTime = IsWithinMaxTravelTime(travelToClient, maxTravelTimeMinutes, reasons);
             var withinCoverage = withinCoverageByRadius && withinCoverageByTravelTime;
 
@@ -263,7 +279,9 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
                 ref proposedStartUtc,
                 reasons);
 
-            var travelToBase = await BuildTravelToBase(ctx, c, reasons, ct);
+            var travelToBase = unavailableForRouting
+                ? new TravelToBase { HomeMinutes = 0, OfficeMinutes = 0 }
+                : await BuildTravelToBase(ctx, c, reasons, ct);
 
             var travelToNearestOffice = new TravelToNearestOffice
             {
@@ -626,6 +644,17 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             : $"MAX_TRAVEL_TIME_EXCEEDED_{travelToClient.EtaMinutes}");
 
         return within;
+    }
+
+    private static bool IsCalendarRoutingEligible(LocationSearchContext ctx, string adviserId)
+    {
+        if (!ctx.AvailabilityPolicy.RequireCalendarAvailability)
+            return true;
+
+        if (!ctx.AvailabilityById.TryGetValue(adviserId, out var availability))
+            return false;
+
+        return availability.State == CalendarAvailabilityState.Ok;
     }
 
     private static (string? OriginPostcode, string Source, int? GapFromPreviousMinutes) SelectOriginPostcode(
