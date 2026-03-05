@@ -368,12 +368,35 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             reasons.Add($"ORIGIN_SOURCE_{originSource}");
     }
 
-    private static (string Status, DateTime ProposedStartUtc) EvaluateAvailability(
+    private (string Status, DateTime ProposedStartUtc) EvaluateAvailability(
         LocationSearchContext ctx,
         AdviserCandidate c,
         List<string> reasons)
     {
         ctx.AvailabilityById.TryGetValue(c.Adviser.AdviserId, out var a);
+        if (ctx.AvailabilityPolicy.RequireCalendarAvailability)
+        {
+            if (a is null)
+            {
+                AddWarningOnce(ctx, "CALENDAR_UNAVAILABLE", "Calendar availability could not be resolved for one or more advisers.");
+                reasons.Add("CALENDAR_AVAILABILITY_MISSING");
+                return ("Unavailable", ctx.Request.Meeting.RequestedStartUtc);
+            }
+
+            if (a.State is CalendarAvailabilityState.MailboxNotFound)
+            {
+                AddWarningOnce(ctx, "MAILBOX_NOT_FOUND", "One or more advisers do not have a mailbox or calendar schedule.");
+                reasons.Add("MAILBOX_NOT_FOUND");
+                return ("Unavailable", ctx.Request.Meeting.RequestedStartUtc);
+            }
+
+            if (a.State is not CalendarAvailabilityState.Ok)
+            {
+                AddWarningOnce(ctx, "CALENDAR_UNAVAILABLE", "Calendar service could not be reached for one or more advisers.");
+                reasons.Add($"CALENDAR_STATE_{a.State}");
+                return ("Unavailable", ctx.Request.Meeting.RequestedStartUtc);
+            }
+        }
 
         var busyBlocks = a?.BusyBlocks
             .Select(b => (b.StartUtc, b.EndUtc))
@@ -393,6 +416,18 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
         reasons.Add($"AVAILABILITY_{status}");
         return (status, proposedStart);
+    }
+
+    private static void AddWarningOnce(LocationSearchContext ctx, string code, string message)
+    {
+        if (ctx.Response.Warnings.Any(x => string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        ctx.Response.Warnings.Add(new ApiWarning
+        {
+            Code = code,
+            Message = message
+        });
     }
 
     private bool AddCoverageReasons(LocationSearchContext ctx, AdviserCandidate c, List<string> reasons)

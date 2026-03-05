@@ -16,6 +16,8 @@ public sealed class AdviserAvailability
     public IReadOnlyList<BusyBlock> BusyBlocks { get; init; } = Array.Empty<BusyBlock>();
     public bool IsOutOfOffice { get; init; }
     public string? CurrentLocationPostcode { get; init; }
+    public CalendarAvailabilityState State { get; init; } = CalendarAvailabilityState.Ok;
+    public string? StateMessage { get; init; }
 }
 
 public sealed class BusyBlock
@@ -23,4 +25,13 @@ public sealed class BusyBlock
     public DateTime StartUtc { get; init; }
     public DateTime EndUtc { get; init; }
     public string? LocationPostcode { get; init; }
+}
+
+public enum CalendarAvailabilityState
+{
+    Ok = 0,
+    MailboxNotFound = 1,
+    ServiceUnavailable = 2,
+    ConfigurationMissing = 3,
+    UnknownError = 4
 }

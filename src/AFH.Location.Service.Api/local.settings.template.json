@@ -46,6 +46,7 @@
     "LocationSearch:Availability:DefaultCompanyBufferMinutes": "30",
     "LocationSearch:Availability:MaxCompanyBufferMinutes": "180",
     "LocationSearch:Availability:PreviousClientProximityMinutes": "180",
+    "LocationSearch:Availability:RequireCalendarAvailability": "true",
 
     "LocationSearch:Ranking:AvailablePenalty": "0",
     "LocationSearch:Ranking:AvailableLaterPenalty": "20",

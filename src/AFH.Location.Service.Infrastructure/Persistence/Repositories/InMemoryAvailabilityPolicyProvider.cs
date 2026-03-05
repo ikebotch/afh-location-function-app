@@ -20,6 +20,7 @@ public sealed class InMemoryAvailabilityPolicyProvider : IAvailabilityPolicyProv
         var defaultCompanyBuffer = _configuration.GetValue<int?>("LocationSearch:Availability:DefaultCompanyBufferMinutes") ?? 30;
         var maxCompanyBuffer = _configuration.GetValue<int?>("LocationSearch:Availability:MaxCompanyBufferMinutes") ?? 180;
         var previousClientProximity = _configuration.GetValue<int?>("LocationSearch:Availability:PreviousClientProximityMinutes") ?? 180;
+        var requireCalendarAvailability = _configuration.GetValue<bool?>("LocationSearch:Availability:RequireCalendarAvailability") ?? true;
 
         return Task.FromResult(new AvailabilityPolicy
         {
@@ -27,7 +28,8 @@ public sealed class InMemoryAvailabilityPolicyProvider : IAvailabilityPolicyProv
             MaxBufferMinutes = Math.Max(0, maxBuffer),
             DefaultCompanyBufferMinutes = Math.Max(0, defaultCompanyBuffer),
             MaxCompanyBufferMinutes = Math.Max(0, maxCompanyBuffer),
-            PreviousClientProximityMinutes = Math.Max(0, previousClientProximity)
+            PreviousClientProximityMinutes = Math.Max(0, previousClientProximity),
+            RequireCalendarAvailability = requireCalendarAvailability
         });
     }
 }

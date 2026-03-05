@@ -33,8 +33,8 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
     {
         if (string.IsNullOrWhiteSpace(_options.BaseUrl))
         {
-            _logger.LogWarning("CalendarService:BaseUrl is missing; returning empty availability.");
-            return NewEmptyAvailability(adviserId);
+            _logger.LogWarning("CalendarService:BaseUrl is missing; returning unavailable calendar state.");
+            return NewAvailability(adviserId, CalendarAvailabilityState.ConfigurationMissing, "CalendarService:BaseUrl is missing.");
         }
 
         var startUtc = window.RequestedStartUtc.AddMinutes(-Math.Max(0, _options.ScheduleLookbackMinutes));
@@ -52,7 +52,10 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         {
             using var response = await _http.SendAsync(request, ct);
             if (response.StatusCode == HttpStatusCode.NotFound)
-                return NewEmptyAvailability(adviserId);
+            {
+                _logger.LogWarning("Calendar mailbox/schedule not found for AdviserId={AdviserId}", adviserId);
+                return NewAvailability(adviserId, CalendarAvailabilityState.MailboxNotFound, "Mailbox or schedule not found.");
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -60,12 +63,15 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
                     "Calendar schedule call failed for AdviserId={AdviserId}. Status={StatusCode}",
                     adviserId,
                     (int)response.StatusCode);
-                return NewEmptyAvailability(adviserId);
+                return NewAvailability(
+                    adviserId,
+                    CalendarAvailabilityState.ServiceUnavailable,
+                    $"Calendar service HTTP {(int)response.StatusCode}");
             }
 
             var dto = await response.Content.ReadFromJsonAsync<ScheduleResponse>(cancellationToken: ct);
             if (dto?.Bookings is null || dto.Bookings.Count == 0)
-                return NewEmptyAvailability(adviserId);
+                return NewAvailability(adviserId, CalendarAvailabilityState.Ok, null);
 
             var bookings = dto.Bookings
                 .Where(b => !string.Equals(b.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
@@ -96,13 +102,17 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
                 AdviserId = adviserId,
                 BusyBlocks = busy,
                 IsOutOfOffice = false,
-                CurrentLocationPostcode = currentLocationPostcode
+                CurrentLocationPostcode = currentLocationPostcode,
+                State = CalendarAvailabilityState.Ok
             };
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Calendar schedule call threw for AdviserId={AdviserId}", adviserId);
-            return NewEmptyAvailability(adviserId);
+            return NewAvailability(
+                adviserId,
+                CalendarAvailabilityState.UnknownError,
+                "Calendar schedule call threw an exception.");
         }
     }
 
@@ -178,11 +188,16 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
             request.Headers.Add("x-functions-key", _options.FunctionKey);
     }
 
-    private static AdviserAvailability NewEmptyAvailability(string adviserId) => new()
+    private static AdviserAvailability NewAvailability(
+        string adviserId,
+        CalendarAvailabilityState state,
+        string? message) => new()
     {
         AdviserId = adviserId,
         BusyBlocks = Array.Empty<BusyBlock>(),
-        IsOutOfOffice = false
+        IsOutOfOffice = false,
+        State = state,
+        StateMessage = message
     };
 
     private sealed class ScheduleResponse
