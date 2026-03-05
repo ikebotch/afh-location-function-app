@@ -1,7 +1,7 @@
-﻿using AFH.Location.Service.Core.Abstractions;
+﻿using AFH.Location.Service.Api.Contracts;
+using AFH.Location.Service.Core.Abstractions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
-using System.Net;
 
 namespace AFH.Location.Service.Api.Functions.V2;
 
@@ -15,9 +15,9 @@ public sealed class LocationSearchFunctionV2
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v2/location/inperson/advisers/search")] HttpRequestData req)
     {
         var _ = await _routing.GetRouteAsync((0, 0), (0, 0), CancellationToken.None);
-
-        var res = req.CreateResponse(HttpStatusCode.OK);
-        await res.WriteStringAsync("v2 OK (Google Maps wired)");
-        return res;
+        return await req.WriteSuccessAsync(new
+        {
+            message = "v2 OK (Google Maps wired)"
+        }, CancellationToken.None);
     }
 }

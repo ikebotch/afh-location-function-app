@@ -1,4 +1,5 @@
-﻿using Microsoft.Azure.Functions.Worker;
+﻿using AFH.Location.Service.Api.Contracts;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Configuration;
@@ -87,8 +88,10 @@ public sealed class JwtServiceAuthMiddleware : IFunctionsWorkerMiddleware
     private static async Task Reject(FunctionContext ctx, int code, string message)
     {
         var req = await ctx.GetHttpRequestDataAsync();
-        var res = req!.CreateResponse((System.Net.HttpStatusCode)code);
-        await res.WriteStringAsync(message);
+        var res = await req!.WriteFailureAsync(
+            (System.Net.HttpStatusCode)code,
+            new { code = "AUTH_ERROR", message },
+            CancellationToken.None);
         ctx.GetInvocationResult().Value = res;
     }
 }

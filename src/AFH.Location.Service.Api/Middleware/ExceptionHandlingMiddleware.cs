@@ -1,4 +1,5 @@
-﻿using AFH.Location.Service.Core.Domain.Errors;
+﻿using AFH.Location.Service.Api.Contracts;
+using AFH.Location.Service.Core.Domain.Errors;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
@@ -22,16 +23,22 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         catch (DestinationResolveException ex)
         {
             var req = await context.GetHttpRequestDataAsync();
-            var res = req!.CreateResponse(HttpStatusCode.UnprocessableEntity);
-            await res.WriteAsJsonAsync(new { code = ex.Code, message = ex.Message });
+            var res = await req!.WriteFailureAsync(
+                HttpStatusCode.UnprocessableEntity,
+                new { code = ex.Code, message = ex.Message },
+                CancellationToken.None);
             context.GetInvocationResult().Value = res;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception");
             var req = await context.GetHttpRequestDataAsync();
-            var res = req?.CreateResponse(HttpStatusCode.InternalServerError);
-            if (res is not null) await res.WriteStringAsync("Something went wrong.");
+            var res = req is null
+                ? null
+                : await req.WriteFailureAsync(
+                    HttpStatusCode.InternalServerError,
+                    new { code = "INTERNAL_ERROR", message = "Something went wrong." },
+                    CancellationToken.None);
             context.GetInvocationResult().Value = res;
         }
     }

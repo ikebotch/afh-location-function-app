@@ -1,8 +1,8 @@
+using AFH.Location.Service.Api.Contracts;
 using AFH.Location.Service.Core.Abstractions;
 using AFH.Location.Service.Core.Contracts.V1.Responses;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
-using System.Net;
 
 namespace AFH.Location.Service.Api.Functions.V1;
 
@@ -32,12 +32,12 @@ public sealed class LicenseListFunctionV1
             .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var ok = req.CreateResponse(HttpStatusCode.OK);
-        await ok.WriteAsJsonAsync(new LicenseListResponseV1
+        var payload = new LicenseListResponseV1
         {
             Licenses = licenses
-        }, ct);
+        };
 
-        return ok;
+        var paging = ApiEnvelopeExtensions.SinglePage(licenses.Length);
+        return await req.WriteSuccessAsync(payload, ct, paging);
     }
 }

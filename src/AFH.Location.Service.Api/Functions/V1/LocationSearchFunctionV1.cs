@@ -1,4 +1,5 @@
-﻿using AFH.Location.Service.Core.Abstractions;
+﻿using AFH.Location.Service.Api.Contracts;
+using AFH.Location.Service.Core.Abstractions;
 using AFH.Location.Service.Core.Contracts.V1.Requests;
 using AFH.Location.Service.Core.Validation.V1;
 using Microsoft.Azure.Functions.Worker;
@@ -25,23 +26,23 @@ public sealed class LocationSearchFunctionV1
         var payload = await req.ReadFromJsonAsync<LocationSearchRequestV1>(cancellationToken: ct);
         if (payload is null)
         {
-            var bad = req.CreateResponse(HttpStatusCode.BadRequest);
-            await bad.WriteAsJsonAsync(new { code = "VALIDATION_ERROR", message = "Invalid JSON payload." }, ct);
-            return bad;
+            return await req.WriteFailureAsync(
+                HttpStatusCode.BadRequest,
+                new { code = "VALIDATION_ERROR", message = "Invalid JSON payload." },
+                ct);
         }
 
         var errors = LocationSearchRequestValidatorV1.Validate(payload);
         if (errors.Count > 0)
         {
-            var bad = req.CreateResponse(HttpStatusCode.BadRequest);
-            await bad.WriteAsJsonAsync(new { code = "VALIDATION_ERROR", message = "Invalid request.", errors }, ct);
-            return bad;
+            return await req.WriteFailureAsync(
+                HttpStatusCode.BadRequest,
+                new { code = "VALIDATION_ERROR", message = "Invalid request.", errors },
+                ct);
         }
 
         var result = await _service.SearchInPersonAsync(payload, ct);
-
-        var ok = req.CreateResponse(HttpStatusCode.OK);
-        await ok.WriteAsJsonAsync(result, ct);
-        return ok;
+        var paging = ApiEnvelopeExtensions.SinglePage(result.Candidates.Count);
+        return await req.WriteSuccessAsync(result, ct, paging);
     }
 }
