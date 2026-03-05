@@ -17,6 +17,9 @@
 
     "CalendarService:BaseUrl": "http://localhost:7071",
     "CalendarService:FunctionKey": "<calendar-functions-key>",
+    "ConnectionStrings:LocationPolicyDb": "Server=localhost,1433;Database=AFH.LocationPolicy;User Id=sa;Password=<password>;TrustServerCertificate=True;",
+    "LocationSearch:PolicyStore:AutoCreate": "true",
+    "LocationSearch:PolicyStore:SeedFromConfiguration": "true",
 
     "SharePoint:Advisers:SiteId": "<site-id>",
     "SharePoint:Advisers:ListId": "<list-id>",

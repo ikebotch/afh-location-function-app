@@ -7,9 +7,11 @@ using AFH.Location.Service.Infrastructure.External.Graph;
 using AFH.Location.Service.Infrastructure.External.Maps.Azure;
 using AFH.Location.Service.Infrastructure.External.Maps.Google;
 using AFH.Location.Service.Infrastructure.Options;
+using AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Service.Infrastructure.Persistence.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 
 namespace AFH.Location.Service.Infrastructure.Composition;
 
@@ -56,9 +58,28 @@ public static class DependencyInjection
 
         services.AddScoped<IOfficeRepository, InMemoryOfficeRepository>();
 
-        services.AddSingleton<ICoveragePolicyProvider, InMemoryCoveragePolicyProvider>();
+        var policyDbConnectionString =
+            configuration.GetConnectionString("LocationPolicyDb")
+            ?? configuration["LocationSearch:PolicyStore:ConnectionString"];
+
+        if (!string.IsNullOrWhiteSpace(policyDbConnectionString))
+        {
+            services.AddDbContext<LocationPolicyDbContext>(options =>
+                options.UseSqlServer(policyDbConnectionString));
+
+            services.AddScoped<ICoveragePolicyProvider, SqlCoveragePolicyProvider>();
+            services.AddScoped<IAvailabilityPolicyProvider, SqlAvailabilityPolicyProvider>();
+            services.AddScoped<ISearchAuditRepository, SqlSearchAuditRepository>();
+            services.AddHostedService<LocationPolicyDbInitializer>();
+        }
+        else
+        {
+            services.AddSingleton<ICoveragePolicyProvider, InMemoryCoveragePolicyProvider>();
+            services.AddSingleton<IAvailabilityPolicyProvider, InMemoryAvailabilityPolicyProvider>();
+            services.AddSingleton<ISearchAuditRepository, NoOpSearchAuditRepository>();
+        }
+
         services.AddSingleton<IRankingPolicyProvider, InMemoryRankingPolicyProvider>();
-        services.AddSingleton<IAvailabilityPolicyProvider, InMemoryAvailabilityPolicyProvider>();
         services.AddSingleton<IBaseOfficePolicyProvider, InMemoryBaseOfficePolicyProvider>();
         services.AddSingleton<IRouteMatrixPolicyProvider, InMemoryRouteMatrixPolicyProvider>();
         services.AddSingleton<IGeoCachePolicyProvider, InMemoryGeoCachePolicyProvider>();
