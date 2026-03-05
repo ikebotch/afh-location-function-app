@@ -157,6 +157,14 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         foreach (var c in ctx.Candidates)
         {
             ctx.AvailabilityById.TryGetValue(c.Adviser.AdviserId, out var availability);
+
+            if (ctx.AvailabilityPolicy.RequireCalendarAvailability &&
+                (availability is null || availability.State != CalendarAvailabilityState.Ok))
+            {
+                ctx.OriginSourceById[c.Adviser.AdviserId] = "SKIPPED_UNAVAILABLE";
+                continue;
+            }
+
             var (originPostcode, source, gapFromPreviousMinutes) = SelectOriginPostcode(ctx, availability, requestedStartUtc);
             var origin = await _adviserCoords.ResolveHomeAsync(c.Adviser, ct, originPostcode);
             if (IsZero(origin)) continue;
@@ -212,6 +220,14 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
     private async Task ComputeNearestOfficeRouteAsync(LocationSearchContext ctx, CancellationToken ct)
     {
+        if (ctx.AvailabilityPolicy.RequireCalendarAvailability &&
+            !ctx.Candidates.Any(c =>
+                ctx.AvailabilityById.TryGetValue(c.Adviser.AdviserId, out var a) &&
+                a.State == CalendarAvailabilityState.Ok))
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(ctx.NearestOfficeId)) return;
         if (!ctx.OfficeCoords.TryGetValue(ctx.NearestOfficeId, out var office)) return;
         if (IsZero(office)) return;
@@ -238,6 +254,12 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             AddBaseReasons(ctx, c, reasons);
 
             var (availStatus, proposedStartUtc) = EvaluateAvailability(ctx, c, reasons);
+            if (!ShouldIncludeByAvailability(availStatus))
+            {
+                reasons.Add($"EXCLUDE_AVAILABILITY_{availStatus.ToUpperInvariant()}");
+                continue;
+            }
+
             var unavailableForRouting =
                 string.Equals(availStatus, "Unavailable", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(availStatus, "Busy", StringComparison.OrdinalIgnoreCase);
@@ -447,6 +469,10 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             Message = message
         });
     }
+
+    private static bool ShouldIncludeByAvailability(string availabilityStatus) =>
+        string.Equals(availabilityStatus, "Available", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(availabilityStatus, "AvailableLater", StringComparison.OrdinalIgnoreCase);
 
     private bool AddCoverageReasons(LocationSearchContext ctx, AdviserCandidate c, List<string> reasons)
     {
