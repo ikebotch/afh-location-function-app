@@ -69,11 +69,21 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
                     $"Calendar service HTTP {(int)response.StatusCode}");
             }
 
-            var dto = await response.Content.ReadFromJsonAsync<ScheduleResponse>(cancellationToken: ct);
-            if (dto?.Bookings is null || dto.Bookings.Count == 0)
+            var schedule = await ReadEnvelopedOrRawAsync<ScheduleResponse>(response, ct);
+
+            if (schedule is null)
+            {
+                _logger.LogWarning("Calendar schedule payload parse failed for AdviserId={AdviserId}", adviserId);
+                return NewAvailability(
+                    adviserId,
+                    CalendarAvailabilityState.ServiceUnavailable,
+                    "Calendar schedule payload parse failed.");
+            }
+
+            if (schedule.Bookings.Count == 0)
                 return NewAvailability(adviserId, CalendarAvailabilityState.Ok, null);
 
-            var bookings = dto.Bookings
+            var bookings = schedule.Bookings
                 .Where(b => !string.Equals(b.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(b => b.StartUtc)
                 .ToList();
@@ -132,7 +142,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         using var response = await _http.SendAsync(httpRequest, ct);
         response.EnsureSuccessStatusCode();
 
-        var body = await response.Content.ReadFromJsonAsync<CalendarAppointmentResult>(cancellationToken: ct);
+        var body = await ReadEnvelopedOrRawAsync<CalendarAppointmentResult>(response, ct);
         return body ?? new CalendarAppointmentResult();
     }
 
@@ -200,9 +210,38 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         StateMessage = message
     };
 
+    private static async Task<T?> ReadEnvelopedOrRawAsync<T>(
+        HttpResponseMessage response,
+        CancellationToken ct)
+        where T : class
+    {
+        var json = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(json))
+            return default;
+
+        try
+        {
+            var enveloped = JsonSerializer.Deserialize<ApiEnvelope<T>>(json);
+            if (enveloped?.Data is not null)
+                return enveloped.Data;
+
+            return JsonSerializer.Deserialize<T>(json);
+        }
+        catch
+        {
+            return default;
+        }
+    }
+
     private sealed class ScheduleResponse
     {
         public List<BookingSummary> Bookings { get; set; } = new();
+    }
+
+    private sealed class ApiEnvelope<T> where T : class
+    {
+        public bool Success { get; set; }
+        public T? Data { get; set; }
     }
 
     private sealed class BookingSummary
