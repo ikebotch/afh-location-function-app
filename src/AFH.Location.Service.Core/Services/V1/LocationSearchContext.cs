@@ -18,6 +18,9 @@ internal sealed class LocationSearchContext
     public Dictionary<string, (double Lat, double Lng)> AdviserOrigins { get; } =
         new(StringComparer.OrdinalIgnoreCase);
 
+    public Dictionary<string, string> OriginSourceById { get; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
     public Dictionary<string, double> AirMilesById { get; } =
         new(StringComparer.OrdinalIgnoreCase);
 

@@ -147,17 +147,26 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
     private async Task ResolveAdviserOriginsAsync(LocationSearchContext ctx, CancellationToken ct)
     {
         var (destLat, destLng) = ctx.Destination;
+        var requestedStartUtc = ctx.Request.Meeting.RequestedStartUtc;
 
         foreach (var c in ctx.Candidates)
         {
             ctx.AvailabilityById.TryGetValue(c.Adviser.AdviserId, out var availability);
-            var origin = await _adviserCoords.ResolveHomeAsync(c.Adviser, ct, availability?.CurrentLocationPostcode);
+            var (originPostcode, source, gapFromPreviousMinutes) = SelectOriginPostcode(ctx, availability, requestedStartUtc);
+            var origin = await _adviserCoords.ResolveHomeAsync(c.Adviser, ct, originPostcode);
             if (IsZero(origin)) continue;
 
             ctx.AdviserOrigins[c.Adviser.AdviserId] = origin;
+            ctx.OriginSourceById[c.Adviser.AdviserId] = source;
 
             var air = CoverageEvaluator.HaversineMiles(origin.Lat, origin.Lng, destLat, destLng);
             ctx.AirMilesById[c.Adviser.AdviserId] = air;
+
+            if (gapFromPreviousMinutes.HasValue)
+                _logger.LogDebug(
+                    "Origin selected from previous client for AdviserId={AdviserId}. GapMinutes={GapMinutes}",
+                    c.Adviser.AdviserId,
+                    gapFromPreviousMinutes.Value);
         }
     }
 
@@ -222,13 +231,32 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
             var (availStatus, proposedStartUtc) = EvaluateAvailability(ctx, c, reasons);
 
-            var withinCoverage = AddCoverageReasons(ctx, c, reasons);
+            var withinCoverageByRadius = AddCoverageReasons(ctx, c, reasons);
 
-            var travelToClient = await BuildTravelToClient(ctx, c, withinCoverage, reasons, ct);
+            var maxTravelTimeMinutes = GetMaxTravelTimeMinutes(ctx, c.Adviser.AdviserId, c.Adviser.Region);
+            reasons.Add($"MAX_TRAVEL_TIME_{maxTravelTimeMinutes}");
+
+            var travelToClient = await BuildTravelToClient(ctx, c, withinCoverageByRadius, reasons, ct);
+            var withinCoverageByTravelTime = IsWithinMaxTravelTime(travelToClient, maxTravelTimeMinutes, reasons);
+            var withinCoverage = withinCoverageByRadius && withinCoverageByTravelTime;
 
             var coverageDistanceMiles = travelToClient.DistanceMiles > 0
                 ? travelToClient.DistanceMiles
                 : (ctx.AirMilesById.TryGetValue(c.Adviser.AdviserId, out var air) ? Math.Round(air, 2) : 0d);
+
+            var travelBufferMinutes = GetTravelBufferMinutes(ctx);
+            var companyBufferMinutes = GetCompanyBufferMinutes(ctx);
+            var preMeetingBufferMinutes = travelToClient.EtaMinutes + companyBufferMinutes;
+            var postMeetingBufferMinutes = companyBufferMinutes;
+
+            ApplyCompanyBufferAvailabilityRules(
+                ctx,
+                c.Adviser.AdviserId,
+                preMeetingBufferMinutes,
+                postMeetingBufferMinutes,
+                ref availStatus,
+                ref proposedStartUtc,
+                reasons);
 
             var travelToBase = await BuildTravelToBase(ctx, c, reasons, ct);
 
@@ -249,6 +277,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             {
                 AdviserId = c.Adviser.AdviserId,
                 AdviserRating = c.Adviser.Rating,
+                GoldStar = c.Adviser.Rating >= 5d,
                 Preferred = c.IsPreferred,
                 Availability = availStatus,
                 ProposedSlotUtc = new ProposedSlot
@@ -265,6 +294,14 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
                 TravelToClient = travelToClient,
                 TravelToBase = travelToBase,
                 TravelToNearestOffice = travelToNearestOffice,
+                Buffers = new BufferInfo
+                {
+                    TravelBufferMinutes = travelBufferMinutes,
+                    CompanyBufferMinutes = companyBufferMinutes,
+                    PreMeetingBufferMinutes = preMeetingBufferMinutes,
+                    PostMeetingBufferMinutes = postMeetingBufferMinutes,
+                    MaxTravelTimeMinutes = maxTravelTimeMinutes
+                },
                 Reasons = reasons
             });
         }
@@ -275,6 +312,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         var ranked = ctx.Response.Candidates
             .Select(c => _ranking.Rank(c, ctx.RankingPolicy))
             .OrderBy(x => x.Score)
+            .ThenByDescending(x => x.Candidate.AdviserRating)
             .ToList();
 
         // apply ranks
@@ -320,6 +358,9 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             reasons.Add("ORIGIN_MISSING");
             reasons.Add("INVALID_HOME_POSTCODE");
         }
+
+        if (ctx.OriginSourceById.TryGetValue(c.Adviser.AdviserId, out var originSource))
+            reasons.Add($"ORIGIN_SOURCE_{originSource}");
     }
 
     private static (string Status, DateTime ProposedStartUtc) EvaluateAvailability(
@@ -334,13 +375,13 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             .ToList()
             ?? new List<(DateTime StartUtc, DateTime EndUtc)>();
 
-        var buffer = GetBufferMinutes(ctx);
-        if (buffer > 0)
+        var travelBuffer = GetTravelBufferMinutes(ctx);
+        if (travelBuffer > 0)
         {
             busyBlocks = busyBlocks
-                .Select(b => (b.StartUtc.AddMinutes(-buffer), b.EndUtc.AddMinutes(buffer)))
+                .Select(b => (b.StartUtc.AddMinutes(-travelBuffer), b.EndUtc.AddMinutes(travelBuffer)))
                 .ToList();
-            reasons.Add($"AVAILABILITY_BUFFER_{buffer}");
+            reasons.Add($"AVAILABILITY_TRAVEL_BUFFER_{travelBuffer}");
         }
 
         var (status, proposedStart) = AvailabilityEvaluator.Evaluate(ctx.Request.Meeting, busyBlocks);
@@ -479,11 +520,18 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
     private static bool IsZero((double Lat, double Lng) x) => x.Lat == 0d && x.Lng == 0d;
 
-    private static int GetBufferMinutes(LocationSearchContext ctx)
+    private static int GetTravelBufferMinutes(LocationSearchContext ctx)
     {
         var requested = ctx.Request.Filters?.BufferMinutes;
         var effective = requested ?? ctx.AvailabilityPolicy.DefaultBufferMinutes;
         return Math.Clamp(effective, 0, Math.Max(0, ctx.AvailabilityPolicy.MaxBufferMinutes));
+    }
+
+    private static int GetCompanyBufferMinutes(LocationSearchContext ctx)
+    {
+        var requested = ctx.Request.Filters?.CompanyBufferMinutes;
+        var effective = requested ?? ctx.AvailabilityPolicy.DefaultCompanyBufferMinutes;
+        return Math.Clamp(effective, 0, Math.Max(0, ctx.AvailabilityPolicy.MaxCompanyBufferMinutes));
     }
 
     private static void ApplyCandidateEligibilityFilters(LocationSearchContext ctx)
@@ -507,10 +555,134 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         return ctx.CoveragePolicy.DefaultRadiusMiles;
     }
 
+    private int GetMaxTravelTimeMinutes(LocationSearchContext ctx, string adviserId, string region)
+    {
+        if (ctx.CoveragePolicy.AdviserMaxTravelTimeMinutes.TryGetValue(adviserId, out var adviserMax))
+            return adviserMax;
+
+        if (ctx.CoveragePolicy.RegionMaxTravelTimeMinutes.TryGetValue(region, out var regionMax))
+            return regionMax;
+
+        return ctx.CoveragePolicy.DefaultMaxTravelTimeMinutes;
+    }
+
     private bool IsWithinCoverage(LocationSearchContext ctx, string adviserId, string region)
     {
         var radius = GetRadiusMiles(ctx, adviserId, region);
         return ctx.AirMilesById.TryGetValue(adviserId, out var miles) && miles <= radius;
+    }
+
+    private static bool IsWithinMaxTravelTime(TravelToClient travelToClient, int maxTravelTimeMinutes, List<string> reasons)
+    {
+        if (travelToClient.EtaMinutes <= 0)
+        {
+            reasons.Add("MAX_TRAVEL_TIME_UNVERIFIED");
+            return false;
+        }
+
+        var within = travelToClient.EtaMinutes <= maxTravelTimeMinutes;
+        reasons.Add(within
+            ? $"MAX_TRAVEL_TIME_OK_{travelToClient.EtaMinutes}"
+            : $"MAX_TRAVEL_TIME_EXCEEDED_{travelToClient.EtaMinutes}");
+
+        return within;
+    }
+
+    private static (string? OriginPostcode, string Source, int? GapFromPreviousMinutes) SelectOriginPostcode(
+        LocationSearchContext ctx,
+        AdviserAvailability? availability,
+        DateTime requestedStartUtc)
+    {
+        if (availability is null || availability.BusyBlocks.Count == 0)
+        {
+            if (!string.IsNullOrWhiteSpace(availability?.CurrentLocationPostcode))
+                return (availability.CurrentLocationPostcode, "CURRENT_LOCATION", null);
+
+            return (null, "HOME", null);
+        }
+
+        var previous = availability.BusyBlocks
+            .Where(x => x.EndUtc <= requestedStartUtc && !string.IsNullOrWhiteSpace(x.LocationPostcode))
+            .OrderByDescending(x => x.EndUtc)
+            .FirstOrDefault();
+
+        if (previous is not null)
+        {
+            var gap = (int)Math.Max(0, (requestedStartUtc - previous.EndUtc).TotalMinutes);
+            if (gap <= ctx.AvailabilityPolicy.PreviousClientProximityMinutes)
+                return (previous.LocationPostcode, "PREVIOUS_CLIENT", gap);
+        }
+
+        if (!string.IsNullOrWhiteSpace(availability.CurrentLocationPostcode))
+            return (availability.CurrentLocationPostcode, "CURRENT_LOCATION", null);
+
+        return (null, "HOME", null);
+    }
+
+    private static void ApplyCompanyBufferAvailabilityRules(
+        LocationSearchContext ctx,
+        string adviserId,
+        int preMeetingBufferMinutes,
+        int postMeetingBufferMinutes,
+        ref string availabilityStatus,
+        ref DateTime proposedStartUtc,
+        List<string> reasons)
+    {
+        if (!ctx.AvailabilityById.TryGetValue(adviserId, out var availability))
+            return;
+
+        if (availability.BusyBlocks.Count == 0)
+            return;
+
+        var durationMinutes = ctx.Request.Meeting.DurationMinutes;
+        var proposedEndUtc = proposedStartUtc.AddMinutes(durationMinutes);
+        var requestedStartUtc = ctx.Request.Meeting.RequestedStartUtc;
+        var latestAllowedUtc = requestedStartUtc.AddMinutes(Math.Max(1, ctx.Request.Meeting.SearchHorizonMinutes));
+
+        var searchStartUtc = proposedStartUtc;
+        var previous = availability.BusyBlocks
+            .Where(x => x.EndUtc <= searchStartUtc)
+            .OrderByDescending(x => x.EndUtc)
+            .FirstOrDefault();
+
+        if (previous is not null)
+        {
+            var gapBefore = (int)Math.Max(0, (proposedStartUtc - previous.EndUtc).TotalMinutes);
+            if (gapBefore < preMeetingBufferMinutes)
+            {
+                var shiftedStart = previous.EndUtc.AddMinutes(preMeetingBufferMinutes);
+                var shiftedEnd = shiftedStart.AddMinutes(durationMinutes);
+                var overlapsShifted = availability.BusyBlocks.Any(b => shiftedStart < b.EndUtc && shiftedEnd > b.StartUtc);
+
+                if (!overlapsShifted && shiftedStart <= latestAllowedUtc)
+                {
+                    availabilityStatus = "AvailableLater";
+                    proposedStartUtc = shiftedStart;
+                    proposedEndUtc = shiftedEnd;
+                    reasons.Add($"COMPANY_BUFFER_SHIFTED_{preMeetingBufferMinutes}");
+                }
+                else
+                {
+                    availabilityStatus = "Busy";
+                    reasons.Add($"COMPANY_BUFFER_PRE_FAIL_{preMeetingBufferMinutes}_{gapBefore}");
+                    return;
+                }
+            }
+        }
+
+        var next = availability.BusyBlocks
+            .Where(x => x.StartUtc >= proposedEndUtc)
+            .OrderBy(x => x.StartUtc)
+            .FirstOrDefault();
+
+        if (next is null) return;
+
+        var gapAfter = (int)Math.Max(0, (next.StartUtc - proposedEndUtc).TotalMinutes);
+        if (gapAfter < postMeetingBufferMinutes)
+        {
+            availabilityStatus = "Busy";
+            reasons.Add($"COMPANY_BUFFER_POST_FAIL_{postMeetingBufferMinutes}_{gapAfter}");
+        }
     }
 
     private static string ResolveBaseOfficeId(string region, BaseOfficePolicy policy)

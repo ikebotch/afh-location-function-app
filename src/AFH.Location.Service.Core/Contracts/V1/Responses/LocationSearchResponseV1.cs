@@ -12,6 +12,7 @@ public sealed class LocationCandidate
 {
     public string AdviserId { get; set; } = default!;
     public double AdviserRating { get; set; }
+    public bool GoldStar { get; set; }
     public bool Preferred { get; set; }
     public string Availability { get; set; } = "Unknown"; // later: enum
     public ProposedSlot ProposedSlotUtc { get; set; } = new();
@@ -20,6 +21,7 @@ public sealed class LocationCandidate
     public TravelToClient TravelToClient { get; set; } = new();
     public TravelToBase TravelToBase { get; set; } = new();
     public TravelToNearestOffice TravelToNearestOffice { get; set; } = new();
+    public BufferInfo Buffers { get; set; } = new();
 
     public List<string> Reasons { get; set; } = new();
     public int Rank { get; set; }
@@ -58,6 +60,15 @@ public sealed class TravelToNearestOffice
     public int EtaMinutes { get; set; }
     public double? DistanceMiles { get; set; }
     public string? Confidence { get; set; }
+}
+
+public sealed class BufferInfo
+{
+    public int TravelBufferMinutes { get; set; }
+    public int CompanyBufferMinutes { get; set; }
+    public int PreMeetingBufferMinutes { get; set; }
+    public int PostMeetingBufferMinutes { get; set; }
+    public int MaxTravelTimeMinutes { get; set; }
 }
 
 public sealed class ApiWarning

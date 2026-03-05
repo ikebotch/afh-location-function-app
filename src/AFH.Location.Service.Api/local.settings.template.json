@@ -29,13 +29,20 @@
     "SharePoint:Advisers:DefaultRating": "0",
 
     "LocationSearch:Coverage:DefaultRadiusMiles": "100",
+    "LocationSearch:Coverage:DefaultMaxTravelTimeMinutes": "90",
     "LocationSearch:Coverage:AdviserRadiusMiles:ADV-001": "120",
+    "LocationSearch:Coverage:AdviserMaxTravelTimeMinutes:ADV-001": "90",
     "LocationSearch:Coverage:RegionRadiusMiles:West Midlands": "100",
     "LocationSearch:Coverage:RegionRadiusMiles:North West": "130",
+    "LocationSearch:Coverage:RegionMaxTravelTimeMinutes:West Midlands": "90",
+    "LocationSearch:Coverage:RegionMaxTravelTimeMinutes:North West": "90",
     "LocationSearch:Coverage:OfficeRadiusMiles:OFF-BROMS": "100",
 
     "LocationSearch:Availability:DefaultBufferMinutes": "15",
     "LocationSearch:Availability:MaxBufferMinutes": "180",
+    "LocationSearch:Availability:DefaultCompanyBufferMinutes": "30",
+    "LocationSearch:Availability:MaxCompanyBufferMinutes": "180",
+    "LocationSearch:Availability:PreviousClientProximityMinutes": "180",
 
     "LocationSearch:Ranking:AvailablePenalty": "0",
     "LocationSearch:Ranking:AvailableLaterPenalty": "20",

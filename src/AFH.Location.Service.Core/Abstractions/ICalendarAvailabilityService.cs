@@ -22,4 +22,5 @@ public sealed class BusyBlock
 {
     public DateTime StartUtc { get; init; }
     public DateTime EndUtc { get; init; }
+    public string? LocationPostcode { get; init; }
 }

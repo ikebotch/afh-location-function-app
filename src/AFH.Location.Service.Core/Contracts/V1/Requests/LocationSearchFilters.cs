@@ -10,6 +10,7 @@ public sealed class LocationSearchFilters
     public string[]? ExcludeAdviserIds { get; init; }
     public int? MaxCandidates { get; init; }
     public int? BufferMinutes { get; init; }
+    public int? CompanyBufferMinutes { get; init; }
     public double? MinAdviserRating { get; init; }
     public double? MaxRankingScore { get; init; }
 

@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AFH.Location.Service.Infrastructure.External.Calendar;
 
@@ -35,7 +37,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
             return NewEmptyAvailability(adviserId);
         }
 
-        var startUtc = window.RequestedStartUtc;
+        var startUtc = window.RequestedStartUtc.AddMinutes(-Math.Max(0, _options.ScheduleLookbackMinutes));
         var endUtc = window.RequestedStartUtc.AddMinutes(Math.Max(1, window.SearchHorizonMinutes + window.DurationMinutes));
 
         var url =
@@ -65,20 +67,36 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
             if (dto?.Bookings is null || dto.Bookings.Count == 0)
                 return NewEmptyAvailability(adviserId);
 
-            var busy = dto.Bookings
+            var bookings = dto.Bookings
                 .Where(b => !string.Equals(b.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(b => b.StartUtc)
+                .ToList();
+
+            var busy = bookings
                 .Select(b => new BusyBlock
                 {
                     StartUtc = b.StartUtc,
-                    EndUtc = b.EndUtc
+                    EndUtc = b.EndUtc,
+                    LocationPostcode = b.ResolvePostcode()
                 })
                 .ToList();
+
+            var previous = bookings
+                .Where(b => b.EndUtc <= window.RequestedStartUtc)
+                .OrderByDescending(b => b.EndUtc)
+                .FirstOrDefault();
+
+            var current = bookings
+                .FirstOrDefault(b => b.StartUtc <= window.RequestedStartUtc && b.EndUtc >= window.RequestedStartUtc);
+
+            var currentLocationPostcode = current?.ResolvePostcode() ?? previous?.ResolvePostcode();
 
             return new AdviserAvailability
             {
                 AdviserId = adviserId,
                 BusyBlocks = busy,
-                IsOutOfOffice = false
+                IsOutOfOffice = false,
+                CurrentLocationPostcode = currentLocationPostcode
             };
         }
         catch (Exception ex)
@@ -177,5 +195,57 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         public DateTime StartUtc { get; set; }
         public DateTime EndUtc { get; set; }
         public string Status { get; set; } = string.Empty;
+        public string? Postcode { get; set; }
+        public string? LocationPostcode { get; set; }
+        public string? ClientPostcode { get; set; }
+
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? ExtensionData { get; set; }
+
+        public string? ResolvePostcode()
+        {
+            if (!string.IsNullOrWhiteSpace(LocationPostcode)) return LocationPostcode;
+            if (!string.IsNullOrWhiteSpace(Postcode)) return Postcode;
+            if (!string.IsNullOrWhiteSpace(ClientPostcode)) return ClientPostcode;
+            if (ExtensionData is null || ExtensionData.Count == 0) return null;
+
+            if (TryReadString(ExtensionData, "postcode", out var p)) return p;
+            if (TryReadString(ExtensionData, "locationPostcode", out p)) return p;
+            if (TryReadString(ExtensionData, "clientPostcode", out p)) return p;
+            if (TryReadNestedPostcode(ExtensionData, "location", out p)) return p;
+            if (TryReadNestedPostcode(ExtensionData, "address", out p)) return p;
+
+            return null;
+        }
+
+        private static bool TryReadString(
+            IReadOnlyDictionary<string, JsonElement> data,
+            string key,
+            out string? value)
+        {
+            value = null;
+            if (!data.TryGetValue(key, out var element)) return false;
+            if (element.ValueKind != JsonValueKind.String) return false;
+            var candidate = element.GetString();
+            if (string.IsNullOrWhiteSpace(candidate)) return false;
+            value = candidate;
+            return true;
+        }
+
+        private static bool TryReadNestedPostcode(
+            IReadOnlyDictionary<string, JsonElement> data,
+            string key,
+            out string? value)
+        {
+            value = null;
+            if (!data.TryGetValue(key, out var element)) return false;
+            if (element.ValueKind != JsonValueKind.Object) return false;
+            if (!element.TryGetProperty("postcode", out var postcodeElement)) return false;
+            if (postcodeElement.ValueKind != JsonValueKind.String) return false;
+            var candidate = postcodeElement.GetString();
+            if (string.IsNullOrWhiteSpace(candidate)) return false;
+            value = candidate;
+            return true;
+        }
     }
 }

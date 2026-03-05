@@ -17,7 +17,8 @@ public sealed class InMemoryCoveragePolicyProvider : ICoveragePolicyProvider
     {
         var policy = new CoveragePolicy
         {
-            DefaultRadiusMiles = _configuration.GetValue<double?>("LocationSearch:Coverage:DefaultRadiusMiles") ?? 100
+            DefaultRadiusMiles = _configuration.GetValue<double?>("LocationSearch:Coverage:DefaultRadiusMiles") ?? 100,
+            DefaultMaxTravelTimeMinutes = Math.Max(1, _configuration.GetValue<int?>("LocationSearch:Coverage:DefaultMaxTravelTimeMinutes") ?? 90)
         };
 
         foreach (var child in _configuration.GetSection("LocationSearch:Coverage:AdviserRadiusMiles").GetChildren())
@@ -30,6 +31,18 @@ public sealed class InMemoryCoveragePolicyProvider : ICoveragePolicyProvider
         {
             if (double.TryParse(child.Value, out var value))
                 policy.RegionRadiusMiles[child.Key] = value;
+        }
+
+        foreach (var child in _configuration.GetSection("LocationSearch:Coverage:AdviserMaxTravelTimeMinutes").GetChildren())
+        {
+            if (int.TryParse(child.Value, out var value) && value > 0)
+                policy.AdviserMaxTravelTimeMinutes[child.Key] = value;
+        }
+
+        foreach (var child in _configuration.GetSection("LocationSearch:Coverage:RegionMaxTravelTimeMinutes").GetChildren())
+        {
+            if (int.TryParse(child.Value, out var value) && value > 0)
+                policy.RegionMaxTravelTimeMinutes[child.Key] = value;
         }
 
         foreach (var child in _configuration.GetSection("LocationSearch:Coverage:OfficeRadiusMiles").GetChildren())

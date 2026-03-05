@@ -6,4 +6,5 @@ public sealed class CalendarServiceOptions
 
     public string BaseUrl { get; set; } = string.Empty;
     public string? FunctionKey { get; set; }
+    public int ScheduleLookbackMinutes { get; set; } = 360;
 }
