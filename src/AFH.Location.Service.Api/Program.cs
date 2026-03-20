@@ -1,18 +1,15 @@
 using AFH.Location.Service.Api.Middleware;
 using AFH.Location.Service.Infrastructure.Composition;
-using Azure.Core.Serialization;
-using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Collections.Generic;
-using System.Text.Json;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(app =>
     {
         app.UseMiddleware<CorrelationIdMiddleware>();
-        app.UseMiddleware<JwtServiceAuthMiddleware>();   
+        app.UseMiddleware<JwtServiceAuthMiddleware>();     // service-to-service auth (or do at APIM)
         app.UseMiddleware<ExceptionHandlingMiddleware>();
     })
     .ConfigureAppConfiguration((ctx, cfg) =>
@@ -33,15 +30,6 @@ var host = new HostBuilder()
     .ConfigureServices((ctx, services) =>
     {
         services.AddLocationInfrastructure(ctx.Configuration);
-        services.Configure<WorkerOptions>(options =>
-        {
-            options.Serializer = new JsonObjectSerializer(
-                new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    DictionaryKeyPolicy = JsonNamingPolicy.CamelCase
-                });
-        });
     })
     .Build();
 

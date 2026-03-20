@@ -1,4 +1,4 @@
-using Microsoft.Azure.Functions.Worker.Http;
+﻿using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 
 namespace AFH.Location.Service.Api.Contracts;

@@ -202,13 +202,13 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         string adviserId,
         CalendarAvailabilityState state,
         string? message) => new()
-    {
-        AdviserId = adviserId,
-        BusyBlocks = Array.Empty<BusyBlock>(),
-        IsOutOfOffice = false,
-        State = state,
-        StateMessage = message
-    };
+        {
+            AdviserId = adviserId,
+            BusyBlocks = Array.Empty<BusyBlock>(),
+            IsOutOfOffice = false,
+            State = state,
+            StateMessage = message
+        };
 
     private static async Task<T?> ReadEnvelopedOrRawAsync<T>(
         HttpResponseMessage response,

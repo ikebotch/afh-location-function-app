@@ -1,6 +1,7 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
+
 
 namespace AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 
@@ -12,7 +13,6 @@ public sealed class LocationPolicyDbContextFactory : IDesignTimeDbContextFactory
     public LocationPolicyDbContext CreateDbContext(string[] args)
     {
         var config = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.json", optional: true)
             .AddJsonFile("local.settings.json", optional: true)
             .AddJsonFile(Path.Combine("src", "AFH.Location.Service.Api", "appsettings.json"), optional: true)
             .AddJsonFile(Path.Combine("src", "AFH.Location.Service.Api", "local.settings.json"), optional: true)

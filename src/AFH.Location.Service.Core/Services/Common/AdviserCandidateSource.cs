@@ -16,7 +16,7 @@ public sealed class AdviserCandidateSource
        LocationSearchRequestV1 req,
        CancellationToken ct)
     {
-       var all = await _repo.GetAllAsync(req.Filters?.AdviserIds, ct);
+        var all = await _repo.GetAllAsync(req.Filters?.AdviserIds, ct);
 
         var preferred = new HashSet<string>(
             req.Filters?.PreferredAdviserIds ?? Array.Empty<string>(),

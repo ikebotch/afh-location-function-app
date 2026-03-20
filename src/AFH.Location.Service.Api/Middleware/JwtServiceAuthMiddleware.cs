@@ -1,6 +1,5 @@
 ﻿using AFH.Location.Service.Api.Contracts;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;

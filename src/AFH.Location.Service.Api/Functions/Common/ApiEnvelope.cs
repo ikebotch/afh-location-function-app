@@ -1,10 +1,12 @@
+﻿using System.Text.Json.Serialization;
+
 namespace AFH.Location.Service.Api.Contracts;
 
 public sealed class ApiEnvelope<T>
 {
     public bool Success { get; init; }
     public T? Data { get; init; }
-    [System.Text.Json.Serialization.JsonIgnore(System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ApiPaging? Paging { get; init; }
 }
 
