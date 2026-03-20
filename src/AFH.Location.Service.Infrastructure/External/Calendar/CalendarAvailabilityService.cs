@@ -1,21 +1,15 @@
 using AFH.Location.Service.Core.Abstractions;
 using AFH.Location.Service.Core.Contracts.V1.Requests;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace AFH.Location.Service.Infrastructure.External.Calendar;
 
 public sealed class CalendarAvailabilityService : ICalendarAvailabilityService
 {
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
     private readonly ICalendarServiceClient _calendarClient;
-    private readonly IMemoryCache _cache;
 
-    public CalendarAvailabilityService(
-        ICalendarServiceClient calendarClient,
-        IMemoryCache cache)
+    public CalendarAvailabilityService(ICalendarServiceClient calendarClient)
     {
         _calendarClient = calendarClient;
-        _cache = cache;
     }
 
     public async Task<IReadOnlyList<AdviserAvailability>> GetAvailabilityAsync(
@@ -26,58 +20,15 @@ public sealed class CalendarAvailabilityService : ICalendarAvailabilityService
         if (adviserIds is null || adviserIds.Count == 0)
             return Array.Empty<AdviserAvailability>();
 
-        var orderedIds = adviserIds
+        var ids = adviserIds
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var byId = new Dictionary<string, AdviserAvailability>(StringComparer.OrdinalIgnoreCase);
-        var missing = new List<string>();
-
-        foreach (var adviserId in orderedIds)
-        {
-            var key = BuildCacheKey(adviserId, window);
-            if (_cache.TryGetValue<AdviserAvailability>(key, out var cached) && cached is not null)
-            {
-                byId[adviserId] = cached;
-                continue;
-            }
-
-            missing.Add(adviserId);
-        }
-
-        if (missing.Count > 0)
-        {
-            var fetched = await _calendarClient.GetAdviserAvailabilityBatchAsync(missing, window, ct);
-            foreach (var item in fetched)
-            {
-                byId[item.AdviserId] = item;
-                var key = BuildCacheKey(item.AdviserId, window);
-                _cache.Set(key, item, CacheTtl);
-            }
-        }
-
-        return orderedIds
-            .Where(byId.ContainsKey)
-            .Select(id => byId[id])
             .ToArray();
-    }
 
-    private static string BuildCacheKey(string adviserId, MeetingWindow window)
-    {
-        // Round to minute to improve cache hits for equivalent windows.
-        var requestedStartUtc = DateTime.SpecifyKind(window.RequestedStartUtc, DateTimeKind.Utc);
-        var normalizedStart = new DateTime(
-            requestedStartUtc.Year,
-            requestedStartUtc.Month,
-            requestedStartUtc.Day,
-            requestedStartUtc.Hour,
-            requestedStartUtc.Minute,
-            0,
-            DateTimeKind.Utc);
+        if (ids.Length == 0)
+            return Array.Empty<AdviserAvailability>();
 
-        return
-            $"calendar:availability:{adviserId.ToLowerInvariant()}:{normalizedStart:O}:{window.DurationMinutes}:{window.SearchHorizonMinutes}";
+        return await _calendarClient.GetAdviserAvailabilityBatchAsync(ids, window, ct);
     }
 }
