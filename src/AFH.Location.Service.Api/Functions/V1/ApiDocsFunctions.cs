@@ -74,6 +74,18 @@ public sealed class ApiDocsFunctions
                         }
                     }
                 },
+                ["/v1/admin/adviser-coverage"] = new
+                {
+                    get = new
+                    {
+                        tags = new[] { "Admin" },
+                        summary = "Get adviser and region coverage points for dashboard mapping",
+                        responses = new Dictionary<string, object>
+                        {
+                            ["200"] = new { description = "Coverage dataset" }
+                        }
+                    }
+                },
                 ["/v2/location/inperson/advisers/search"] = new
                 {
                     post = new

@@ -9,4 +9,6 @@ public sealed class Adviser
     public IReadOnlyCollection<string> Skills { get; set; } = Array.Empty<string>();
     public double Rating { get; set; }
     public bool IsActive { get; set; }
+    public double? CoverageRadiusMiles { get; set; }
+    public int? MaxTravelTimeMinutes { get; set; }
 }

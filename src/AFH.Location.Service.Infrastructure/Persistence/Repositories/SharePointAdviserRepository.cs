@@ -147,6 +147,8 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
             var postcode = TryGet(fields, _opts.PostcodeField);
             var region = TryGet(fields, _opts.RegionField);
             var rating = TryGetDouble(fields, _opts.RatingField) ?? _opts.DefaultRating;
+            var coverageRadiusMiles = TryGetDouble(fields, _opts.CoverageRadiusMilesField);
+            var maxTravelTimeMinutes = TryGetInt(fields, _opts.MaxTravelTimeMinutesField);
 
             // Multi-choice skills
             var skills = GetMultiChoice(fields, _opts.SkillsField);
@@ -163,7 +165,9 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
                 Region = region ?? "",
                 Skills = skills,
                 Rating = rating,
-                IsActive = true
+                IsActive = true,
+                CoverageRadiusMiles = coverageRadiusMiles is > 0 ? coverageRadiusMiles : null,
+                MaxTravelTimeMinutes = maxTravelTimeMinutes is > 0 ? maxTravelTimeMinutes : null
             });
         }
 
@@ -212,6 +216,13 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
     {
         if (!dict.TryGetValue(key, out var v) || v is null) return null;
         if (double.TryParse(v.ToString(), out var parsed)) return parsed;
+        return null;
+    }
+
+    private static int? TryGetInt(IDictionary<string, object> dict, string key)
+    {
+        if (!dict.TryGetValue(key, out var v) || v is null) return null;
+        if (int.TryParse(v.ToString(), out var parsed)) return parsed;
         return null;
     }
 }

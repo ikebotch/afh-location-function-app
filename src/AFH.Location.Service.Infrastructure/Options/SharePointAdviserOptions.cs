@@ -22,6 +22,8 @@ public sealed class SharePointAdviserOptions
     //public string RegionField { get; set; } = "field_8";
     public string PostcodeField { get; set; } = "field_13";
     public string RatingField { get; set; } = "Rating";
+    public string CoverageRadiusMilesField { get; set; } = "CoverageRadiusMiles";
+    public string MaxTravelTimeMinutesField { get; set; } = "MaxTravelTimeMinutes";
     public double DefaultRating { get; set; } = 0;
     public string StatusField { get; set; } = "Adviser_x0020_Status";
     public string BioOnWebsiteField { get; set; } = "BioonWebsite_x003f_";
