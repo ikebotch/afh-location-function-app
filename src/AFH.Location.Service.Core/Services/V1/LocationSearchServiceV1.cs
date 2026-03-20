@@ -9,6 +9,7 @@ namespace AFH.Location.Service.Core.Services.V1;
 
 public sealed class LocationSearchServiceV1 : ILocationSearchService
 {
+    private const int MaxParallelOriginResolutions = 8;
     private readonly AdviserCandidateSource _candidateSource;
     private readonly ICalendarAvailabilityService _calendar;
 
@@ -151,44 +152,68 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
     private async Task LoadPoliciesAsync(LocationSearchContext ctx, CancellationToken ct)
     {
-        ctx.CoveragePolicy = await _coveragePolicyProvider.GetAsync(ct);
-        ctx.BaseOfficePolicy = await _baseOfficePolicyProvider.GetAsync(ct);
-        ctx.RankingPolicy = await _rankingPolicyProvider.GetAsync(ct);
-        ctx.AvailabilityPolicy = await _availabilityPolicyProvider.GetAsync(ct);
+        var coverageTask = _coveragePolicyProvider.GetAsync(ct);
+        var baseOfficeTask = _baseOfficePolicyProvider.GetAsync(ct);
+        var rankingTask = _rankingPolicyProvider.GetAsync(ct);
+        var availabilityTask = _availabilityPolicyProvider.GetAsync(ct);
+
+        await Task.WhenAll(coverageTask, baseOfficeTask, rankingTask, availabilityTask);
+
+        ctx.CoveragePolicy = coverageTask.Result;
+        ctx.BaseOfficePolicy = baseOfficeTask.Result;
+        ctx.RankingPolicy = rankingTask.Result;
+        ctx.AvailabilityPolicy = availabilityTask.Result;
     }
 
     private async Task ResolveAdviserOriginsAsync(LocationSearchContext ctx, CancellationToken ct)
     {
         var (destLat, destLng) = ctx.Destination;
         var requestedStartUtc = ctx.Request.Meeting.RequestedStartUtc;
+        using var gate = new SemaphoreSlim(MaxParallelOriginResolutions, MaxParallelOriginResolutions);
+        var sync = new object();
 
-        foreach (var c in ctx.Candidates)
+        var tasks = ctx.Candidates.Select(async c =>
         {
-            ctx.AvailabilityById.TryGetValue(c.Adviser.AdviserId, out var availability);
-
-            if (ctx.AvailabilityPolicy.RequireCalendarAvailability &&
-                (availability is null || availability.State != CalendarAvailabilityState.Ok))
+            await gate.WaitAsync(ct);
+            try
             {
-                ctx.OriginSourceById[c.Adviser.AdviserId] = "SKIPPED_UNAVAILABLE";
-                continue;
+                ctx.AvailabilityById.TryGetValue(c.Adviser.AdviserId, out var availability);
+
+                if (ctx.AvailabilityPolicy.RequireCalendarAvailability &&
+                    (availability is null || availability.State != CalendarAvailabilityState.Ok))
+                {
+                    lock (sync)
+                        ctx.OriginSourceById[c.Adviser.AdviserId] = "SKIPPED_UNAVAILABLE";
+                    return;
+                }
+
+                var (originPostcode, source, gapFromPreviousMinutes) = SelectOriginPostcode(ctx, availability, requestedStartUtc);
+                var origin = await _adviserCoords.ResolveHomeAsync(c.Adviser, ct, originPostcode);
+                if (IsZero(origin))
+                    return;
+
+                var air = CoverageEvaluator.HaversineMiles(origin.Lat, origin.Lng, destLat, destLng);
+
+                lock (sync)
+                {
+                    ctx.AdviserOrigins[c.Adviser.AdviserId] = origin;
+                    ctx.OriginSourceById[c.Adviser.AdviserId] = source;
+                    ctx.AirMilesById[c.Adviser.AdviserId] = air;
+                }
+
+                if (gapFromPreviousMinutes.HasValue)
+                    _logger.LogDebug(
+                        "Origin selected from previous client for AdviserId={AdviserId}. GapMinutes={GapMinutes}",
+                        c.Adviser.AdviserId,
+                        gapFromPreviousMinutes.Value);
             }
+            finally
+            {
+                gate.Release();
+            }
+        });
 
-            var (originPostcode, source, gapFromPreviousMinutes) = SelectOriginPostcode(ctx, availability, requestedStartUtc);
-            var origin = await _adviserCoords.ResolveHomeAsync(c.Adviser, ct, originPostcode);
-            if (IsZero(origin)) continue;
-
-            ctx.AdviserOrigins[c.Adviser.AdviserId] = origin;
-            ctx.OriginSourceById[c.Adviser.AdviserId] = source;
-
-            var air = CoverageEvaluator.HaversineMiles(origin.Lat, origin.Lng, destLat, destLng);
-            ctx.AirMilesById[c.Adviser.AdviserId] = air;
-
-            if (gapFromPreviousMinutes.HasValue)
-                _logger.LogDebug(
-                    "Origin selected from previous client for AdviserId={AdviserId}. GapMinutes={GapMinutes}",
-                    c.Adviser.AdviserId,
-                    gapFromPreviousMinutes.Value);
-        }
+        await Task.WhenAll(tasks);
     }
 
     private async Task ComputeMatrixRoutesToClientAsync(LocationSearchContext ctx, CancellationToken ct)
