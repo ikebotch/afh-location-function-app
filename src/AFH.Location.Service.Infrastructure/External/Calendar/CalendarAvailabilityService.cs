@@ -49,18 +49,13 @@ public sealed class CalendarAvailabilityService : ICalendarAvailabilityService
 
         if (missing.Count > 0)
         {
-            var tasks = missing
-                .Select(async adviserId =>
-                {
-                    var availability = await _calendarClient.GetAdviserAvailabilityAsync(adviserId, window, ct);
-                    var key = BuildCacheKey(adviserId, window);
-                    _cache.Set(key, availability, CacheTtl);
-                    return availability;
-                });
-
-            var fetched = await Task.WhenAll(tasks);
+            var fetched = await _calendarClient.GetAdviserAvailabilityBatchAsync(missing, window, ct);
             foreach (var item in fetched)
+            {
                 byId[item.AdviserId] = item;
+                var key = BuildCacheKey(item.AdviserId, window);
+                _cache.Set(key, item, CacheTtl);
+            }
         }
 
         return orderedIds

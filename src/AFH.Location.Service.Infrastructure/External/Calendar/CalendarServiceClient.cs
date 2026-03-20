@@ -37,8 +37,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
             return NewAvailability(adviserId, CalendarAvailabilityState.ConfigurationMissing, "CalendarService:BaseUrl is missing.");
         }
 
-        var startUtc = window.RequestedStartUtc.AddMinutes(-Math.Max(0, _options.ScheduleLookbackMinutes));
-        var endUtc = window.RequestedStartUtc.AddMinutes(Math.Max(1, window.SearchHorizonMinutes + window.DurationMinutes));
+        var (startUtc, endUtc) = BuildScheduleWindow(window);
 
         var url =
             $"{_options.BaseUrl.TrimEnd('/')}/api/v1/calendar/users/{Uri.EscapeDataString(adviserId)}/schedule" +
@@ -126,6 +125,91 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         }
     }
 
+    public async Task<IReadOnlyList<AdviserAvailability>> GetAdviserAvailabilityBatchAsync(
+        IReadOnlyList<string> adviserIds,
+        MeetingWindow window,
+        CancellationToken ct)
+    {
+        if (adviserIds is null || adviserIds.Count == 0)
+            return Array.Empty<AdviserAvailability>();
+
+        if (string.IsNullOrWhiteSpace(_options.BaseUrl))
+        {
+            _logger.LogWarning("CalendarService:BaseUrl is missing; returning unavailable calendar state.");
+            return adviserIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => NewAvailability(x.Trim(), CalendarAvailabilityState.ConfigurationMissing, "CalendarService:BaseUrl is missing."))
+                .ToArray();
+        }
+
+        var ids = adviserIds
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (ids.Length == 0)
+            return Array.Empty<AdviserAvailability>();
+
+        var (startUtc, endUtc) = BuildScheduleWindow(window);
+        var url = $"{_options.BaseUrl.TrimEnd('/')}/api/v1/calendar/users/schedule/batch";
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(new
+            {
+                userIds = ids,
+                startUtc,
+                endUtc
+            })
+        };
+        AddAuth(request);
+
+        try
+        {
+            using var response = await _http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Calendar batch schedule call failed. Status={StatusCode} Advisers={AdviserCount}",
+                    (int)response.StatusCode,
+                    ids.Length);
+
+                return ids
+                    .Select(id => NewAvailability(id, CalendarAvailabilityState.ServiceUnavailable, $"Calendar service HTTP {(int)response.StatusCode}"))
+                    .ToArray();
+            }
+
+            var batch = await ReadEnvelopedOrRawAsync<BatchScheduleResponse>(response, ct);
+            if (batch?.Schedules is null)
+            {
+                _logger.LogWarning("Calendar batch schedule payload parse failed.");
+                return ids
+                    .Select(id => NewAvailability(id, CalendarAvailabilityState.ServiceUnavailable, "Calendar batch payload parse failed."))
+                    .ToArray();
+            }
+
+            var byId = new Dictionary<string, AdviserAvailability>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in batch.Schedules)
+            {
+                byId[item.UserId] = MapAvailability(item.UserId, window, item.State, item.Message, item.Bookings);
+            }
+
+            return ids
+                .Select(id => byId.TryGetValue(id, out var mapped)
+                    ? mapped
+                    : NewAvailability(id, CalendarAvailabilityState.UnknownError, "Calendar batch response missing user schedule."))
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Calendar batch schedule call threw for {AdviserCount} advisers.", ids.Length);
+            return ids
+                .Select(id => NewAvailability(id, CalendarAvailabilityState.UnknownError, "Calendar batch schedule call threw an exception."))
+                .ToArray();
+        }
+    }
+
     public async Task<CalendarAppointmentResult> CreateAppointmentAsync(
         CreateCalendarAppointmentRequest request,
         CancellationToken ct)
@@ -210,6 +294,64 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
             StateMessage = message
         };
 
+    private (DateTime StartUtc, DateTime EndUtc) BuildScheduleWindow(MeetingWindow window)
+    {
+        var startUtc = window.RequestedStartUtc.AddMinutes(-Math.Max(0, _options.ScheduleLookbackMinutes));
+        var endUtc = window.RequestedStartUtc.AddMinutes(Math.Max(1, window.SearchHorizonMinutes + window.DurationMinutes));
+        return (startUtc, endUtc);
+    }
+
+    private static AdviserAvailability MapAvailability(
+        string adviserId,
+        MeetingWindow window,
+        string? state,
+        string? message,
+        IReadOnlyList<BookingSummary>? bookings)
+    {
+        if (string.Equals(state, "MailboxNotFound", StringComparison.OrdinalIgnoreCase))
+            return NewAvailability(adviserId, CalendarAvailabilityState.MailboxNotFound, message ?? "Mailbox not found.");
+
+        if (string.Equals(state, "ServiceUnavailable", StringComparison.OrdinalIgnoreCase))
+            return NewAvailability(adviserId, CalendarAvailabilityState.ServiceUnavailable, message ?? "Calendar unavailable.");
+
+        if (string.Equals(state, "ConfigurationMissing", StringComparison.OrdinalIgnoreCase))
+            return NewAvailability(adviserId, CalendarAvailabilityState.ConfigurationMissing, message ?? "Calendar configuration missing.");
+
+        if (string.Equals(state, "UnknownError", StringComparison.OrdinalIgnoreCase))
+            return NewAvailability(adviserId, CalendarAvailabilityState.UnknownError, message ?? "Unknown calendar error.");
+
+        var list = (bookings ?? Array.Empty<BookingSummary>())
+            .Where(IsBlockingBooking)
+            .OrderBy(b => b.StartUtc)
+            .ToList();
+
+        var busy = list
+            .Select(b => new BusyBlock
+            {
+                StartUtc = b.StartUtc,
+                EndUtc = b.EndUtc,
+                LocationPostcode = b.ResolvePostcode()
+            })
+            .ToList();
+
+        var previous = list
+            .Where(b => b.EndUtc <= window.RequestedStartUtc)
+            .OrderByDescending(b => b.EndUtc)
+            .FirstOrDefault();
+
+        var current = list
+            .FirstOrDefault(b => b.StartUtc <= window.RequestedStartUtc && b.EndUtc >= window.RequestedStartUtc);
+
+        return new AdviserAvailability
+        {
+            AdviserId = adviserId,
+            BusyBlocks = busy,
+            IsOutOfOffice = false,
+            CurrentLocationPostcode = current?.ResolvePostcode() ?? previous?.ResolvePostcode(),
+            State = CalendarAvailabilityState.Ok
+        };
+    }
+
     private static async Task<T?> ReadEnvelopedOrRawAsync<T>(
         HttpResponseMessage response,
         CancellationToken ct)
@@ -235,6 +377,19 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
 
     private sealed class ScheduleResponse
     {
+        public List<BookingSummary> Bookings { get; set; } = new();
+    }
+
+    private sealed class BatchScheduleResponse
+    {
+        public List<BatchUserSchedule> Schedules { get; set; } = new();
+    }
+
+    private sealed class BatchUserSchedule
+    {
+        public string UserId { get; set; } = string.Empty;
+        public string State { get; set; } = string.Empty;
+        public string? Message { get; set; }
         public List<BookingSummary> Bookings { get; set; } = new();
     }
 

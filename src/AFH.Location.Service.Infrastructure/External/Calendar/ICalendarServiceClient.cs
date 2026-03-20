@@ -10,6 +10,11 @@ public interface ICalendarServiceClient
         MeetingWindow window,
         CancellationToken ct);
 
+    Task<IReadOnlyList<AdviserAvailability>> GetAdviserAvailabilityBatchAsync(
+        IReadOnlyList<string> adviserIds,
+        MeetingWindow window,
+        CancellationToken ct);
+
     Task<CalendarAppointmentResult> CreateAppointmentAsync(
         CreateCalendarAppointmentRequest request,
         CancellationToken ct);
