@@ -12,6 +12,11 @@ public sealed class AdviserCoverageFunctionV1
 {
     private static readonly ConcurrentDictionary<string, (double Lat, double Lng)> CoordinateCache = new(StringComparer.OrdinalIgnoreCase);
     private const double DefaultAverageTravelSpeedMph = 35d;
+    private static readonly SemaphoreSlim CacheRefreshGate = new(1, 1);
+    private static readonly TimeSpan CoverageCacheTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan BuildTimeout = TimeSpan.FromSeconds(20);
+    private static DateTime _cachedAtUtc = DateTime.MinValue;
+    private static AdviserCoverageResponseV1? _cachedResponse;
 
     private readonly IAdviserRepository _adviserRepository;
     private readonly IOfficeRepository _officeRepository;
@@ -39,6 +44,36 @@ public sealed class AdviserCoverageFunctionV1
         HttpRequestData req,
         CancellationToken ct)
     {
+        if (_cachedResponse is not null && DateTime.UtcNow - _cachedAtUtc < CoverageCacheTtl)
+            return await req.WriteSuccessAsync(_cachedResponse, ct, ApiEnvelopeExtensions.SinglePage(_cachedResponse.Advisers.Count));
+
+        await CacheRefreshGate.WaitAsync(ct);
+        try
+        {
+            if (_cachedResponse is not null && DateTime.UtcNow - _cachedAtUtc < CoverageCacheTtl)
+                return await req.WriteSuccessAsync(_cachedResponse, ct, ApiEnvelopeExtensions.SinglePage(_cachedResponse.Advisers.Count));
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(BuildTimeout);
+
+            var response = await BuildCoverageAsync(timeoutCts.Token);
+            _cachedResponse = response;
+            _cachedAtUtc = DateTime.UtcNow;
+
+            return await req.WriteSuccessAsync(response, ct, ApiEnvelopeExtensions.SinglePage(response.Advisers.Count));
+        }
+        catch (OperationCanceledException) when (_cachedResponse is not null)
+        {
+            return await req.WriteSuccessAsync(_cachedResponse, ct, ApiEnvelopeExtensions.SinglePage(_cachedResponse.Advisers.Count));
+        }
+        finally
+        {
+            CacheRefreshGate.Release();
+        }
+    }
+
+    private async Task<AdviserCoverageResponseV1> BuildCoverageAsync(CancellationToken ct)
+    {
         var advisers = await _adviserRepository.GetAllAsync(null, ct);
         var coveragePolicy = await _coveragePolicyProvider.GetAsync(ct);
         var averageTravelSpeedMph =
@@ -46,16 +81,36 @@ public sealed class AdviserCoverageFunctionV1
             ?? DefaultAverageTravelSpeedMph;
 
         var activeAdvisers = advisers.Where(x => x.IsActive).ToList();
+        var adviserPostcodes = activeAdvisers
+            .Select(a => (a.HomePostcode ?? string.Empty).Trim())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var offices = await _officeRepository.GetAllAsync(ct);
+        var officePostcodes = offices
+            .Select(o => (o.Postcode ?? string.Empty).Trim())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var allPostcodes = adviserPostcodes
+            .Concat(officePostcodes)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var coordinates = await ResolveCoordinatesAsync(allPostcodes, ct);
 
         var adviserPoints = new List<AdviserCoveragePointV1>(activeAdvisers.Count);
-
         foreach (var adviser in activeAdvisers)
         {
             var postcode = (adviser.HomePostcode ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(postcode))
                 continue;
 
-            var coord = await ResolveCoordinatesAsync(postcode, ct);
+            if (!coordinates.TryGetValue(postcode, out var coord))
+                continue;
+
             if (coord.Lat == 0 && coord.Lng == 0)
                 continue;
 
@@ -81,18 +136,17 @@ public sealed class AdviserCoverageFunctionV1
             });
         }
 
-        var offices = await _officeRepository.GetAllAsync(ct);
         var regionPoints = new List<RegionCoveragePointV1>();
-
         foreach (var group in offices.GroupBy(x => x.Region, StringComparer.OrdinalIgnoreCase))
         {
             var coords = new List<(double Lat, double Lng)>();
             foreach (var office in group)
             {
-                var coord = await ResolveCoordinatesAsync(office.Postcode, ct);
-                if (coord.Lat == 0 && coord.Lng == 0)
+                if (!coordinates.TryGetValue(office.Postcode, out var coord))
                     continue;
 
+                if (coord.Lat == 0 && coord.Lng == 0)
+                    continue;
                 coords.Add(coord);
             }
 
@@ -108,16 +162,39 @@ public sealed class AdviserCoverageFunctionV1
             });
         }
 
-        var response = new AdviserCoverageResponseV1
+        return new AdviserCoverageResponseV1
         {
             Advisers = adviserPoints.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToArray(),
             Regions = regionPoints.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToArray()
         };
-
-        return await req.WriteSuccessAsync(response, ct, ApiEnvelopeExtensions.SinglePage(response.Advisers.Count));
     }
 
-    private async Task<(double Lat, double Lng)> ResolveCoordinatesAsync(string postcode, CancellationToken ct)
+    private async Task<Dictionary<string, (double Lat, double Lng)>> ResolveCoordinatesAsync(
+        IReadOnlyList<string> postcodes,
+        CancellationToken ct)
+    {
+        var result = new ConcurrentDictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
+        var throttler = new SemaphoreSlim(6, 6);
+
+        var tasks = postcodes.Select(async postcode =>
+        {
+            await throttler.WaitAsync(ct);
+            try
+            {
+                var value = await ResolveSingleCoordinateAsync(postcode, ct);
+                result[postcode] = value;
+            }
+            finally
+            {
+                throttler.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        return result.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private async Task<(double Lat, double Lng)> ResolveSingleCoordinateAsync(string postcode, CancellationToken ct)
     {
         var key = postcode.Trim().ToUpperInvariant();
         if (CoordinateCache.TryGetValue(key, out var cached))
