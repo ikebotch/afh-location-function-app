@@ -10,6 +10,7 @@ namespace AFH.Location.Service.Core.Services.V1;
 public sealed class LocationSearchServiceV1 : ILocationSearchService
 {
     private const int MaxParallelOriginResolutions = 8;
+    private const int MaxParallelCandidateBuild = 6;
     private readonly AdviserCandidateSource _candidateSource;
     private readonly ICalendarAvailabilityService _calendar;
 
@@ -279,110 +280,125 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
     private async Task BuildResponseCandidatesAsync(LocationSearchContext ctx, CancellationToken ct)
     {
-        var (destLat, destLng) = ctx.Destination;
+        var built = new List<LocationCandidate>();
+        var sync = new object();
+        using var gate = new SemaphoreSlim(MaxParallelCandidateBuild, MaxParallelCandidateBuild);
 
-        foreach (var c in ctx.Candidates)
+        var tasks = ctx.Candidates.Select(async c =>
         {
-            var reasons = new List<string>();
-            AddBaseReasons(ctx, c, reasons);
-
-            var (availStatus, proposedStartUtc) = EvaluateAvailability(ctx, c, reasons);
-            if (!ShouldIncludeByAvailability(availStatus))
+            await gate.WaitAsync(ct);
+            try
             {
-                reasons.Add($"EXCLUDE_AVAILABILITY_{availStatus.ToUpperInvariant()}");
-                continue;
-            }
+                var reasons = new List<string>();
+                AddBaseReasons(ctx, c, reasons);
 
-            var unavailableForRouting =
-                string.Equals(availStatus, "Unavailable", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(availStatus, "Busy", StringComparison.OrdinalIgnoreCase);
-
-            var withinCoverageByRadius = !unavailableForRouting && AddCoverageReasons(ctx, c, reasons);
-
-            var maxTravelTimeMinutes = GetMaxTravelTimeMinutes(ctx, c.Adviser.AdviserId, c.Adviser.Region);
-            reasons.Add($"MAX_TRAVEL_TIME_{maxTravelTimeMinutes}");
-
-            TravelToClient travelToClient;
-            if (unavailableForRouting)
-            {
-                reasons.Add("SKIP_ROUTING_UNAVAILABLE");
-                travelToClient = new TravelToClient { EtaMinutes = 0, DistanceMiles = 0, Confidence = "Low" };
-            }
-            else
-            {
-                travelToClient = await BuildTravelToClient(ctx, c, withinCoverageByRadius, reasons, ct);
-            }
-
-            var withinCoverageByTravelTime = IsWithinMaxTravelTime(travelToClient, maxTravelTimeMinutes, reasons);
-            var withinCoverage = withinCoverageByRadius && withinCoverageByTravelTime;
-
-            var coverageDistanceMiles = travelToClient.DistanceMiles > 0
-                ? travelToClient.DistanceMiles
-                : (ctx.AirMilesById.TryGetValue(c.Adviser.AdviserId, out var air) ? Math.Round(air, 2) : 0d);
-
-            var travelBufferMinutes = GetTravelBufferMinutes(ctx);
-            var companyBufferMinutes = GetCompanyBufferMinutes(ctx);
-            var preMeetingBufferMinutes = travelToClient.EtaMinutes + companyBufferMinutes;
-            var postMeetingBufferMinutes = companyBufferMinutes;
-
-            ApplyCompanyBufferAvailabilityRules(
-                ctx,
-                c.Adviser.AdviserId,
-                preMeetingBufferMinutes,
-                postMeetingBufferMinutes,
-                ref availStatus,
-                ref proposedStartUtc,
-                reasons);
-
-            var travelToBase = unavailableForRouting
-                ? new TravelToBase { HomeMinutes = 0, OfficeMinutes = 0 }
-                : await BuildTravelToBase(ctx, c, reasons, ct);
-
-            var travelToNearestOffice = new TravelToNearestOffice
-            {
-                OfficeId = ctx.NearestOfficeId ?? "TBC",
-                EtaMinutes = ctx.NearestOfficeRoute?.EtaMinutes ?? 0,
-                DistanceMiles = ctx.NearestOfficeRoute?.DistanceMiles,
-                Confidence = ctx.NearestOfficeRoute?.Confidence
-            };
-
-            // ranking signals
-            reasons.Add($"RANK_AVAILABLE_{(availStatus == "Available" ? "Y" : "N")}");
-            reasons.Add($"RANK_ETA_{travelToClient.EtaMinutes}");
-            reasons.Add($"RANK_DISTANCE_{travelToClient.DistanceMiles:0.##}");
-
-            ctx.Response.Candidates.Add(new LocationCandidate
-            {
-                AdviserId = c.Adviser.AdviserId,
-                AdviserRating = c.Adviser.Rating,
-                GoldStar = c.Adviser.Rating >= 5d,
-                Preferred = c.IsPreferred,
-                Availability = availStatus,
-                ProposedSlotUtc = new ProposedSlot
+                var (availStatus, proposedStartUtc) = EvaluateAvailability(ctx, c, reasons);
+                if (!ShouldIncludeByAvailability(availStatus))
                 {
-                    Start = proposedStartUtc,
-                    End = proposedStartUtc.AddMinutes(ctx.Request.Meeting.DurationMinutes)
-                },
-                Coverage = new CoverageInfo
+                    reasons.Add($"EXCLUDE_AVAILABILITY_{availStatus.ToUpperInvariant()}");
+                    return;
+                }
+
+                var unavailableForRouting =
+                    string.Equals(availStatus, "Unavailable", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(availStatus, "Busy", StringComparison.OrdinalIgnoreCase);
+
+                var withinCoverageByRadius = !unavailableForRouting && AddCoverageReasons(ctx, c, reasons);
+
+                var maxTravelTimeMinutes = GetMaxTravelTimeMinutes(ctx, c.Adviser.AdviserId, c.Adviser.Region);
+                reasons.Add($"MAX_TRAVEL_TIME_{maxTravelTimeMinutes}");
+
+                TravelToClient travelToClient;
+                if (unavailableForRouting)
                 {
-                    WithinCoverage = withinCoverage,
-                    AnchorPostcode = c.Adviser.HomePostcode,
-                    DistanceMiles = coverageDistanceMiles
-                },
-                TravelToClient = travelToClient,
-                TravelToBase = travelToBase,
-                TravelToNearestOffice = travelToNearestOffice,
-                Buffers = new BufferInfo
+                    reasons.Add("SKIP_ROUTING_UNAVAILABLE");
+                    travelToClient = new TravelToClient { EtaMinutes = 0, DistanceMiles = 0, Confidence = "Low" };
+                }
+                else
                 {
-                    TravelBufferMinutes = travelBufferMinutes,
-                    CompanyBufferMinutes = companyBufferMinutes,
-                    PreMeetingBufferMinutes = preMeetingBufferMinutes,
-                    PostMeetingBufferMinutes = postMeetingBufferMinutes,
-                    MaxTravelTimeMinutes = maxTravelTimeMinutes
-                },
-                Reasons = reasons
-            });
-        }
+                    travelToClient = await BuildTravelToClient(ctx, c, withinCoverageByRadius, reasons, ct);
+                }
+
+                var withinCoverageByTravelTime = IsWithinMaxTravelTime(travelToClient, maxTravelTimeMinutes, reasons);
+                var withinCoverage = withinCoverageByRadius && withinCoverageByTravelTime;
+
+                var coverageDistanceMiles = travelToClient.DistanceMiles > 0
+                    ? travelToClient.DistanceMiles
+                    : (ctx.AirMilesById.TryGetValue(c.Adviser.AdviserId, out var air) ? Math.Round(air, 2) : 0d);
+
+                var travelBufferMinutes = GetTravelBufferMinutes(ctx);
+                var companyBufferMinutes = GetCompanyBufferMinutes(ctx);
+                var preMeetingBufferMinutes = travelToClient.EtaMinutes + companyBufferMinutes;
+                var postMeetingBufferMinutes = companyBufferMinutes;
+
+                ApplyCompanyBufferAvailabilityRules(
+                    ctx,
+                    c.Adviser.AdviserId,
+                    preMeetingBufferMinutes,
+                    postMeetingBufferMinutes,
+                    ref availStatus,
+                    ref proposedStartUtc,
+                    reasons);
+
+                var travelToBase = unavailableForRouting
+                    ? new TravelToBase { HomeMinutes = 0, OfficeMinutes = 0 }
+                    : await BuildTravelToBase(ctx, c, reasons, ct);
+
+                var travelToNearestOffice = new TravelToNearestOffice
+                {
+                    OfficeId = ctx.NearestOfficeId ?? "TBC",
+                    EtaMinutes = ctx.NearestOfficeRoute?.EtaMinutes ?? 0,
+                    DistanceMiles = ctx.NearestOfficeRoute?.DistanceMiles,
+                    Confidence = ctx.NearestOfficeRoute?.Confidence
+                };
+
+                reasons.Add($"RANK_AVAILABLE_{(availStatus == "Available" ? "Y" : "N")}");
+                reasons.Add($"RANK_ETA_{travelToClient.EtaMinutes}");
+                reasons.Add($"RANK_DISTANCE_{travelToClient.DistanceMiles:0.##}");
+
+                var candidate = new LocationCandidate
+                {
+                    AdviserId = c.Adviser.AdviserId,
+                    AdviserRating = c.Adviser.Rating,
+                    GoldStar = c.Adviser.Rating >= 5d,
+                    Preferred = c.IsPreferred,
+                    Availability = availStatus,
+                    ProposedSlotUtc = new ProposedSlot
+                    {
+                        Start = proposedStartUtc,
+                        End = proposedStartUtc.AddMinutes(ctx.Request.Meeting.DurationMinutes)
+                    },
+                    Coverage = new CoverageInfo
+                    {
+                        WithinCoverage = withinCoverage,
+                        AnchorPostcode = c.Adviser.HomePostcode,
+                        DistanceMiles = coverageDistanceMiles
+                    },
+                    TravelToClient = travelToClient,
+                    TravelToBase = travelToBase,
+                    TravelToNearestOffice = travelToNearestOffice,
+                    Buffers = new BufferInfo
+                    {
+                        TravelBufferMinutes = travelBufferMinutes,
+                        CompanyBufferMinutes = companyBufferMinutes,
+                        PreMeetingBufferMinutes = preMeetingBufferMinutes,
+                        PostMeetingBufferMinutes = postMeetingBufferMinutes,
+                        MaxTravelTimeMinutes = maxTravelTimeMinutes
+                    },
+                    Reasons = reasons
+                };
+
+                lock (sync)
+                    built.Add(candidate);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        ctx.Response.Candidates = built;
     }
 
     private void RankAndApplyCandidates(LocationSearchContext ctx)
@@ -603,7 +619,13 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             ctx.OfficeCoords.TryGetValue(baseOfficeId, out var office) &&
             !IsZero(office))
         {
-            result.OfficeMinutes = await SafeEtaAsync((destLat, destLng), (office.Lat, office.Lng), "BASE_OFFICE", reasons, ct);
+            if (!ctx.OfficeRouteMinutesByOfficeId.TryGetValue(baseOfficeId, out var officeMinutes))
+            {
+                officeMinutes = await SafeEtaAsync((destLat, destLng), (office.Lat, office.Lng), "BASE_OFFICE", reasons, ct);
+                ctx.OfficeRouteMinutesByOfficeId.TryAdd(baseOfficeId, officeMinutes);
+            }
+
+            result.OfficeMinutes = officeMinutes;
         }
         else
         {

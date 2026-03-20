@@ -2,6 +2,7 @@
 using AFH.Location.Service.Core.Contracts.V1.Requests;
 using AFH.Location.Service.Core.Contracts.V1.Responses;
 using AFH.Location.Service.Core.Services.Common;
+using System.Collections.Concurrent;
 
 namespace AFH.Location.Service.Core.Services.V1;
 
@@ -11,7 +12,7 @@ internal sealed class LocationSearchContext
     public required LocationSearchResponseV1 Response { get; init; }
 
     public required (double Lat, double Lng) Destination { get; set; }
-    public required DestinationResolved DestResolved { get; set; } 
+    public required DestinationResolved DestResolved { get; set; }
 
     public IReadOnlyList<AdviserCandidate> Candidates { get; set; } = Array.Empty<AdviserCandidate>();
 
@@ -40,4 +41,7 @@ internal sealed class LocationSearchContext
 
     public string? NearestOfficeId { get; set; }
     public RouteResult? NearestOfficeRoute { get; set; }
+
+    public ConcurrentDictionary<string, int> OfficeRouteMinutesByOfficeId { get; } =
+        new(StringComparer.OrdinalIgnoreCase);
 }
