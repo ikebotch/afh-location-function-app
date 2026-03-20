@@ -304,12 +304,17 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
             StateMessage = message
         };
 
+
+
+
+
     private (DateTime StartUtc, DateTime EndUtc) BuildScheduleWindow(MeetingWindow window)
     {
         var startUtc = window.RequestedStartUtc.AddMinutes(-Math.Max(0, _options.ScheduleLookbackMinutes));
         var endUtc = window.RequestedStartUtc.AddMinutes(Math.Max(1, window.SearchHorizonMinutes + window.DurationMinutes));
         return (startUtc, endUtc);
     }
+
 
     private static AdviserAvailability MapAvailability(
         string adviserId,
@@ -362,25 +367,31 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
         };
     }
 
-    private static async Task<T?> ReadEnvelopedOrRawAsync<T>(
-        HttpResponseMessage response,
-        CancellationToken ct)
-        where T : class
+    private async Task<T?> ReadEnvelopedOrRawAsync<T>(
+       HttpResponseMessage response,
+       CancellationToken ct)
+       where T : class
     {
         var json = await response.Content.ReadAsStringAsync(ct);
         if (string.IsNullOrWhiteSpace(json))
             return default;
 
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
         try
         {
-            var enveloped = JsonSerializer.Deserialize<ApiEnvelope<T>>(json);
+            var enveloped = JsonSerializer.Deserialize<ApiEnvelope<T>>(json, options);
             if (enveloped?.Data is not null)
                 return enveloped.Data;
 
-            return JsonSerializer.Deserialize<T>(json);
+            return JsonSerializer.Deserialize<T>(json, options);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Failed to parse calendar response. Body: {Json}", json);
             return default;
         }
     }
