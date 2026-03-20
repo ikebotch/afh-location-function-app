@@ -133,9 +133,17 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
     private async Task LoadAvailabilityAsync(LocationSearchContext ctx, CancellationToken ct)
     {
+        var extensionMinutes = GetAvailabilitySearchExtensionMinutes(ctx);
+        var meetingWindow = new MeetingWindow
+        {
+            RequestedStartUtc = ctx.Request.Meeting.RequestedStartUtc,
+            DurationMinutes = ctx.Request.Meeting.DurationMinutes,
+            SearchHorizonMinutes = Math.Max(1, ctx.Request.Meeting.SearchHorizonMinutes + extensionMinutes)
+        };
+
         var availability = await _calendar.GetAvailabilityAsync(
             ctx.Candidates.Select(x => x.Adviser.AdviserId).ToList(),
-            ctx.Request.Meeting,
+            meetingWindow,
             ct);
 
         ctx.AvailabilityById = availability.ToDictionary(x => x.AdviserId, StringComparer.OrdinalIgnoreCase);
@@ -621,6 +629,13 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
         var effective = requested ?? policyDefault;
         return Math.Clamp(effective, 0, Math.Max(0, ctx.AvailabilityPolicy.MaxCompanyBufferMinutes));
+    }
+
+    private static int GetAvailabilitySearchExtensionMinutes(LocationSearchContext ctx)
+    {
+        var travel = GetTravelBufferMinutes(ctx);
+        var company = GetCompanyBufferMinutes(ctx);
+        return Math.Max(0, travel) + Math.Max(0, company);
     }
 
     private static void ApplyCandidateEligibilityFilters(LocationSearchContext ctx)
