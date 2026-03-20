@@ -613,8 +613,13 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
 
     private static int GetCompanyBufferMinutes(LocationSearchContext ctx)
     {
+        const int fallbackDefaultMinutes = 30;
         var requested = ctx.Request.Filters?.CompanyBufferMinutes;
-        var effective = requested ?? ctx.AvailabilityPolicy.DefaultCompanyBufferMinutes;
+        var policyDefault = ctx.AvailabilityPolicy.DefaultCompanyBufferMinutes > 0
+            ? ctx.AvailabilityPolicy.DefaultCompanyBufferMinutes
+            : fallbackDefaultMinutes;
+
+        var effective = requested ?? policyDefault;
         return Math.Clamp(effective, 0, Math.Max(0, ctx.AvailabilityPolicy.MaxCompanyBufferMinutes));
     }
 

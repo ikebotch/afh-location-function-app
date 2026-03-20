@@ -84,7 +84,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
                 return NewAvailability(adviserId, CalendarAvailabilityState.Ok, null);
 
             var bookings = schedule.Bookings
-                .Where(b => !string.Equals(b.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                .Where(IsBlockingBooking)
                 .OrderBy(b => b.StartUtc)
                 .ToList();
 
@@ -301,5 +301,14 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
             value = candidate;
             return true;
         }
+    }
+
+    private static bool IsBlockingBooking(BookingSummary booking)
+    {
+        if (string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var normalized = (booking.Status ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized is "busy" or "tentative" or "oof" or "outofoffice" or "workingelsewhere";
     }
 }
