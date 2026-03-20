@@ -170,6 +170,16 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
             using var response = await _http.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
             {
+                if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+                {
+                    _logger.LogWarning(
+                        "Calendar batch schedule endpoint unavailable (Status={StatusCode}). Falling back to per-user schedule calls.",
+                        (int)response.StatusCode);
+
+                    var fallbackTasks = ids.Select(id => GetAdviserAvailabilityAsync(id, window, ct));
+                    return await Task.WhenAll(fallbackTasks);
+                }
+
                 _logger.LogWarning(
                     "Calendar batch schedule call failed. Status={StatusCode} Advisers={AdviserCount}",
                     (int)response.StatusCode,
