@@ -58,6 +58,7 @@ public sealed class HttpAdviserFeedRepository : IAdviserRepository
             .Select(x => new Adviser
             {
                 AdviserId = x.AdviserId.Trim(),
+                CalendarUserId = ResolveCalendarUserId(x),
                 DisplayName = string.IsNullOrWhiteSpace(x.DisplayName) ? x.AdviserId.Trim() : x.DisplayName.Trim(),
                 HomePostcode = x.HomePostcode?.Trim() ?? string.Empty,
                 Region = x.Region?.Trim() ?? string.Empty,
@@ -72,6 +73,20 @@ public sealed class HttpAdviserFeedRepository : IAdviserRepository
                 MaxTravelTimeMinutes = x.MaxTravelTimeMinutes is > 0 ? x.MaxTravelTimeMinutes : null
             })
             .ToList();
+    }
+
+    private static string ResolveCalendarUserId(AdviserDto source)
+    {
+        if (!string.IsNullOrWhiteSpace(source.CalendarUserId))
+            return source.CalendarUserId.Trim();
+
+        if (!string.IsNullOrWhiteSpace(source.Email))
+            return source.Email.Trim();
+
+        if (!string.IsNullOrWhiteSpace(source.UserId))
+            return source.UserId.Trim();
+
+        return source.AdviserId.Trim();
     }
 
     private string BuildUrl(IReadOnlyList<string> ids)
@@ -125,6 +140,9 @@ public sealed class HttpAdviserFeedRepository : IAdviserRepository
     private sealed class AdviserDto
     {
         public string AdviserId { get; set; } = string.Empty;
+        public string? CalendarUserId { get; set; }
+        public string? Email { get; set; }
+        public string? UserId { get; set; }
         public string DisplayName { get; set; } = string.Empty;
         public string HomePostcode { get; set; } = string.Empty;
         public string Region { get; set; } = string.Empty;

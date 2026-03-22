@@ -143,6 +143,7 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
             if (string.IsNullOrWhiteSpace(adviserId))
                 continue;
 
+            var calendarUserId = TryGet(fields, _opts.EmailField);
             var name = TryGet(fields, _opts.NameField) ?? TryGet(fields, "Title") ?? adviserId;
             var postcode = TryGet(fields, _opts.PostcodeField);
             var region = TryGet(fields, _opts.RegionField);
@@ -160,6 +161,7 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
             advisers.Add(new Adviser
             {
                 AdviserId = adviserId,
+                CalendarUserId = string.IsNullOrWhiteSpace(calendarUserId) ? adviserId : calendarUserId.Trim(),
                 DisplayName = name,
                 HomePostcode = postcode ?? "",
                 Region = region ?? "",

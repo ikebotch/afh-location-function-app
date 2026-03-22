@@ -143,12 +143,35 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             SearchHorizonMinutes = Math.Max(1, ctx.Request.Meeting.SearchHorizonMinutes + extensionMinutes)
         };
 
-        var availability = await _calendar.GetAvailabilityAsync(
-            ctx.Candidates.Select(x => x.Adviser.AdviserId).ToList(),
-            meetingWindow,
-            ct);
+        var adviserToCalendar = ctx.Candidates
+            .ToDictionary(
+                x => x.Adviser.AdviserId,
+                x => ResolveCalendarUserId(x.Adviser),
+                StringComparer.OrdinalIgnoreCase);
 
-        ctx.AvailabilityById = availability.ToDictionary(x => x.AdviserId, StringComparer.OrdinalIgnoreCase);
+        var requestedCalendarUsers = adviserToCalendar.Values
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var availability = await _calendar.GetAvailabilityAsync(requestedCalendarUsers, meetingWindow, ct);
+        var availabilityByCalendarUser = availability
+            .ToDictionary(x => x.AdviserId, StringComparer.OrdinalIgnoreCase);
+
+        var availabilityByAdviser = new Dictionary<string, AdviserAvailability>(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in ctx.Candidates)
+        {
+            var adviserId = candidate.Adviser.AdviserId;
+            if (!adviserToCalendar.TryGetValue(adviserId, out var calendarUserId) || string.IsNullOrWhiteSpace(calendarUserId))
+                continue;
+
+            if (!availabilityByCalendarUser.TryGetValue(calendarUserId, out var calendarAvailability))
+                continue;
+
+            availabilityByAdviser[adviserId] = CloneAvailabilityForAdviser(adviserId, calendarAvailability);
+        }
+
+        ctx.AvailabilityById = availabilityByAdviser;
     }
 
     private async Task LoadPoliciesAsync(LocationSearchContext ctx, CancellationToken ct)
@@ -536,6 +559,26 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         if (!within) reasons.Add("OUT_OF_COVERAGE");
         return within;
     }
+
+    private static string ResolveCalendarUserId(Core.Domain.Entities.Adviser adviser)
+    {
+        if (!string.IsNullOrWhiteSpace(adviser.CalendarUserId))
+            return adviser.CalendarUserId.Trim();
+
+        return adviser.AdviserId;
+    }
+
+    private static AdviserAvailability CloneAvailabilityForAdviser(
+        string adviserId,
+        AdviserAvailability source) => new()
+        {
+            AdviserId = adviserId,
+            BusyBlocks = source.BusyBlocks,
+            IsOutOfOffice = source.IsOutOfOffice,
+            CurrentLocationPostcode = source.CurrentLocationPostcode,
+            State = source.State,
+            StateMessage = source.StateMessage
+        };
 
     private async Task<TravelToClient> BuildTravelToClient(
         LocationSearchContext ctx,

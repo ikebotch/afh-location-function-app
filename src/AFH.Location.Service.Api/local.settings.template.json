@@ -28,6 +28,7 @@
     "SharePoint:Advisers:SiteId": "<site-id>",
     "SharePoint:Advisers:ListId": "<list-id>",
     "SharePoint:Advisers:AdviserIdField": "field_3",
+    "SharePoint:Advisers:EmailField": "field_3",
     "SharePoint:Advisers:NameField": "Title",
     "SharePoint:Advisers:SkillsField": "License",
     "SharePoint:Advisers:RegionField": "Region",
