@@ -53,8 +53,17 @@ public static class DependencyInjection
         services.AddScoped<IRouteMatrixService, AzureMapsRouteMatrixService>();
         services.AddScoped<RouteMatrixCoordinator>();
 
+        services.Configure<AdviserFeedOptions>(configuration.GetSection(AdviserFeedOptions.SectionName));
         services.Configure<SharePointAdviserOptions>(configuration.GetSection(SharePointAdviserOptions.SectionName));
-        services.AddScoped<IAdviserRepository, SharePointAdviserRepository>();
+        var useAdviserFeed = configuration.GetValue<bool>("AdviserFeed:Enabled");
+        if (useAdviserFeed)
+        {
+            services.AddScoped<IAdviserRepository, HttpAdviserFeedRepository>();
+        }
+        else
+        {
+            services.AddScoped<IAdviserRepository, SharePointAdviserRepository>();
+        }
 
         services.AddScoped<IOfficeRepository, InMemoryOfficeRepository>();
 

@@ -17,6 +17,10 @@
 
     "CalendarService:BaseUrl": "http://localhost:7071",
     "CalendarService:FunctionKey": "<calendar-functions-key>",
+    "AdviserFeed:Enabled": "false",
+    "AdviserFeed:BaseUrl": "http://localhost:7080",
+    "AdviserFeed:EndpointPath": "/api/v1/mock/advisers",
+    "AdviserFeed:ApiKey": "",
     "ConnectionStrings:LocationPolicyDb": "Server=localhost,1433;Database=AFH.LocationPolicy;User Id=sa;Password=<password>;TrustServerCertificate=True;",
     "LocationSearch:PolicyStore:AutoCreate": "true",
     "LocationSearch:PolicyStore:SeedFromConfiguration": "true",
