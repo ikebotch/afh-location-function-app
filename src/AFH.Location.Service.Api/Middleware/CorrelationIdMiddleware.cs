@@ -1,14 +1,13 @@
-﻿using AFH.Location.Service.Core.Abstractions;
+using AFH.Location.Service.Core.Abstractions;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 
 namespace AFH.Location.Service.Api.Middleware;
 
 public sealed class CorrelationIdMiddleware : IFunctionsWorkerMiddleware
 {
-    private const string Header = "x-correlation-id";
-
-
+    public const string Header = "x-correlation-id";
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
@@ -17,14 +16,24 @@ public sealed class CorrelationIdMiddleware : IFunctionsWorkerMiddleware
         {
             RequestContextAccessor.SetPath(req.Url.AbsolutePath);
 
-            var cid = req.Headers.TryGetValues("x-correlation-id", out var values)
+            var cid = req.Headers.TryGetValues(Header, out var values)
                 ? values.FirstOrDefault()
                 : null;
 
-            context.Items["x-correlation-id"] =
-                string.IsNullOrWhiteSpace(cid) ? Guid.NewGuid().ToString() : cid!;
+            context.Items[Header] = string.IsNullOrWhiteSpace(cid)
+                ? Guid.NewGuid().ToString("N")
+                : cid!;
         }
 
         await next(context);
+
+        var response = context.GetInvocationResult().Value as HttpResponseData;
+        if (response is not null &&
+            context.Items.TryGetValue(Header, out var value) &&
+            value is string correlationId &&
+            !response.Headers.TryGetValues(Header, out _))
+        {
+            response.Headers.Add(Header, correlationId);
+        }
     }
 }

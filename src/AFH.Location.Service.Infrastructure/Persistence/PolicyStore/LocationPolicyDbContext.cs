@@ -18,6 +18,7 @@ public sealed class LocationPolicyDbContext : DbContext
     public DbSet<CoverageAdviserPolicyEntity> CoverageAdvisers => Set<CoverageAdviserPolicyEntity>();
     public DbSet<AvailabilityDefaultPolicyEntity> AvailabilityDefaults => Set<AvailabilityDefaultPolicyEntity>();
     public DbSet<SearchAuditRecordEntity> SearchAuditRecords => Set<SearchAuditRecordEntity>();
+    public DbSet<IntegrationOperationAuditEntity> IntegrationOperationAudits => Set<IntegrationOperationAuditEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +75,28 @@ public sealed class LocationPolicyDbContext : DbContext
 
             entity.HasIndex(x => x.CreatedUtc);
             entity.HasIndex(x => x.RequestId);
+        });
+
+        modelBuilder.Entity<IntegrationOperationAuditEntity>(entity =>
+        {
+            entity.ToTable("IntegrationOperationAudit");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ServiceName).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.FunctionName).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Method).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.Path).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.QueryString).HasMaxLength(2048);
+            entity.Property(x => x.CorrelationId).HasMaxLength(128);
+            entity.Property(x => x.OperationId).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.StatusCode).IsRequired();
+            entity.Property(x => x.DurationMs).IsRequired();
+            entity.Property(x => x.ErrorType).HasMaxLength(128);
+            entity.Property(x => x.ErrorMessage).HasMaxLength(2048);
+            entity.Property(x => x.CreatedUtc).IsRequired();
+
+            entity.HasIndex(x => x.CreatedUtc);
+            entity.HasIndex(x => x.CorrelationId);
+            entity.HasIndex(x => new { x.FunctionName, x.CreatedUtc });
         });
     }
 }

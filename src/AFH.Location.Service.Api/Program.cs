@@ -9,6 +9,7 @@ var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(app =>
     {
         app.UseMiddleware<CorrelationIdMiddleware>();
+        app.UseMiddleware<OperationAuditMiddleware>();
         app.UseMiddleware<JwtServiceAuthMiddleware>();     // service-to-service auth (or do at APIM)
         app.UseMiddleware<ExceptionHandlingMiddleware>();
     })

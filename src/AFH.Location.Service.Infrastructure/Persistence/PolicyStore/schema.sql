@@ -72,3 +72,27 @@ BEGIN
     CREATE INDEX IX_SearchAuditRecords_CreatedUtc ON dbo.SearchAuditRecords(CreatedUtc);
     CREATE INDEX IX_SearchAuditRecords_RequestId ON dbo.SearchAuditRecords(RequestId);
 END;
+
+IF OBJECT_ID('dbo.IntegrationOperationAudit', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.IntegrationOperationAudit
+    (
+        Id BIGINT IDENTITY(1,1) PRIMARY KEY,
+        ServiceName NVARCHAR(64) NOT NULL,
+        FunctionName NVARCHAR(256) NOT NULL,
+        Method NVARCHAR(16) NOT NULL,
+        Path NVARCHAR(512) NOT NULL,
+        QueryString NVARCHAR(2048) NULL,
+        CorrelationId NVARCHAR(128) NULL,
+        OperationId NVARCHAR(128) NOT NULL,
+        StatusCode INT NOT NULL,
+        DurationMs BIGINT NOT NULL,
+        ErrorType NVARCHAR(128) NULL,
+        ErrorMessage NVARCHAR(2048) NULL,
+        CreatedUtc DATETIME2 NOT NULL
+    );
+
+    CREATE INDEX IX_IntegrationOperationAudit_CreatedUtc ON dbo.IntegrationOperationAudit(CreatedUtc);
+    CREATE INDEX IX_IntegrationOperationAudit_CorrelationId ON dbo.IntegrationOperationAudit(CorrelationId);
+    CREATE INDEX IX_IntegrationOperationAudit_FunctionName_CreatedUtc ON dbo.IntegrationOperationAudit(FunctionName, CreatedUtc);
+END;
