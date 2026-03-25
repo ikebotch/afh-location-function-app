@@ -26,7 +26,7 @@ public sealed class LocationSearchBatchFunctionV1
 
     [Function("LocationSearchBatchV1")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/location/inperson/advisers/search/batch")]
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/location/inperson/advisers/search/batch")]
         HttpRequestData req,
         CancellationToken ct)
     {

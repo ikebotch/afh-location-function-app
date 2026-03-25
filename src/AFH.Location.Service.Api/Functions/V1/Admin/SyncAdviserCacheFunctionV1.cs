@@ -16,7 +16,7 @@ public sealed class SyncAdviserCacheFunctionV1
 
     [Function("SyncAdviserCacheV1")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/admin/advisers/cache/sync")]
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/admin/advisers/cache/sync")]
         HttpRequestData req,
         CancellationToken ct)
     {

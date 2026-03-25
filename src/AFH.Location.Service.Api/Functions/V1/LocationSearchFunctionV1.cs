@@ -20,7 +20,7 @@ public sealed class LocationSearchFunctionV1
 
     [Function("LocationSearchV1")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/location/inperson/advisers/search")]
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/location/inperson/advisers/search")]
         HttpRequestData req,
         CancellationToken ct)
     {

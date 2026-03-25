@@ -18,6 +18,7 @@
     "SharePointGraph:ClientSecret": "<client-secret>",
 
     "CalendarService:BaseUrl": "http://localhost:7071",
+    "CalendarService:FunctionKey": "<calendar-function-key>",
     "CalendarService:InternalToken": "<shared-internal-token>",
     "AdviserFeed:Enabled": "false",
     "AdviserFeed:BaseUrl": "http://localhost:7080",

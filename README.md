@@ -40,6 +40,7 @@
   - `endUtc`
   - `freshnessMode=PreferCached`
 - Auth:
+  - `x-functions-key: <calendar function key>` via `CalendarService:FunctionKey`
   - `Authorization: Bearer <shared internal token>` via `CalendarService:InternalToken`
 
 ## Required Local Config (Location)
@@ -53,4 +54,4 @@
 
 ## Protected Routes
 - Health and docs remain public.
-- Adviser search, batch search, coverage, and license endpoints are protected by internal bearer auth unless development auth relaxation is explicitly enabled.
+- Adviser search, batch search, coverage, license, and cache-sync endpoints are function-key protected and also require internal bearer auth unless development auth relaxation is explicitly enabled.

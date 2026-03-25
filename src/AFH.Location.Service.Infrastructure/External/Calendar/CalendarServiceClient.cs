@@ -289,6 +289,9 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
 
     private void AddAuth(HttpRequestMessage request)
     {
+        if (!string.IsNullOrWhiteSpace(_options.FunctionKey))
+            request.Headers.TryAddWithoutValidation("x-functions-key", _options.FunctionKey.Trim());
+
         if (!string.IsNullOrWhiteSpace(_options.InternalToken))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.InternalToken.Trim());
     }

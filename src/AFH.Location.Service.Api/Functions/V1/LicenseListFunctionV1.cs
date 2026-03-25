@@ -17,7 +17,7 @@ public sealed class LicenseListFunctionV1
 
     [Function("LicenseListV1")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/location/licenses")]
+        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/location/licenses")]
         HttpRequestData req,
         CancellationToken ct)
     {

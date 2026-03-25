@@ -17,7 +17,7 @@ public sealed class AdviserCoverageFunctionV1
 
     [Function("AdviserCoverageV1")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/admin/adviser-coverage")]
+        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/admin/adviser-coverage")]
         HttpRequestData req,
         CancellationToken ct)
     {
