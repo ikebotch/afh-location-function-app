@@ -4,8 +4,9 @@
 
 ### Location Service (this repo)
 - Owns adviser discovery and search inputs.
-- Reads advisers from SharePoint (region, skills, rating, home postcode).
-- Reads adviser availability from Calendar Service schedule endpoint.
+- Uses SQL-cached adviser reference data on the hot path and keeps live adviser-source reads behind a sync path.
+- Owns geocode and route caching for adviser search and ranking.
+- Reads adviser availability from Calendar Service batch schedule endpoints using `PreferCached` freshness on search paths.
 - Returns ranked advisers with coverage and travel outputs.
 
 ### Booking Service (separate repo)
@@ -22,12 +23,22 @@
 - Avoids duplicated calendar integration logic.
 - Keeps booking and event ownership clear.
 - Reduces config/auth drift across services.
+- Keeps live SharePoint and map-provider traffic out of the adviser search hot path.
+
+## Cached Reference And Routing Model
+- `AdviserReferenceCache` is the local SQL-backed read model for adviser profile/ranking inputs.
+- `GeoCacheEntries` stores resolved coordinate results for adviser and office lookups.
+- `RouteCacheEntries` stores travel-time and distance results for repeated routing evaluations.
+- `POST /api/v1/admin/advisers/cache/sync` refreshes the adviser reference cache from the configured live adviser source.
+- Search reads `IAdviserRepository`, which now resolves from cache first and only falls back to the live source when the cache is empty.
 
 ## Integration Contract (Location -> Calendar Service)
-- Endpoint: `GET /api/v1/calendar/users/{userId}/schedule`
-- Query:
+- Endpoint: `POST /api/v1/calendar/users/schedule/batch`
+- Body:
+  - `userIds`
   - `startUtc`
   - `endUtc`
+  - `freshnessMode=PreferCached`
 - Auth:
   - `Authorization: Bearer <shared internal token>` via `CalendarService:InternalToken`
 

@@ -9,7 +9,7 @@ using Microsoft.Kiota.Abstractions.Serialization;
 
 namespace AFH.Location.Service.Infrastructure.Persistence.Repositories;
 
-public sealed class SharePointAdviserRepository : IAdviserRepository
+public sealed class SharePointAdviserRepository : IAdviserSourceRepository
 {
     private readonly GraphServiceClient _graph;
     private readonly SharePointAdviserOptions _opts;
@@ -161,13 +161,16 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
             {
                 AdviserId = adviserId,
                 DisplayName = name,
+                MailboxUserId = TryGet(fields, _opts.EmailField) ?? adviserId,
                 HomePostcode = postcode ?? "",
                 Region = region ?? "",
                 Skills = skills,
                 Rating = rating,
                 IsActive = true,
+                IsBookable = true,
                 CoverageRadiusMiles = coverageRadiusMiles is > 0 ? coverageRadiusMiles : null,
-                MaxTravelTimeMinutes = maxTravelTimeMinutes is > 0 ? maxTravelTimeMinutes : null
+                MaxTravelTimeMinutes = maxTravelTimeMinutes is > 0 ? maxTravelTimeMinutes : null,
+                LastSyncedUtc = DateTime.UtcNow
             });
         }
 

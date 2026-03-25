@@ -8,7 +8,7 @@ using System.Text.Json;
 
 namespace AFH.Location.Service.Infrastructure.Persistence.Repositories;
 
-public sealed class HttpAdviserFeedRepository : IAdviserRepository
+public sealed class HttpAdviserFeedRepository : IAdviserSourceRepository
 {
     private readonly HttpClient _http;
     private readonly AdviserFeedOptions _options;
@@ -59,6 +59,7 @@ public sealed class HttpAdviserFeedRepository : IAdviserRepository
             {
                 AdviserId = x.AdviserId.Trim(),
                 DisplayName = string.IsNullOrWhiteSpace(x.DisplayName) ? x.AdviserId.Trim() : x.DisplayName.Trim(),
+                MailboxUserId = string.IsNullOrWhiteSpace(x.MailboxUserId) ? x.AdviserId.Trim() : x.MailboxUserId.Trim(),
                 HomePostcode = x.HomePostcode?.Trim() ?? string.Empty,
                 Region = x.Region?.Trim() ?? string.Empty,
                 Skills = (x.Skills ?? [])
@@ -68,8 +69,10 @@ public sealed class HttpAdviserFeedRepository : IAdviserRepository
                     .ToArray(),
                 Rating = x.Rating,
                 IsActive = x.IsActive,
+                IsBookable = x.IsBookable,
                 CoverageRadiusMiles = x.CoverageRadiusMiles is > 0 ? x.CoverageRadiusMiles : null,
-                MaxTravelTimeMinutes = x.MaxTravelTimeMinutes is > 0 ? x.MaxTravelTimeMinutes : null
+                MaxTravelTimeMinutes = x.MaxTravelTimeMinutes is > 0 ? x.MaxTravelTimeMinutes : null,
+                LastSyncedUtc = DateTime.UtcNow
             })
             .ToList();
     }
@@ -127,10 +130,12 @@ public sealed class HttpAdviserFeedRepository : IAdviserRepository
         public string AdviserId { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string HomePostcode { get; set; } = string.Empty;
+        public string MailboxUserId { get; set; } = string.Empty;
         public string Region { get; set; } = string.Empty;
         public List<string>? Skills { get; set; }
         public double Rating { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool IsBookable { get; set; } = true;
         public double? CoverageRadiusMiles { get; set; }
         public int? MaxTravelTimeMinutes { get; set; }
     }

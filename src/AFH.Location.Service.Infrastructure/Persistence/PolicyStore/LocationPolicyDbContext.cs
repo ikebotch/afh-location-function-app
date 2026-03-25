@@ -19,6 +19,9 @@ public sealed class LocationPolicyDbContext : DbContext
     public DbSet<AvailabilityDefaultPolicyEntity> AvailabilityDefaults => Set<AvailabilityDefaultPolicyEntity>();
     public DbSet<SearchAuditRecordEntity> SearchAuditRecords => Set<SearchAuditRecordEntity>();
     public DbSet<IntegrationOperationAuditEntity> IntegrationOperationAudits => Set<IntegrationOperationAuditEntity>();
+    public DbSet<AdviserReferenceCacheEntity> AdviserReferenceCache => Set<AdviserReferenceCacheEntity>();
+    public DbSet<GeoCacheEntryEntity> GeoCacheEntries => Set<GeoCacheEntryEntity>();
+    public DbSet<RouteCacheEntryEntity> RouteCacheEntries => Set<RouteCacheEntryEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +100,39 @@ public sealed class LocationPolicyDbContext : DbContext
             entity.HasIndex(x => x.CreatedUtc);
             entity.HasIndex(x => x.CorrelationId);
             entity.HasIndex(x => new { x.FunctionName, x.CreatedUtc });
+        });
+
+        modelBuilder.Entity<AdviserReferenceCacheEntity>(entity =>
+        {
+            entity.ToTable("AdviserReferenceCache");
+            entity.HasKey(x => x.AdviserId);
+            entity.Property(x => x.AdviserId).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.DisplayName).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.MailboxUserId).HasMaxLength(128);
+            entity.Property(x => x.HomePostcode).HasMaxLength(32);
+            entity.Property(x => x.Region).HasMaxLength(128);
+            entity.Property(x => x.BaseOfficeId).HasMaxLength(100);
+            entity.Property(x => x.TeamName).HasMaxLength(128);
+            entity.Property(x => x.ManagerId).HasMaxLength(100);
+            entity.Property(x => x.SkillsCsv).HasMaxLength(2000);
+            entity.HasIndex(x => x.LastSyncedUtc);
+        });
+
+        modelBuilder.Entity<GeoCacheEntryEntity>(entity =>
+        {
+            entity.ToTable("GeoCacheEntries");
+            entity.HasKey(x => x.CacheKey);
+            entity.Property(x => x.CacheKey).HasMaxLength(512).IsRequired();
+            entity.HasIndex(x => x.ExpiresUtc);
+        });
+
+        modelBuilder.Entity<RouteCacheEntryEntity>(entity =>
+        {
+            entity.ToTable("RouteCacheEntries");
+            entity.HasKey(x => x.CacheKey);
+            entity.Property(x => x.CacheKey).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.Confidence).HasMaxLength(32).IsRequired();
+            entity.HasIndex(x => x.ExpiresUtc);
         });
     }
 }
