@@ -3,6 +3,7 @@ using AFH.Location.Service.Core.Contracts.V1.Requests;
 using AFH.Location.Service.Infrastructure.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net.Http.Headers;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -288,8 +289,8 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
 
     private void AddAuth(HttpRequestMessage request)
     {
-        if (!string.IsNullOrWhiteSpace(_options.FunctionKey))
-            request.Headers.Add("x-functions-key", _options.FunctionKey);
+        if (!string.IsNullOrWhiteSpace(_options.InternalToken))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.InternalToken.Trim());
     }
 
     private static AdviserAvailability NewAvailability(

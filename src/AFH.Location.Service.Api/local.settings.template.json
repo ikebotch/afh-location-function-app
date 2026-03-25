@@ -5,18 +5,20 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "APPLICATIONINSIGHTS_CONNECTION_STRING": "",
 
-    "Auth:TenantId": "<tenant-id>",
-    "Auth:Audience": "<api-app-id-uri-or-client-id>",
+    "InternalApiAuth:Token": "<shared-internal-token>",
+    "InternalApiAuth:AllowAnonymousInDevelopment": "true",
+    "BusinessTime:TimeZone": "Europe/London",
 
     "Maps:Azure:Key": "<azure-maps-key>",
-    "Maps:Google:ApiKey": "<google-maps-key>",
+    "Maps:Google:Enabled": "false",
+    "Maps:Google:ApiKey": "<google-maps-key-if-provider-is-finished>",
 
     "SharePointGraph:TenantId": "<tenant-id>",
     "SharePointGraph:ClientId": "<client-id>",
     "SharePointGraph:ClientSecret": "<client-secret>",
 
     "CalendarService:BaseUrl": "http://localhost:7071",
-    "CalendarService:FunctionKey": "<calendar-functions-key>",
+    "CalendarService:InternalToken": "<shared-internal-token>",
     "AdviserFeed:Enabled": "false",
     "AdviserFeed:BaseUrl": "http://localhost:7080",
     "AdviserFeed:EndpointPath": "/api/v1/mock/advisers",
@@ -28,7 +30,6 @@
     "SharePoint:Advisers:SiteId": "<site-id>",
     "SharePoint:Advisers:ListId": "<list-id>",
     "SharePoint:Advisers:AdviserIdField": "field_3",
-    "SharePoint:Advisers:EmailField": "field_3",
     "SharePoint:Advisers:NameField": "Title",
     "SharePoint:Advisers:SkillsField": "License",
     "SharePoint:Advisers:RegionField": "Region",

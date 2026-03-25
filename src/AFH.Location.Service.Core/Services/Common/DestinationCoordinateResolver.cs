@@ -50,16 +50,5 @@ public sealed class DestinationCoordinateResolver
 
 
 
-    private static string NormaliseAddress(Address a)
-    {
-        // Keep it simple and deterministic
-        var parts = new[]
-        {
-            a.Line1, a.Line2, a.Town, a.Postcode, a.Country
-        }
-        .Where(x => !string.IsNullOrWhiteSpace(x))
-        .Select(x => x.Trim());
-
-        return string.Join(", ", parts);
-    }
+    
 }

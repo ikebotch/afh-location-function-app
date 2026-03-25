@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AFH.Location.Service.Core\AFH.Location.Service.Core.csproj" />
+    <ProjectReference Include="..\..\src\AFH.Location.Service.Infrastructure\AFH.Location.Service.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\AFH.Location.Service.Api\AFH.Location.Service.Api.csproj" />
   </ItemGroup>
 
 </Project>

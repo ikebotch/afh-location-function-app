@@ -9,6 +9,7 @@ using AFH.Location.Service.Infrastructure.External.Maps.Google;
 using AFH.Location.Service.Infrastructure.Options;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Service.Infrastructure.Persistence.Repositories;
+using AFH.Location.Service.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,13 @@ public static class DependencyInjection
 
         services.AddOptions<CalendarServiceOptions>()
             .Bind(configuration.GetSection(CalendarServiceOptions.SectionName))
+            .ValidateOnStart();
+        services.AddOptions<InternalApiAuthOptions>()
+            .Bind(configuration.GetSection(InternalApiAuthOptions.SectionName))
+            .ValidateOnStart();
+        services.AddOptions<GoogleMapsOptions>()
+            .Bind(configuration.GetSection(GoogleMapsOptions.SectionName))
+            .Validate(options => !options.Enabled, "Maps:Google:Enabled cannot be set because the Google provider path is intentionally disabled until it is fully implemented.")
             .ValidateOnStart();
 
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
@@ -52,6 +60,8 @@ public static class DependencyInjection
 
         services.AddScoped<IRouteMatrixService, AzureMapsRouteMatrixService>();
         services.AddScoped<RouteMatrixCoordinator>();
+        services.AddSingleton<IBusinessTimeZoneProvider, BusinessTimeZoneProvider>();
+        services.AddScoped<AvailabilityEvaluator>();
 
         services.Configure<AdviserFeedOptions>(configuration.GetSection(AdviserFeedOptions.SectionName));
         services.Configure<SharePointAdviserOptions>(configuration.GetSection(SharePointAdviserOptions.SectionName));

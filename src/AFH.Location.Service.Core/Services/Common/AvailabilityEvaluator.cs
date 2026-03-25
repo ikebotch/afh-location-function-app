@@ -1,14 +1,24 @@
-﻿using AFH.Location.Service.Core.Contracts.V1.Requests;
+using AFH.Location.Service.Core.Abstractions;
+using AFH.Location.Service.Core.Contracts.V1.Requests;
 
 namespace AFH.Location.Service.Core.Services.Common;
 
-public static class AvailabilityEvaluator
+public sealed class AvailabilityEvaluator
 {
     private static readonly TimeSpan BusinessDayStart = TimeSpan.FromHours(8);
     private static readonly TimeSpan BusinessDayEnd = TimeSpan.FromHours(17);
-    private static readonly TimeZoneInfo LondonTz = TimeZoneInfo.FindSystemTimeZoneById("Europe/London");
+    private readonly TimeZoneInfo _businessTimeZone;
 
-    public static (string Status, DateTime ProposedStartUtc) Evaluate(
+    public AvailabilityEvaluator(IBusinessTimeZoneProvider businessTimeZoneProvider)
+    {
+        var timeZoneId = string.IsNullOrWhiteSpace(businessTimeZoneProvider.TimeZoneId)
+            ? "UTC"
+            : businessTimeZoneProvider.TimeZoneId.Trim();
+
+        _businessTimeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+    }
+
+    public (string Status, DateTime ProposedStartUtc) Evaluate(
         MeetingWindow meeting,
         IReadOnlyList<(DateTime StartUtc, DateTime EndUtc)> busyBlocks)
     {
@@ -30,7 +40,7 @@ public static class AvailabilityEvaluator
 
         DateTime NormalizeToBusinessStart(DateTime utc)
         {
-            var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), LondonTz);
+            var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), _businessTimeZone);
             var localDate = local.Date;
             var localStart = localDate.Add(BusinessDayStart);
 
@@ -45,13 +55,13 @@ public static class AvailabilityEvaluator
             else
                 local = new DateTime(local.Year, local.Month, local.Day, local.Hour, roundedMinutes, 0);
 
-            return TimeZoneInfo.ConvertTimeToUtc(local, LondonTz);
+            return TimeZoneInfo.ConvertTimeToUtc(local, _businessTimeZone);
         }
 
         bool IsWithinBusinessHours(DateTime utcStart, DateTime utcEnd)
         {
-            var localStart = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcStart, DateTimeKind.Utc), LondonTz);
-            var localEnd = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcEnd, DateTimeKind.Utc), LondonTz);
+            var localStart = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcStart, DateTimeKind.Utc), _businessTimeZone);
+            var localEnd = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcEnd, DateTimeKind.Utc), _businessTimeZone);
 
             if (localStart.Date != localEnd.Date)
                 return false;
@@ -59,12 +69,10 @@ public static class AvailabilityEvaluator
             return localStart.TimeOfDay >= BusinessDayStart && localEnd.TimeOfDay <= BusinessDayEnd;
         }
 
-        // Requested slot is free
         var normalizedStart = NormalizeToBusinessStart(requestedStart);
         if (IsFreeAt(normalizedStart))
             return ("Available", normalizedStart);
 
-        // Find next free slot in horizon (simple step search)
         var step = TimeSpan.FromMinutes(15);
         for (var t = normalizedStart.Add(step); t.Add(duration) <= horizonEnd; t = t.Add(step))
         {

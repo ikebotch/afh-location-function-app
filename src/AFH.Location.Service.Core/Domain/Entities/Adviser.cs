@@ -3,7 +3,6 @@
 public sealed class Adviser
 {
     public string AdviserId { get; set; } = default!;
-    public string? CalendarUserId { get; set; }
     public string DisplayName { get; set; } = default!;
     public string HomePostcode { get; set; } = default!;
     public string Region { get; set; } = default!;

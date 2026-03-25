@@ -29,15 +29,17 @@
   - `startUtc`
   - `endUtc`
 - Auth:
-  - `x-functions-key` header via `CalendarService:FunctionKey` (when required)
+  - `Authorization: Bearer <shared internal token>` via `CalendarService:InternalToken`
 
 ## Required Local Config (Location)
-- `SharePointGraph:*`
-- `SharePoint:Advisers:*`
-- `CalendarService:BaseUrl`
-- `CalendarService:FunctionKey`
-- `LocationSearch:*`
+- Copy `src/AFH.Location.Service.Api/local.settings.template.json` to `src/AFH.Location.Service.Api/local.settings.json`.
+- Fill in `SharePointGraph:*`, `SharePoint:Advisers:*`, `CalendarService:*`, `InternalApiAuth:*`, and `BusinessTime:TimeZone`.
+- Keep `Maps:Google:Enabled=false`. The Google provider path is intentionally disabled until routing and geocoding are fully implemented.
 
 ## API Docs
 - Scalar UI: `/api/scalar`
 - OpenAPI JSON: `/api/openapi/v1.json`
+
+## Protected Routes
+- Health and docs remain public.
+- Adviser search, batch search, coverage, and license endpoints are protected by internal bearer auth unless development auth relaxation is explicitly enabled.

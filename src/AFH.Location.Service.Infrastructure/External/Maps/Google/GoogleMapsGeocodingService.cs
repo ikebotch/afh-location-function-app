@@ -5,5 +5,5 @@ namespace AFH.Location.Service.Infrastructure.External.Maps.Google;
 public sealed class GoogleMapsGeocodingService : IGeocodingService
 {
     public Task<(double Lat, double Lng)> GeocodeAsync(string address, CancellationToken ct)
-        => Task.FromResult((0d, 0d)); // TODO
+        => throw new NotSupportedException("Google geocoding is disabled because the provider path is incomplete and must not return fake coordinates.");
 }
