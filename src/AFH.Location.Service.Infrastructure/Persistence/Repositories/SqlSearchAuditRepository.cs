@@ -1,4 +1,4 @@
-using AFH.Location.Service.Core.Abstractions;
+using AFH.Location.Service.Application.Abstractions;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore.Entities;
 

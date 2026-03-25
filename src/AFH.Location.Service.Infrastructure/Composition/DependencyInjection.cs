@@ -1,11 +1,10 @@
-﻿using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Services.Common;
-using AFH.Location.Service.Core.Services.V1;
+﻿using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Application.Services.Common;
+using AFH.Location.Service.Application.Services.V1;
 using AFH.Location.Service.Infrastructure.Caching;
 using AFH.Location.Service.Infrastructure.External.Calendar;
 using AFH.Location.Service.Infrastructure.External.Graph;
 using AFH.Location.Service.Infrastructure.External.Maps.Azure;
-using AFH.Location.Service.Infrastructure.External.Maps.Google;
 using AFH.Location.Service.Infrastructure.Options;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Service.Infrastructure.Persistence.Repositories;
@@ -24,14 +23,14 @@ public static class DependencyInjection
     {
         services.AddHttpClient();
 
-        services.AddSingleton<IRequestContextAccessor, RequestContextAccessor>();
-        services.AddScoped<IMapsProviderSelector, PathBasedMapsProviderSelector>();
-
         services.AddOptions<CalendarServiceOptions>()
             .Bind(configuration.GetSection(CalendarServiceOptions.SectionName))
             .ValidateOnStart();
         services.AddOptions<InternalApiAuthOptions>()
             .Bind(configuration.GetSection(InternalApiAuthOptions.SectionName))
+            .ValidateOnStart();
+        services.AddOptions<LocationCoverageOptions>()
+            .Bind(configuration.GetSection(LocationCoverageOptions.SectionName))
             .ValidateOnStart();
         services.AddOptions<GoogleMapsOptions>()
             .Bind(configuration.GetSection(GoogleMapsOptions.SectionName))
@@ -40,27 +39,12 @@ public static class DependencyInjection
 
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
         services.AddScoped<ICalendarAvailabilityService, CalendarAvailabilityService>();
-
-        services.AddScoped<AzureMapsGeocodingService>();
-        services.AddScoped<AzureMapsRoutingService>();
-        services.AddScoped<AzureMapsRouteMatrixService>();
-
-        services.AddScoped<GoogleMapsGeocodingService>();
-        services.AddScoped<GoogleMapsRoutingService>();
-
-        services.AddScoped<IGeocodingService>(sp =>
-            sp.GetRequiredService<IMapsProviderSelector>().IsV2Request()
-                ? sp.GetRequiredService<GoogleMapsGeocodingService>()
-                : sp.GetRequiredService<AzureMapsGeocodingService>());
-
-        services.AddScoped<IRoutingService>(sp =>
-            sp.GetRequiredService<IMapsProviderSelector>().IsV2Request()
-                ? sp.GetRequiredService<GoogleMapsRoutingService>()
-                : sp.GetRequiredService<AzureMapsRoutingService>());
-
+        services.AddScoped<IGeocodingService, AzureMapsGeocodingService>();
+        services.AddScoped<IRoutingService, AzureMapsRoutingService>();
         services.AddScoped<IRouteMatrixService, AzureMapsRouteMatrixService>();
         services.AddScoped<RouteMatrixCoordinator>();
         services.AddSingleton<IBusinessTimeZoneProvider, BusinessTimeZoneProvider>();
+        services.AddSingleton<ICoveragePresentationSettings, CoveragePresentationSettings>();
         services.AddScoped<AvailabilityEvaluator>();
 
         services.Configure<AdviserFeedOptions>(configuration.GetSection(AdviserFeedOptions.SectionName));
@@ -113,7 +97,8 @@ public static class DependencyInjection
         services.AddScoped<OfficeCoordinateResolver>();
         services.AddScoped<AdviserCandidateSource>();
         services.AddScoped<RankingService>();
-
+        services.AddScoped<ILicenseCatalogService, LicenseCatalogService>();
+        services.AddScoped<IAdviserCoverageService, AdviserCoverageServiceV1>();
         services.AddScoped<ILocationSearchService, LocationSearchServiceV1>();
 
         return services;

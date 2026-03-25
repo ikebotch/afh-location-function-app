@@ -1,7 +1,8 @@
 ﻿using AFH.Location.Service.Api.Contracts;
-using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Contracts.V1.Requests;
-using AFH.Location.Service.Core.Validation.V1;
+using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Api.Mappings.V1;
+using AFH.Location.Service.Contract.V1.Requests;
+using AFH.Location.Service.Application.Validation.V1;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
@@ -32,7 +33,8 @@ public sealed class LocationSearchFunctionV1
                 ct);
         }
 
-        var errors = LocationSearchRequestValidatorV1.Validate(payload);
+        var request = LocationContractMapper.ToApplicationRequest(payload);
+        var errors = LocationSearchRequestValidatorV1.Validate(request);
         if (errors.Count > 0)
         {
             return await req.WriteFailureAsync(
@@ -41,8 +43,9 @@ public sealed class LocationSearchFunctionV1
                 ct);
         }
 
-        var result = await _service.SearchInPersonAsync(payload, ct);
-        var paging = ApiEnvelopeExtensions.SinglePage(result.Candidates.Count);
-        return await req.WriteSuccessAsync(result, ct, paging);
+        var result = await _service.SearchInPersonAsync(request, ct);
+        var response = LocationContractMapper.ToContractResponse(result);
+        var paging = ApiEnvelopeExtensions.SinglePage(response.Candidates.Count);
+        return await req.WriteSuccessAsync(response, ct, paging);
     }
 }

@@ -1,5 +1,5 @@
-using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Contracts.V1.Requests;
+using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Application.Models.V1;
 
 namespace AFH.Location.Service.Infrastructure.External.Calendar;
 
@@ -7,12 +7,12 @@ public interface ICalendarServiceClient
 {
     Task<AdviserAvailability> GetAdviserAvailabilityAsync(
         string adviserId,
-        MeetingWindow window,
+        LocationMeetingWindow window,
         CancellationToken ct);
 
     Task<IReadOnlyList<AdviserAvailability>> GetAdviserAvailabilityBatchAsync(
         IReadOnlyList<string> adviserIds,
-        MeetingWindow window,
+        LocationMeetingWindow window,
         CancellationToken ct);
 
     Task<CalendarAppointmentResult> CreateAppointmentAsync(

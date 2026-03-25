@@ -1,5 +1,5 @@
-using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Contracts.V1.Responses;
+using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Api.Mappings.V1;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
@@ -8,11 +8,11 @@ namespace AFH.Location.Service.Api.Functions.V1;
 
 public sealed class LicenseListFunctionV1
 {
-    private readonly IAdviserRepository _adviserRepository;
+    private readonly ILicenseCatalogService _licenseCatalogService;
 
-    public LicenseListFunctionV1(IAdviserRepository adviserRepository)
+    public LicenseListFunctionV1(ILicenseCatalogService licenseCatalogService)
     {
-        _adviserRepository = adviserRepository;
+        _licenseCatalogService = licenseCatalogService;
     }
 
     [Function("LicenseListV1")]
@@ -21,22 +21,11 @@ public sealed class LicenseListFunctionV1
         HttpRequestData req,
         CancellationToken ct)
     {
-        var advisers = await _adviserRepository.GetAllAsync(null, ct);
-
-        var licenses = advisers
-            .Where(a => a.IsActive)
-            .SelectMany(a => a.Skills)
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var result = await _licenseCatalogService.GetLicensesAsync(ct);
+        var response = LocationContractMapper.ToContractResponse(result);
 
         var ok = req.CreateResponse(HttpStatusCode.OK);
-        await ok.WriteAsJsonAsync(new LicenseListResponseV1
-        {
-            Licenses = licenses
-        }, ct);
+        await ok.WriteAsJsonAsync(response, ct);
 
         return ok;
     }

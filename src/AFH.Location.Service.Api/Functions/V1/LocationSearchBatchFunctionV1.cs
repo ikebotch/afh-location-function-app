@@ -1,8 +1,9 @@
 using AFH.Location.Service.Api.Contracts;
-using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Contracts.V1.Requests;
-using AFH.Location.Service.Core.Contracts.V1.Responses;
-using AFH.Location.Service.Core.Validation.V1;
+using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Api.Mappings.V1;
+using AFH.Location.Service.Application.Models.V1;
+using AFH.Location.Service.Contract.V1.Requests;
+using AFH.Location.Service.Application.Validation.V1;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
@@ -42,7 +43,7 @@ public sealed class LocationSearchBatchFunctionV1
             .Select((request, index) => (request, index))
             .ToArray();
 
-        var results = new LocationSearchBatchItemResponseV1[indexed.Length];
+        var results = new LocationSearchBatchItemResult[indexed.Length];
         using var gate = new SemaphoreSlim(_maxParallel, _maxParallel);
 
         var tasks = indexed.Select(async item =>
@@ -52,7 +53,7 @@ public sealed class LocationSearchBatchFunctionV1
             {
                 if (item.request is null)
                 {
-                    results[item.index] = new LocationSearchBatchItemResponseV1
+                    results[item.index] = new LocationSearchBatchItemResult
                     {
                         RequestId = string.Empty,
                         Success = false,
@@ -62,10 +63,11 @@ public sealed class LocationSearchBatchFunctionV1
                     return;
                 }
 
-                var validationErrors = LocationSearchRequestValidatorV1.Validate(item.request);
+                var request = LocationContractMapper.ToApplicationRequest(item.request);
+                var validationErrors = LocationSearchRequestValidatorV1.Validate(request);
                 if (validationErrors.Count > 0)
                 {
-                    results[item.index] = new LocationSearchBatchItemResponseV1
+                    results[item.index] = new LocationSearchBatchItemResult
                     {
                         RequestId = item.request.RequestId ?? string.Empty,
                         Success = false,
@@ -75,8 +77,8 @@ public sealed class LocationSearchBatchFunctionV1
                     return;
                 }
 
-                var search = await _service.SearchInPersonAsync(item.request, ct);
-                results[item.index] = new LocationSearchBatchItemResponseV1
+                var search = await _service.SearchInPersonAsync(request, ct);
+                results[item.index] = new LocationSearchBatchItemResult
                 {
                     RequestId = item.request.RequestId ?? string.Empty,
                     Success = true,
@@ -85,7 +87,7 @@ public sealed class LocationSearchBatchFunctionV1
             }
             catch (Exception ex)
             {
-                results[item.index] = new LocationSearchBatchItemResponseV1
+                results[item.index] = new LocationSearchBatchItemResult
                 {
                     RequestId = item.request?.RequestId ?? string.Empty,
                     Success = false,
@@ -101,13 +103,14 @@ public sealed class LocationSearchBatchFunctionV1
 
         await Task.WhenAll(tasks);
 
-        var response = new LocationSearchBatchResponseV1
+        var response = new LocationSearchBatchResult
         {
             GeneratedAtUtc = DateTime.UtcNow,
             Results = results.ToList()
         };
 
-        var paging = ApiEnvelopeExtensions.SinglePage(response.Results.Count);
-        return await req.WriteSuccessAsync(response, ct, paging);
+        var contractResponse = LocationContractMapper.ToContractResponse(response);
+        var paging = ApiEnvelopeExtensions.SinglePage(contractResponse.Results.Count);
+        return await req.WriteSuccessAsync(contractResponse, ct, paging);
     }
 }

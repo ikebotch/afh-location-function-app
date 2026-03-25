@@ -1,4 +1,3 @@
-using AFH.Location.Service.Core.Abstractions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
@@ -14,8 +13,6 @@ public sealed class CorrelationIdMiddleware : IFunctionsWorkerMiddleware
         var req = await context.GetHttpRequestDataAsync();
         if (req is not null)
         {
-            RequestContextAccessor.SetPath(req.Url.AbsolutePath);
-
             var cid = req.Headers.TryGetValues(Header, out var values)
                 ? values.FirstOrDefault()
                 : null;

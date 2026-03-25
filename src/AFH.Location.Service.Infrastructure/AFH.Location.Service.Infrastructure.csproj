@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<ItemGroup>
-		<ProjectReference Include="..\AFH.Location.Service.Core\AFH.Location.Service.Core.csproj" />
+		<ProjectReference Include="..\AFH.Location.Service.Application\AFH.Location.Service.Application.csproj" />
+		<ProjectReference Include="..\AFH.Location.Service.Domain\AFH.Location.Service.Domain.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

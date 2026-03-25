@@ -27,7 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AFH.Location.Service.Core\AFH.Location.Service.Core.csproj" />
+    <ProjectReference Include="..\AFH.Location.Service.Application\AFH.Location.Service.Application.csproj" />
+    <ProjectReference Include="..\AFH.Location.Service.Contract\AFH.Location.Service.Contract.csproj" />
+    <ProjectReference Include="..\AFH.Location.Service.Domain\AFH.Location.Service.Domain.csproj" />
     <ProjectReference Include="..\AFH.Location.Service.Infrastructure\AFH.Location.Service.Infrastructure.csproj" />
   </ItemGroup>
 	

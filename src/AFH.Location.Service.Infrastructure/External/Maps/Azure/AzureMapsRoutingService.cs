@@ -1,4 +1,4 @@
-﻿using AFH.Location.Service.Core.Abstractions;
+﻿using AFH.Location.Service.Application.Abstractions;
 using Microsoft.Extensions.Configuration;
 using System.Text.Encodings.Web;
 using System.Text.Json;

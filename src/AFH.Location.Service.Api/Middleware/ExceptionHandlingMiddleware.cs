@@ -1,5 +1,5 @@
 ﻿using AFH.Location.Service.Api.Contracts;
-using AFH.Location.Service.Core.Domain.Errors;
+using AFH.Location.Service.Domain.Errors;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;

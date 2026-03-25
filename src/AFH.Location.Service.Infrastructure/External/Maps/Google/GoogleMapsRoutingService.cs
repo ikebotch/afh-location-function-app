@@ -1,4 +1,4 @@
-﻿using AFH.Location.Service.Core.Abstractions;
+﻿using AFH.Location.Service.Application.Abstractions;
 
 namespace AFH.Location.Service.Infrastructure.External.Maps.Google;
 

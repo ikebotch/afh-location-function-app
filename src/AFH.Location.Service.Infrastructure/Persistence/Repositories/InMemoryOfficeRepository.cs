@@ -1,5 +1,5 @@
-﻿using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Models;
+﻿using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Domain.Entities;
 
 namespace AFH.Location.Service.Infrastructure.Persistence.Repositories;
 

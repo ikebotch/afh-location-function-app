@@ -1,6 +1,6 @@
-using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Contracts.V1.Requests;
-using AFH.Location.Service.Core.Services.Common;
+using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Application.Services.Common;
+using AFH.Location.Service.Application.Models.V1;
 using AFH.Location.Service.Infrastructure.External.Maps.Google;
 using Microsoft.Extensions.Configuration;
 
@@ -34,7 +34,7 @@ public class ProviderSafetyTests
     {
         var sut = new AvailabilityEvaluator(new StubTimeZoneProvider("UTC"));
 
-        var meeting = new MeetingWindow
+        var meeting = new LocationMeetingWindow
         {
             RequestedStartUtc = new DateTime(2026, 03, 25, 7, 5, 0, DateTimeKind.Utc),
             DurationMinutes = 60,

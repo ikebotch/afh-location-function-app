@@ -1,5 +1,5 @@
-using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Domain.Entities;
+using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Domain.Entities;
 using AFH.Location.Service.Infrastructure.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

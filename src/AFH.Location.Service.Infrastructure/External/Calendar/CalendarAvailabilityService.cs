@@ -1,5 +1,5 @@
-using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Contracts.V1.Requests;
+using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Application.Models.V1;
 
 namespace AFH.Location.Service.Infrastructure.External.Calendar;
 
@@ -14,7 +14,7 @@ public sealed class CalendarAvailabilityService : ICalendarAvailabilityService
 
     public async Task<IReadOnlyList<AdviserAvailability>> GetAvailabilityAsync(
         IReadOnlyList<string> adviserIds,
-        MeetingWindow window,
+        LocationMeetingWindow window,
         CancellationToken ct)
     {
         if (adviserIds is null || adviserIds.Count == 0)

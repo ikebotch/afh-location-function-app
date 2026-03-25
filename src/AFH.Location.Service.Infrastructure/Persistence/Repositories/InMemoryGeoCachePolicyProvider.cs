@@ -1,5 +1,5 @@
-﻿using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Services.Common;
+﻿using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Domain;
 
 namespace AFH.Location.Service.Infrastructure.Persistence.Repositories;
 
@@ -24,4 +24,3 @@ public sealed class InMemoryGeoCachePolicyProvider : IGeoCachePolicyProvider
         return Task.FromResult(_policy);
     }
 }
-

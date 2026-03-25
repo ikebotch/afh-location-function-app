@@ -1,5 +1,5 @@
-using AFH.Location.Service.Core.Abstractions;
-using AFH.Location.Service.Core.Contracts.V1.Requests;
+using AFH.Location.Service.Application.Abstractions;
+using AFH.Location.Service.Application.Models.V1;
 using AFH.Location.Service.Infrastructure.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,7 +29,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
 
     public async Task<AdviserAvailability> GetAdviserAvailabilityAsync(
         string adviserId,
-        MeetingWindow window,
+        LocationMeetingWindow window,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_options.BaseUrl))
@@ -128,7 +128,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
 
     public async Task<IReadOnlyList<AdviserAvailability>> GetAdviserAvailabilityBatchAsync(
         IReadOnlyList<string> adviserIds,
-        MeetingWindow window,
+        LocationMeetingWindow window,
         CancellationToken ct)
     {
         if (adviserIds is null || adviserIds.Count == 0)
@@ -309,7 +309,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
 
 
 
-    private (DateTime StartUtc, DateTime EndUtc) BuildScheduleWindow(MeetingWindow window)
+    private (DateTime StartUtc, DateTime EndUtc) BuildScheduleWindow(LocationMeetingWindow window)
     {
         var startUtc = window.RequestedStartUtc.AddMinutes(-Math.Max(0, _options.ScheduleLookbackMinutes));
         var endUtc = window.RequestedStartUtc.AddMinutes(Math.Max(1, window.SearchHorizonMinutes + window.DurationMinutes));
@@ -319,7 +319,7 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
 
     private static AdviserAvailability MapAvailability(
         string adviserId,
-        MeetingWindow window,
+        LocationMeetingWindow window,
         string? state,
         string? message,
         IReadOnlyList<BookingSummary>? bookings)
