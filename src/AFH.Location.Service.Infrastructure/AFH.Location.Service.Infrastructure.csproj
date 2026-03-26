@@ -3,10 +3,11 @@
 	<ItemGroup>
 		<ProjectReference Include="..\AFH.Location.Service.Application\AFH.Location.Service.Application.csproj" />
 		<ProjectReference Include="..\AFH.Location.Service.Domain\AFH.Location.Service.Domain.csproj" />
-		<ProjectReference Include="..\..\..\afh-sharepoint-integration\src\AFH.Common.SharePointUtils\AFH.Common.SharePointUtils.csproj" />
+		<ProjectReference Include="..\..\..\afh-sharepoint-integration\src\AFH.Common.SharePointUtils.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Microsoft.ApplicationInsights" Version="2.23.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.9" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10" />

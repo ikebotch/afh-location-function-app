@@ -23,6 +23,9 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         catch (DestinationResolveException ex)
         {
             var req = await context.GetHttpRequestDataAsync();
+            if (req is null)
+                throw;
+
             var res = await req!.WriteFailureAsync(
                 HttpStatusCode.UnprocessableEntity,
                 new { code = ex.Code, message = ex.Message },
@@ -33,6 +36,9 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         {
             _logger.LogError(ex, "Unhandled exception");
             var req = await context.GetHttpRequestDataAsync();
+            if (req is null)
+                throw;
+
             var res = req is null
                 ? null
                 : await req.WriteFailureAsync(

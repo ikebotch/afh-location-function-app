@@ -6,6 +6,7 @@ using AFH.Location.Service.Infrastructure.External.Calendar;
 using AFH.Location.Service.Infrastructure.External.Graph;
 using AFH.Location.Service.Infrastructure.External.Maps;
 using AFH.Location.Service.Infrastructure.External.Maps.Azure;
+using AFH.Location.Service.Infrastructure.Logging;
 using AFH.Location.Service.Infrastructure.Options;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Service.Infrastructure.Persistence.Repositories;
@@ -24,6 +25,7 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.AddHttpClient();
+        services.Configure<ApplicationLoggingOptions>(configuration.GetSection(ApplicationLoggingOptions.SectionName));
 
         services.AddOptions<CalendarServiceOptions>()
             .Bind(configuration.GetSection(CalendarServiceOptions.SectionName))
@@ -74,6 +76,7 @@ public static class DependencyInjection
         if (!string.IsNullOrWhiteSpace(policyDbConnectionString))
         {
             services.AddDbContext<LocationPolicyDbContext>(options => options.UseSqlServer(policyDbConnectionString));
+            services.AddDbContextFactory<LocationPolicyDbContext>(options => options.UseSqlServer(policyDbConnectionString));
             services.AddScoped<ICoveragePolicyProvider, SqlCoveragePolicyProvider>();
             services.AddScoped<IAvailabilityPolicyProvider, SqlAvailabilityPolicyProvider>();
             services.AddScoped<ISearchAuditRepository, SqlSearchAuditRepository>();
@@ -110,6 +113,25 @@ public static class DependencyInjection
         services.AddScoped<IAdviserCacheSyncService, AdviserCacheSyncService>();
         services.AddScoped<IAdviserRepository, CachedAdviserRepository>();
         services.AddScoped<ILocationSearchService, LocationSearchServiceV1>();
+        services.AddScoped<DatabaseApplicationLogSink>(sp => new DatabaseApplicationLogSink(
+            sp.GetService<IDbContextFactory<LocationPolicyDbContext>>(),
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DatabaseApplicationLogSink>>()));
+        services.AddScoped<ApplicationInsightsLogSink>(sp => new ApplicationInsightsLogSink(
+            sp.GetService<Microsoft.ApplicationInsights.TelemetryClient>(),
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<ApplicationInsightsLogSink>>()));
+        services.AddScoped<IApplicationLogSink>(sp =>
+        {
+            var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<ApplicationLoggingOptions>>().Value;
+            return options.Provider switch
+            {
+                ApplicationLogProvider.Database => sp.GetRequiredService<DatabaseApplicationLogSink>(),
+                ApplicationLogProvider.ApplicationInsights => sp.GetRequiredService<ApplicationInsightsLogSink>(),
+                _ => new CompositeApplicationLogSink(
+                    sp.GetRequiredService<DatabaseApplicationLogSink>(),
+                    sp.GetRequiredService<ApplicationInsightsLogSink>())
+            };
+        });
 
         return services;
     }

@@ -19,6 +19,7 @@ public sealed class LocationPolicyDbContext : DbContext
     public DbSet<AvailabilityDefaultPolicyEntity> AvailabilityDefaults => Set<AvailabilityDefaultPolicyEntity>();
     public DbSet<SearchAuditRecordEntity> SearchAuditRecords => Set<SearchAuditRecordEntity>();
     public DbSet<IntegrationOperationAuditEntity> IntegrationOperationAudits => Set<IntegrationOperationAuditEntity>();
+    public DbSet<ApplicationLogEntity> ApplicationLogs => Set<ApplicationLogEntity>();
     public DbSet<AdviserReferenceCacheEntity> AdviserReferenceCache => Set<AdviserReferenceCacheEntity>();
     public DbSet<GeoCacheEntryEntity> GeoCacheEntries => Set<GeoCacheEntryEntity>();
     public DbSet<RouteCacheEntryEntity> RouteCacheEntries => Set<RouteCacheEntryEntity>();
@@ -100,6 +101,28 @@ public sealed class LocationPolicyDbContext : DbContext
             entity.HasIndex(x => x.CreatedUtc);
             entity.HasIndex(x => x.CorrelationId);
             entity.HasIndex(x => new { x.FunctionName, x.CreatedUtc });
+        });
+
+        modelBuilder.Entity<ApplicationLogEntity>(entity =>
+        {
+            entity.ToTable("ApplicationLogs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Level).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Operation).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.CorrelationId).HasMaxLength(128);
+            entity.Property(x => x.UserId).HasMaxLength(128);
+            entity.Property(x => x.ContextId).HasMaxLength(256);
+            entity.Property(x => x.EventType).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Result).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.Message).HasMaxLength(2048).IsRequired();
+            entity.Property(x => x.ExceptionType).HasMaxLength(256);
+            entity.Property(x => x.ExceptionMessage).HasMaxLength(2048);
+            entity.Property(x => x.PayloadJson).HasMaxLength(4096);
+            entity.HasIndex(x => x.OccurredUtc);
+            entity.HasIndex(x => x.CorrelationId);
+            entity.HasIndex(x => new { x.Category, x.OccurredUtc });
+            entity.HasIndex(x => new { x.Operation, x.OccurredUtc });
         });
 
         modelBuilder.Entity<AdviserReferenceCacheEntity>(entity =>

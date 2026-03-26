@@ -4,6 +4,9 @@
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "APPLICATIONINSIGHTS_CONNECTION_STRING": "",
+    "ApplicationLogging:Provider": "Both",
+    "ApplicationLogging:MaxPayloadLength": "2048",
+    "ApplicationLogging:LogPayloads": "true",
 
     "InternalApiAuth:Token": "<shared-internal-token>",
     "InternalApiAuth:AllowAnonymousInDevelopment": "true",

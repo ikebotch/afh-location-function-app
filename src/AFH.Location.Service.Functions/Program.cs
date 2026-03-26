@@ -36,6 +36,7 @@ var host = new HostBuilder()
     })
     .ConfigureServices((ctx, services) =>
     {
+        services.AddApplicationInsightsTelemetryWorkerService();
         services.AddLocationInfrastructure(ctx.Configuration);
         services.Configure<WorkerOptions>(options =>
         {
