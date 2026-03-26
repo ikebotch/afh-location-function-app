@@ -45,7 +45,7 @@
 
 ## Required Local Config (Location)
 - Copy `src/AFH.Location.Service.Api/local.settings.template.json` to `src/AFH.Location.Service.Api/local.settings.json`.
-- Fill in `SharePointGraph:*`, `SharePoint:Advisers:*`, `CalendarService:*`, `InternalApiAuth:*`, and `BusinessTime:TimeZone`.
+- Fill in `AzureAD:*`, `SharePoint:Advisers:*`, `CalendarService:*`, `InternalApiAuth:*`, and `BusinessTime:TimeZone`.
 - Keep `Maps:Google:Enabled=false`. The Google provider path is intentionally disabled until routing and geocoding are fully implemented.
 
 ## API Docs

@@ -23,7 +23,7 @@
     <ProjectReference Include="..\..\src\AFH.Location.Service.Contract\AFH.Location.Service.Contract.csproj" />
     <ProjectReference Include="..\..\src\AFH.Location.Service.Domain\AFH.Location.Service.Domain.csproj" />
     <ProjectReference Include="..\..\src\AFH.Location.Service.Infrastructure\AFH.Location.Service.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\AFH.Location.Service.Api\AFH.Location.Service.Api.csproj" />
+    <ProjectReference Include="..\..\src\AFH.Location.Service.Functions\AFH.Location.Service.Functions.csproj" />
   </ItemGroup>
 
 </Project>

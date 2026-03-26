@@ -10,6 +10,7 @@ using AFH.Location.Service.Infrastructure.Options;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Service.Infrastructure.Persistence.Repositories;
 using AFH.Location.Service.Infrastructure.Services;
+using AFH.Common.SharePointUtils.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -97,7 +98,7 @@ public static class DependencyInjection
         services.AddSingleton<IGeoCachePolicyProvider, InMemoryGeoCachePolicyProvider>();
 
         services.AddMemoryCache();
-        services.AddGraphClient(configuration);
+        services.AddSharePoint(configuration);
 
         services.AddScoped<DestinationCoordinateResolver>();
         services.AddScoped<AdviserCoordinateResolver>();

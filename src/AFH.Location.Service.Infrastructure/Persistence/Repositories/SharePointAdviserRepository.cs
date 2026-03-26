@@ -1,85 +1,39 @@
 ﻿using AFH.Location.Service.Application.Abstractions;
 using AFH.Location.Service.Domain.Entities;
 using AFH.Location.Service.Infrastructure.Options;
+using AFH.Common.SharePointUtils.Abstractions;
+using AFH.Common.SharePointUtils.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Graph;
 using Microsoft.Graph.Models;
-using Microsoft.Kiota.Abstractions.Serialization;
 
 namespace AFH.Location.Service.Infrastructure.Persistence.Repositories;
 
 public sealed class SharePointAdviserRepository : IAdviserSourceRepository
 {
-    private readonly GraphServiceClient _graph;
+    private readonly ISharePointListService _sharePointListService;
+    private readonly ISharePointFieldResolver _fieldResolver;
     private readonly SharePointAdviserOptions _opts;
     private readonly ILogger<SharePointAdviserRepository> _logger;
 
     public SharePointAdviserRepository(
-        GraphServiceClient graph,
+        ISharePointListService sharePointListService,
+        ISharePointFieldResolver fieldResolver,
         IOptions<SharePointAdviserOptions> opts,
         ILogger<SharePointAdviserRepository> logger)
     {
-        _graph = graph;
+        _sharePointListService = sharePointListService;
+        _fieldResolver = fieldResolver;
         _opts = opts.Value;
         _logger = logger;
     }
 
-    // ------------------------------------------------------------
-    // Multi-choice parser (Kiota-safe using JSON conversion)
-    // ------------------------------------------------------------
-
-
-
-  
-
-
-
-private static string[] GetMultiChoice(IDictionary<string, object> fields, string key)
-{
-    if (!fields.TryGetValue(key, out var raw) || raw is not UntypedArray ua)
-        return Array.Empty<string>();
-
-    var result = new List<string>();
-
-    var items = ua.GetValue();
-    if (items == null)
-        return Array.Empty<string>();
-
-    foreach (var node in items)
+    public async Task<IReadOnlyList<Adviser>> GetAllAsync(
+        IReadOnlyCollection<string>? adviserIds,
+        CancellationToken ct)
     {
-        if (node is UntypedString s)
-        {
-            var value = s.GetValue() as string;
-
-            if (!string.IsNullOrWhiteSpace(value))
-                result.Add(value);
-        }
-    }
-
-    return result.ToArray();
-}
-// ------------------------------------------------------------
-// Main load method
-// ------------------------------------------------------------
-public async Task<IReadOnlyList<Adviser>> GetAllAsync(
-                    IReadOnlyCollection<string>? adviserIds,
-                    CancellationToken ct)
-    {
-
-
-
         if (string.IsNullOrWhiteSpace(_opts.SiteId) || string.IsNullOrWhiteSpace(_opts.ListId))
             throw new InvalidOperationException("SharePoint SiteId and AdvisersListId must be configured.");
-
-        // Load SharePoint fields (debugging)
-        var spFields = await GetFieldsAsync();
-        foreach (var f in spFields)
-        {
-            _logger.LogInformation(
-                "Field: DisplayName={DisplayName}, InternalName={Type},InternalName={Name}, Id={Id}",
-                f.DisplayName, f.Type, f.Name, f.Id);
-        }
 
         // Filter logic
         var ids = (adviserIds ?? Array.Empty<string>())
@@ -88,6 +42,12 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        var fieldProfile = await _fieldResolver.ResolveProfileAsync(
+            _opts.SiteId,
+            _opts.ListId,
+            new SharePointAdviserFieldProfile(_opts),
+            ct);
+
         var listItems = new List<ListItem>();
 
         if (ids.Count == 0)
@@ -95,39 +55,32 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
             _logger.LogInformation("Loading ALL advisers from SharePoint siteId={SiteId} listId={ListId}",
                 _opts.SiteId, _opts.ListId);
 
-            var page = await _graph
-                .Sites[_opts.SiteId]
-                .Lists[_opts.ListId]
-                .Items
-                .GetAsync(cfg =>
-                {
-                    cfg.QueryParameters.Expand = new[] { "fields" };
-                    cfg.QueryParameters.Top = 999;
-                }, ct);
+            var items = await _sharePointListService.GetListItems(
+                _opts.SiteId,
+                _opts.ListId,
+                expandFields: ["fields"],
+                cancellationToken: ct);
 
-            if (page?.Value is { Count: > 0 })
-                listItems.AddRange(page.Value);
+            listItems.AddRange(items);
         }
         else
         {
             _logger.LogInformation("Loading {Count} advisers by AdviserId from SharePoint siteId={SiteId} listId={ListId}",
                 ids.Count, _opts.SiteId, _opts.ListId);
 
-            foreach (var filter in BuildOrFilters(ids, _opts.AdviserIdField, chunkSize: 15))
+            foreach (var currentFilter in BuildOrFilters(
+                ids,
+                fieldProfile.GetRequiredInternalName(SharePointAdviserFieldNames.AdviserId),
+                chunkSize: 15))
             {
-                var page = await _graph
-                    .Sites[_opts.SiteId]
-                    .Lists[_opts.ListId]
-                    .Items
-                    .GetAsync(cfg =>
-                    {
-                        cfg.QueryParameters.Expand = new[] { "fields" };
-                        cfg.QueryParameters.Filter = filter;
-                        cfg.QueryParameters.Top = 999;
-                    }, ct);
+                var items = await _sharePointListService.GetListItems(
+                    _opts.SiteId,
+                    _opts.ListId,
+                    currentFilter,
+                    expandFields: ["fields"],
+                    cancellationToken: ct);
 
-                if (page?.Value is { Count: > 0 })
-                    listItems.AddRange(page.Value);
+                listItems.AddRange(items);
             }
         }
 
@@ -136,35 +89,35 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
 
         foreach (var li in listItems)
         {
-            var fields = li.Fields?.AdditionalData;
-            if (fields is null) continue;
+            var fields = li.GetFieldValues();
+            if (fields.Count == 0) continue;
 
-            var adviserId = TryGet(fields, _opts.AdviserIdField);
+            var adviserId = fields.GetString(fieldProfile, SharePointAdviserFieldNames.AdviserId);
             if (string.IsNullOrWhiteSpace(adviserId))
                 continue;
 
-            var name = TryGet(fields, _opts.NameField) ?? TryGet(fields, "Title") ?? adviserId;
-            var postcode = TryGet(fields, _opts.PostcodeField);
-            var region = TryGet(fields, _opts.RegionField);
-            var rating = TryGetDouble(fields, _opts.RatingField) ?? _opts.DefaultRating;
-            var coverageRadiusMiles = TryGetDouble(fields, _opts.CoverageRadiusMilesField);
-            var maxTravelTimeMinutes = TryGetInt(fields, _opts.MaxTravelTimeMinutesField);
-
-            // Multi-choice skills
-            var skills = GetMultiChoice(fields, _opts.SkillsField);
-
-
-
-
+            var displayName = fields.GetString(fieldProfile, SharePointAdviserFieldNames.DisplayName);
+            var name = fields.GetString(fieldProfile, SharePointAdviserFieldNames.Name)
+                ?? displayName
+                ?? adviserId;
+            var postcode = fields.GetString(fieldProfile, SharePointAdviserFieldNames.Postcode);
+            var region = fields.GetString(fieldProfile, SharePointAdviserFieldNames.Region);
+            var rating = fields.GetDouble(fieldProfile.GetRequiredInternalName(SharePointAdviserFieldNames.Rating))
+                ?? _opts.DefaultRating;
+            var coverageRadiusMiles = fields.GetDouble(
+                fieldProfile.GetRequiredInternalName(SharePointAdviserFieldNames.CoverageRadiusMiles));
+            var maxTravelTimeMinutes = fields.GetInt32(
+                fieldProfile.GetRequiredInternalName(SharePointAdviserFieldNames.MaxTravelTimeMinutes));
+            var skills = fields.GetChoices(fieldProfile.GetRequiredInternalName(SharePointAdviserFieldNames.Skills));
 
             advisers.Add(new Adviser
             {
                 AdviserId = adviserId,
                 DisplayName = name,
-                MailboxUserId = TryGet(fields, _opts.EmailField) ?? adviserId,
+                MailboxUserId = fields.GetString(fieldProfile, SharePointAdviserFieldNames.Email) ?? adviserId,
                 HomePostcode = postcode ?? "",
                 Region = region ?? "",
-                Skills = skills,
+                Skills = skills.ToArray(),
                 Rating = rating,
                 IsActive = true,
                 IsBookable = true,
@@ -180,9 +133,6 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
             .ToList();
     }
 
-    // ------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------
     private static IEnumerable<string> BuildOrFilters(
         IReadOnlyList<string> adviserIds,
         string adviserIdInternalFieldName,
@@ -199,33 +149,5 @@ public async Task<IReadOnlyList<Adviser>> GetAllAsync(
 
             yield return string.Join(" or ", parts);
         }
-    }
-
-    public async Task<IReadOnlyList<ColumnDefinition>> GetFieldsAsync()
-    {
-        var columns = await _graph
-            .Sites[_opts.SiteId]
-            .Lists[_opts.ListId]
-            .Columns
-            .GetAsync();
-
-        return columns?.Value?.ToList() ?? new List<ColumnDefinition>();
-    }
-
-    private static string? TryGet(IDictionary<string, object> dict, string key)
-        => dict.TryGetValue(key, out var v) ? v?.ToString() : null;
-
-    private static double? TryGetDouble(IDictionary<string, object> dict, string key)
-    {
-        if (!dict.TryGetValue(key, out var v) || v is null) return null;
-        if (double.TryParse(v.ToString(), out var parsed)) return parsed;
-        return null;
-    }
-
-    private static int? TryGetInt(IDictionary<string, object> dict, string key)
-    {
-        if (!dict.TryGetValue(key, out var v) || v is null) return null;
-        if (int.TryParse(v.ToString(), out var parsed)) return parsed;
-        return null;
     }
 }

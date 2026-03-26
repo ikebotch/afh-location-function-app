@@ -13,9 +13,9 @@
     "Maps:Google:Enabled": "false",
     "Maps:Google:ApiKey": "<google-maps-key-if-provider-is-finished>",
 
-    "SharePointGraph:TenantId": "<tenant-id>",
-    "SharePointGraph:ClientId": "<client-id>",
-    "SharePointGraph:ClientSecret": "<client-secret>",
+    "AzureAD:TenantId": "<tenant-id>",
+    "AzureAD:ClientId": "<client-id>",
+    "AzureAD:ClientSecret": "<client-secret>",
 
     "CalendarService:BaseUrl": "http://localhost:7071",
     "CalendarService:FunctionKey": "<calendar-function-key>",

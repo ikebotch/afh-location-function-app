@@ -14,8 +14,8 @@ public sealed class LocationPolicyDbContextFactory : IDesignTimeDbContextFactory
     {
         var config = new ConfigurationBuilder()
             .AddJsonFile("local.settings.json", optional: true)
-            .AddJsonFile(Path.Combine("src", "AFH.Location.Service.Api", "appsettings.json"), optional: true)
-            .AddJsonFile(Path.Combine("src", "AFH.Location.Service.Api", "local.settings.json"), optional: true)
+            .AddJsonFile(Path.Combine("src", "AFH.Location.Service.Functions", "appsettings.json"), optional: true)
+            .AddJsonFile(Path.Combine("src", "AFH.Location.Service.Functions", "local.settings.json"), optional: true)
             .AddEnvironmentVariables()
             .Build();
 
