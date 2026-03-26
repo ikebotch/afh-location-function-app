@@ -44,9 +44,16 @@
   - `Authorization: Bearer <shared internal token>` via `CalendarService:InternalToken`
 
 ## Required Local Config (Location)
-- Copy `src/AFH.Location.Service.Api/local.settings.template.json` to `src/AFH.Location.Service.Api/local.settings.json`.
-- Fill in `AzureAD:*`, `SharePoint:Advisers:*`, `CalendarService:*`, `InternalApiAuth:*`, and `BusinessTime:TimeZone`.
+- Copy `src/AFH.Location.Service.Functions/local.settings.template.json` to `src/AFH.Location.Service.Functions/local.settings.json`.
+- Fill in the required values:
+  `AzureAD:*`, `SharePoint:Advisers:SiteId`, `SharePoint:Advisers:ListId`, `CalendarService:BaseUrl`, `CalendarService:FunctionKey`, `CalendarService:InternalToken`, and `InternalApiAuth:Token`.
+- The template now also includes the active SharePoint field-name mapping keys used by the current `SharePointAdviserRepository` implementation, so local list-field overrides do not have to be discovered by source inspection.
 - Keep `Maps:Google:Enabled=false`. The Google provider path is intentionally disabled until routing and geocoding are fully implemented.
+
+## Local Settings Conventions
+- Internal bearer auth uses `InternalApiAuth:Token`.
+- Calendar downstream auth uses `CalendarService:BaseUrl`, `CalendarService:FunctionKey`, and `CalendarService:InternalToken`.
+- SharePoint config stays under `SharePoint:Advisers:*` because those keys map directly to the active infrastructure options and SharePointUtils consumption path.
 
 ## API Docs
 - Scalar UI: `/api/scalar`
