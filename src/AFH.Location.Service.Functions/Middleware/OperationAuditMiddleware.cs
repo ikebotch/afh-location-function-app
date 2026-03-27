@@ -11,16 +11,13 @@ namespace AFH.Location.Service.Api.Middleware;
 
 public sealed class OperationAuditMiddleware : IFunctionsWorkerMiddleware
 {
-    private readonly IApplicationLogSink _applicationLogSink;
     private readonly ApplicationLoggingOptions _loggingOptions;
     private readonly ILogger<OperationAuditMiddleware> _logger;
 
     public OperationAuditMiddleware(
-        IApplicationLogSink applicationLogSink,
         IOptions<ApplicationLoggingOptions> loggingOptions,
         ILogger<OperationAuditMiddleware> logger)
     {
-        _applicationLogSink = applicationLogSink;
         _loggingOptions = loggingOptions.Value;
         _logger = logger;
     }
@@ -51,30 +48,38 @@ public sealed class OperationAuditMiddleware : IFunctionsWorkerMiddleware
 
             try
             {
-                await _applicationLogSink.WriteAsync(new ApplicationLogEntry
+                var applicationLogSink = context.InstanceServices.GetService(typeof(IApplicationLogSink)) as IApplicationLogSink;
+                if (applicationLogSink is null)
                 {
-                    OccurredUtc = DateTime.UtcNow,
-                    Level = GetLevel(unhandled, statusCode),
-                    Category = "FunctionInvocation",
-                    Operation = context.FunctionDefinition.Name,
-                    CorrelationId = correlationId,
-                    ContextId = context.InvocationId,
-                    EventType = unhandled is null ? "InvocationCompleted" : "InvocationFailed",
-                    Result = unhandled is null && statusCode < 400 ? "Success" : "Failure",
-                    Message = unhandled is null
-                        ? "Location function invocation completed."
-                        : "Location function invocation failed.",
-                    ExceptionType = unhandled?.GetType().Name,
-                    ExceptionMessage = unhandled?.Message,
-                    PayloadJson = ApplicationLogPayloadHelper.Serialize(new
+                    _logger.LogWarning("Location application log sink was not available for Function={Function}.", context.FunctionDefinition.Name);
+                }
+                else
+                {
+                    await applicationLogSink.WriteAsync(new ApplicationLogEntry
                     {
-                        Trigger = req is null ? "Function" : "Http",
-                        Method = req?.Method,
-                        Path = req?.Url.AbsolutePath,
-                        StatusCode = statusCode,
-                        DurationMs = sw.ElapsedMilliseconds,
-                    }, _loggingOptions)
-                }, CancellationToken.None);
+                        OccurredUtc = DateTime.UtcNow,
+                        Level = GetLevel(unhandled, statusCode),
+                        Category = "FunctionInvocation",
+                        Operation = context.FunctionDefinition.Name,
+                        CorrelationId = correlationId,
+                        ContextId = context.InvocationId,
+                        EventType = unhandled is null ? "InvocationCompleted" : "InvocationFailed",
+                        Result = unhandled is null && statusCode < 400 ? "Success" : "Failure",
+                        Message = unhandled is null
+                            ? "Location function invocation completed."
+                            : "Location function invocation failed.",
+                        ExceptionType = unhandled?.GetType().Name,
+                        ExceptionMessage = unhandled?.Message,
+                        PayloadJson = ApplicationLogPayloadHelper.Serialize(new
+                        {
+                            Trigger = req is null ? "Function" : "Http",
+                            Method = req?.Method,
+                            Path = req?.Url.AbsolutePath,
+                            StatusCode = statusCode,
+                            DurationMs = sw.ElapsedMilliseconds,
+                        }, _loggingOptions)
+                    }, CancellationToken.None);
+                }
             }
             catch (Exception ex)
             {

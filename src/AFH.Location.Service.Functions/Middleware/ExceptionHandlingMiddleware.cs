@@ -12,16 +12,13 @@ namespace AFH.Location.Service.Api.Middleware;
 
 public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 {
-    private readonly IApplicationLogSink _applicationLogSink;
     private readonly ApplicationLoggingOptions _loggingOptions;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
 
     public ExceptionHandlingMiddleware(
-        IApplicationLogSink applicationLogSink,
         IOptions<ApplicationLoggingOptions> loggingOptions,
         ILogger<ExceptionHandlingMiddleware> logger)
     {
-        _applicationLogSink = applicationLogSink;
         _loggingOptions = loggingOptions.Value;
         _logger = logger;
     }
@@ -77,7 +74,14 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             ? value?.ToString()
             : null;
 
-        return _applicationLogSink.WriteAsync(new ApplicationLogEntry
+        var applicationLogSink = context.InstanceServices.GetService(typeof(IApplicationLogSink)) as IApplicationLogSink;
+        if (applicationLogSink is null)
+        {
+            _logger.LogWarning("Location application log sink was not available for exception handling on Path={Path}.", request.Url.AbsolutePath);
+            return Task.CompletedTask;
+        }
+
+        return applicationLogSink.WriteAsync(new ApplicationLogEntry
         {
             OccurredUtc = DateTime.UtcNow,
             Level = statusCode == HttpStatusCode.InternalServerError ? "Error" : "Warning",

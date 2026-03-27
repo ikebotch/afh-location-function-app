@@ -76,7 +76,9 @@ public static class DependencyInjection
         if (!string.IsNullOrWhiteSpace(policyDbConnectionString))
         {
             services.AddDbContext<LocationPolicyDbContext>(options => options.UseSqlServer(policyDbConnectionString));
-            services.AddDbContextFactory<LocationPolicyDbContext>(options => options.UseSqlServer(policyDbConnectionString));
+            services.AddDbContextFactory<LocationPolicyDbContext>(
+                options => options.UseSqlServer(policyDbConnectionString),
+                ServiceLifetime.Scoped);
             services.AddScoped<ICoveragePolicyProvider, SqlCoveragePolicyProvider>();
             services.AddScoped<IAvailabilityPolicyProvider, SqlAvailabilityPolicyProvider>();
             services.AddScoped<ISearchAuditRepository, SqlSearchAuditRepository>();

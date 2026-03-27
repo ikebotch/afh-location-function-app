@@ -5,6 +5,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AFH.Location.Service.Api.Middleware;
@@ -20,19 +21,19 @@ public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
 
     private readonly InternalApiAuthOptions _options;
     private readonly IHostEnvironment _hostEnvironment;
-    private readonly IApplicationLogSink _applicationLogSink;
     private readonly ApplicationLoggingOptions _loggingOptions;
+    private readonly ILogger<InternalApiAuthMiddleware> _logger;
 
     public InternalApiAuthMiddleware(
         IOptions<InternalApiAuthOptions> options,
         IHostEnvironment hostEnvironment,
-        IApplicationLogSink applicationLogSink,
-        IOptions<ApplicationLoggingOptions> loggingOptions)
+        IOptions<ApplicationLoggingOptions> loggingOptions,
+        ILogger<InternalApiAuthMiddleware> logger)
     {
         _options = options.Value;
         _hostEnvironment = hostEnvironment;
-        _applicationLogSink = applicationLogSink;
         _loggingOptions = loggingOptions.Value;
+        _logger = logger;
     }
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
@@ -115,7 +116,14 @@ public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
             ? value?.ToString()
             : null;
 
-        return _applicationLogSink.WriteAsync(new ApplicationLogEntry
+        var applicationLogSink = context.InstanceServices.GetService(typeof(IApplicationLogSink)) as IApplicationLogSink;
+        if (applicationLogSink is null)
+        {
+            _logger.LogWarning("Location application log sink was not available for auth failure on Path={Path}.", request.Url.AbsolutePath);
+            return Task.CompletedTask;
+        }
+
+        return applicationLogSink.WriteAsync(new ApplicationLogEntry
         {
             OccurredUtc = DateTime.UtcNow,
             Level = statusCode == System.Net.HttpStatusCode.InternalServerError ? "Error" : "Warning",
