@@ -2,8 +2,10 @@ using AFH.Location.Service.Api.Contracts;
 using AFH.Location.Service.Application.Abstractions;
 using AFH.Location.Service.Api.Mappings.V1;
 using AFH.Location.Service.Application.Models.V1;
-using AFH.Location.Service.Contract.V1.Requests;
 using AFH.Location.Service.Application.Validation.V1;
+using AFH.Location.Service.Api.OpenApi;
+using AFH.Location.Service.Contract.V1.Requests;
+using AFH.Location.Service.Contract.V1.Responses;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
@@ -25,6 +27,17 @@ public sealed class LocationSearchBatchFunctionV1
     }
 
     [Function("LocationSearchBatchV1")]
+    [LocationOpenApiOperation(
+        "Search",
+        "Search in-person advisers in batch",
+        Description = "Function-auth endpoint. Executes multiple location adviser searches in one request with bounded parallelism.",
+        RequestBodyType = typeof(LocationSearchBatchRequestV1),
+        SuccessResponseType = typeof(ApiEnvelope<LocationSearchBatchResponseV1>),
+        SuccessDescription = "Batch adviser search results")]
+    [LocationOpenApiResponse(400, "Validation error", ResponseType = typeof(ApiEnvelope<ApiErrorResponseV1>))]
+    [LocationOpenApiResponse(401, "Unauthorized", ResponseType = typeof(ApiEnvelope<ApiErrorResponseV1>))]
+    [LocationOpenApiResponse(403, "Forbidden", ResponseType = typeof(ApiEnvelope<ApiErrorResponseV1>))]
+    [LocationOpenApiResponse(500, "Server error", ResponseType = typeof(ApiEnvelope<ApiErrorResponseV1>))]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/location/inperson/advisers/search/batch")]
         HttpRequestData req,
