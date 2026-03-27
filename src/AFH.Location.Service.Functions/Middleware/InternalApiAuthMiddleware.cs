@@ -1,6 +1,8 @@
 using AFH.Location.Service.Api.Contracts;
+using AFH.Location.Service.Infrastructure.Logging;
 using AFH.Location.Service.Infrastructure.Options;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -18,13 +20,19 @@ public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
 
     private readonly InternalApiAuthOptions _options;
     private readonly IHostEnvironment _hostEnvironment;
+    private readonly IApplicationLogSink _applicationLogSink;
+    private readonly ApplicationLoggingOptions _loggingOptions;
 
     public InternalApiAuthMiddleware(
         IOptions<InternalApiAuthOptions> options,
-        IHostEnvironment hostEnvironment)
+        IHostEnvironment hostEnvironment,
+        IApplicationLogSink applicationLogSink,
+        IOptions<ApplicationLoggingOptions> loggingOptions)
     {
         _options = options.Value;
         _hostEnvironment = hostEnvironment;
+        _applicationLogSink = applicationLogSink;
+        _loggingOptions = loggingOptions.Value;
     }
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
@@ -55,6 +63,7 @@ public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
         var failure = ValidateAuthorization(_options.Token, authHeader);
         if (failure is not null)
         {
+            await WriteFailureLogAsync(context, req, failure.Value.StatusCode, "AUTH_ERROR", failure.Value.Message);
             await Reject(context, (int)failure.Value.StatusCode, failure.Value.Message);
             return;
         }
@@ -93,5 +102,39 @@ public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
             new { code = "AUTH_ERROR", message },
             CancellationToken.None);
         ctx.GetInvocationResult().Value = res;
+    }
+
+    private Task WriteFailureLogAsync(
+        FunctionContext context,
+        HttpRequestData request,
+        System.Net.HttpStatusCode statusCode,
+        string failureCode,
+        string detail)
+    {
+        var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value)
+            ? value?.ToString()
+            : null;
+
+        return _applicationLogSink.WriteAsync(new ApplicationLogEntry
+        {
+            OccurredUtc = DateTime.UtcNow,
+            Level = statusCode == System.Net.HttpStatusCode.InternalServerError ? "Error" : "Warning",
+            Category = "Authorization",
+            Operation = context.FunctionDefinition.Name,
+            CorrelationId = correlationId,
+            ContextId = context.InvocationId,
+            EventType = failureCode,
+            Result = "Failure",
+            Message = detail,
+            PayloadJson = ApplicationLogPayloadHelper.Serialize(new
+            {
+                FailureSource = nameof(InternalApiAuthMiddleware),
+                FailureCode = failureCode,
+                StatusCode = (int)statusCode,
+                Path = request.Url.AbsolutePath,
+                Method = request.Method,
+                CorrelationId = correlationId
+            }, _loggingOptions)
+        }, CancellationToken.None);
     }
 }
