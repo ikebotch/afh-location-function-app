@@ -1,21 +1,23 @@
 using AFH.Location.Service.Application.Abstractions;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace AFH.Location.Service.Infrastructure.Persistence.Repositories;
 
 public sealed class SqlRouteCache : IRouteCache
 {
-    private readonly LocationPolicyDbContext _db;
+    private readonly IDbContextFactory<LocationPolicyDbContext> _dbContextFactory;
 
-    public SqlRouteCache(LocationPolicyDbContext db)
+    public SqlRouteCache(IDbContextFactory<LocationPolicyDbContext> dbContextFactory)
     {
-        _db = db;
+        _dbContextFactory = dbContextFactory;
     }
 
     public bool TryGet(string key, out RouteResult result)
     {
-        var entry = _db.RouteCacheEntries.FirstOrDefault(x => x.CacheKey == key);
+        using var db = _dbContextFactory.CreateDbContext();
+        var entry = db.RouteCacheEntries.AsNoTracking().FirstOrDefault(x => x.CacheKey == key);
         if (entry is null || entry.ExpiresUtc <= DateTime.UtcNow)
         {
             result = default!;
@@ -28,11 +30,12 @@ public sealed class SqlRouteCache : IRouteCache
 
     public void Set(string key, RouteResult result, TimeSpan ttl)
     {
-        var entry = _db.RouteCacheEntries.FirstOrDefault(x => x.CacheKey == key);
+        using var db = _dbContextFactory.CreateDbContext();
+        var entry = db.RouteCacheEntries.FirstOrDefault(x => x.CacheKey == key);
         if (entry is null)
         {
             entry = new RouteCacheEntryEntity { CacheKey = key };
-            _db.RouteCacheEntries.Add(entry);
+            db.RouteCacheEntries.Add(entry);
         }
 
         entry.EtaMinutes = result.EtaMinutes;
@@ -40,6 +43,6 @@ public sealed class SqlRouteCache : IRouteCache
         entry.Confidence = result.Confidence;
         entry.UpdatedUtc = DateTime.UtcNow;
         entry.ExpiresUtc = DateTime.UtcNow.Add(ttl <= TimeSpan.Zero ? TimeSpan.FromMinutes(10) : ttl);
-        _db.SaveChanges();
+        db.SaveChanges();
     }
 }

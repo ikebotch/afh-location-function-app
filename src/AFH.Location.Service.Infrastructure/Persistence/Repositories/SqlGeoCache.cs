@@ -1,21 +1,23 @@
 using AFH.Location.Service.Application.Abstractions;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Service.Infrastructure.Persistence.PolicyStore.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace AFH.Location.Service.Infrastructure.Persistence.Repositories;
 
 public sealed class SqlGeoCache : IGeoCache, IAdviserGeoCache
 {
-    private readonly LocationPolicyDbContext _db;
+    private readonly IDbContextFactory<LocationPolicyDbContext> _dbContextFactory;
 
-    public SqlGeoCache(LocationPolicyDbContext db)
+    public SqlGeoCache(IDbContextFactory<LocationPolicyDbContext> dbContextFactory)
     {
-        _db = db;
+        _dbContextFactory = dbContextFactory;
     }
 
     public bool TryGet(string key, out (double Lat, double Lng) coords)
     {
-        var entry = _db.GeoCacheEntries.FirstOrDefault(x => x.CacheKey == key);
+        using var db = _dbContextFactory.CreateDbContext();
+        var entry = db.GeoCacheEntries.AsNoTracking().FirstOrDefault(x => x.CacheKey == key);
         if (entry is null || entry.ExpiresUtc <= DateTime.UtcNow)
         {
             coords = default;
@@ -28,17 +30,18 @@ public sealed class SqlGeoCache : IGeoCache, IAdviserGeoCache
 
     public void Set(string key, (double Lat, double Lng) coords, TimeSpan ttl)
     {
-        var entry = _db.GeoCacheEntries.FirstOrDefault(x => x.CacheKey == key);
+        using var db = _dbContextFactory.CreateDbContext();
+        var entry = db.GeoCacheEntries.FirstOrDefault(x => x.CacheKey == key);
         if (entry is null)
         {
             entry = new GeoCacheEntryEntity { CacheKey = key };
-            _db.GeoCacheEntries.Add(entry);
+            db.GeoCacheEntries.Add(entry);
         }
 
         entry.Latitude = coords.Lat;
         entry.Longitude = coords.Lng;
         entry.UpdatedUtc = DateTime.UtcNow;
         entry.ExpiresUtc = DateTime.UtcNow.Add(ttl <= TimeSpan.Zero ? TimeSpan.FromMinutes(10) : ttl);
-        _db.SaveChanges();
+        db.SaveChanges();
     }
 }
