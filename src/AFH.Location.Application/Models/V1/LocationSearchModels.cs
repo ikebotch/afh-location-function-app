@@ -61,6 +61,7 @@ public sealed class LocationSearchResult
 public sealed class LocationSearchCandidate
 {
     public string AdviserId { get; set; } = default!;
+    public string MailboxUserId { get; set; } = string.Empty;
     public double AdviserRating { get; set; }
     public bool GoldStar { get; set; }
     public bool Preferred { get; set; }

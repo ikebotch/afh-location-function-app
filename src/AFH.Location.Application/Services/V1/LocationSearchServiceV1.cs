@@ -146,12 +146,34 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
             SearchHorizonMinutes = Math.Max(1, ctx.Request.Meeting.SearchHorizonMinutes + extensionMinutes)
         };
 
+        var mailboxByAdviserId = ctx.Candidates
+            .Where(x => !string.IsNullOrWhiteSpace(x.Adviser.AdviserId))
+            .GroupBy(x => x.Adviser.AdviserId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var mailbox = g
+                        .Select(x => x.Adviser.MailboxUserId)
+                        .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+                    return string.IsNullOrWhiteSpace(mailbox) ? g.Key : mailbox.Trim();
+                },
+                StringComparer.OrdinalIgnoreCase);
+
         var availability = await _calendar.GetAvailabilityAsync(
-            ctx.Candidates.Select(x => x.Adviser.AdviserId).ToList(),
+            mailboxByAdviserId.Values
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             meetingWindow,
             ct);
 
-        ctx.AvailabilityById = availability.ToDictionary(x => x.AdviserId, StringComparer.OrdinalIgnoreCase);
+        var availabilityByMailbox = availability.ToDictionary(x => x.AdviserId, StringComparer.OrdinalIgnoreCase);
+        ctx.AvailabilityById = mailboxByAdviserId
+            .Where(x => availabilityByMailbox.ContainsKey(x.Value))
+            .ToDictionary(
+                x => x.Key,
+                x => availabilityByMailbox[x.Value],
+                StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task LoadPoliciesAsync(LocationSearchContext ctx, CancellationToken ct)
@@ -357,6 +379,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
                 var candidate = new LocationSearchCandidate
                 {
                     AdviserId = c.Adviser.AdviserId,
+                    MailboxUserId = string.IsNullOrWhiteSpace(c.Adviser.MailboxUserId) ? c.Adviser.AdviserId : c.Adviser.MailboxUserId.Trim(),
                     AdviserRating = c.Adviser.Rating,
                     GoldStar = c.Adviser.Rating >= 5d,
                     Preferred = c.IsPreferred,

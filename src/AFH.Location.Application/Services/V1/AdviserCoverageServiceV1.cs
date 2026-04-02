@@ -112,8 +112,12 @@ public sealed class AdviserCoverageServiceV1 : IAdviserCoverageService
             {
                 Id = adviser.AdviserId,
                 Name = adviser.DisplayName,
+                MailboxUserId = string.IsNullOrWhiteSpace(adviser.MailboxUserId) ? adviser.AdviserId : adviser.MailboxUserId.Trim(),
                 Region = adviser.Region,
                 Postcode = postcode,
+                IsActive = adviser.IsActive,
+                Skills = adviser.Skills.ToArray(),
+                Rating = adviser.Rating,
                 Latitude = coord.Lat,
                 Longitude = coord.Lng,
                 MaxTravelTimeMinutes = maxTravelTimeMinutes,

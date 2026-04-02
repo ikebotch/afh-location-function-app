@@ -76,8 +76,12 @@ public static class LocationContractMapper
             {
                 Id = x.Id,
                 Name = x.Name,
+                MailboxUserId = x.MailboxUserId,
                 Region = x.Region,
                 Postcode = x.Postcode,
+                IsActive = x.IsActive,
+                Skills = x.Skills,
+                Rating = x.Rating,
                 Latitude = x.Latitude,
                 Longitude = x.Longitude,
                 MaxTravelTimeMinutes = x.MaxTravelTimeMinutes,
@@ -124,6 +128,7 @@ public static class LocationContractMapper
         return new LocationCandidate
         {
             AdviserId = candidate.AdviserId,
+            MailboxUserId = candidate.MailboxUserId,
             AdviserRating = candidate.AdviserRating,
             GoldStar = candidate.GoldStar,
             Preferred = candidate.Preferred,
