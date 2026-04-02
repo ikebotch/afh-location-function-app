@@ -21,18 +21,19 @@ steps:
 # NuGet
 # - task: NuGetToolInstaller@1
 
-# - task: NuGetCommand@2
-#   inputs:
-#     command: 'restore'
-#     restoreSolution: '$(solution)'
-#     feedsToUse: 'select'
-#     vstsFeed: '$(vstsFeed)'
+- task: NuGetCommand@2
+  inputs:
+    command: 'restore'
+    restoreSolution: '$(solution)'
+    feedsToUse: 'select'
+    vstsFeed: '$(vstsFeed)'
+
 
 - task: DotNetCoreCLI@2
   displayName: 'Build .NET'
   inputs:
     command: 'build'
-    projects: 'src/AFH.Location.Service.Api/AFH.Location.Service.Api.csproj'
+    projects: 'src/AFH.Location.Function/AFH.Location.Function.csproj'
     arguments: '--output $(Build.BinariesDirectory)/publish_output --configuration $(buildConfiguration)'
 
 
