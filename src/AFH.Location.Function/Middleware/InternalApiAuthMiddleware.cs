@@ -1,3 +1,4 @@
+using AFH.BackendPlatform;
 using AFH.Location.Function.Contracts;
 using AFH.Location.Function.Security;
 using AFH.Location.Infrastructure.Logging;

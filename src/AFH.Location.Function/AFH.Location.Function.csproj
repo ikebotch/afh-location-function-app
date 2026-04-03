@@ -29,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AFH.BackendPlatform\AFH.BackendPlatform.csproj" />
     <ProjectReference Include="..\AFH.Location.Application\AFH.Location.Application.csproj" />
     <ProjectReference Include="..\AFH.Location.Contract\AFH.Location.Contract.csproj" />
     <ProjectReference Include="..\AFH.Location.Domain\AFH.Location.Domain.csproj" />

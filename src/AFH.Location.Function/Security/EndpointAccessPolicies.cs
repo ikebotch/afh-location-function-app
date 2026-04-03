@@ -1,12 +1,6 @@
-namespace AFH.Location.Function.Security;
+using AFH.BackendPlatform;
 
-public enum EndpointAccessPolicy
-{
-    Public,
-    UserAuthenticated,
-    InternalOnly,
-    WebhookVerified
-}
+namespace AFH.Location.Function.Security;
 
 public static class EndpointAccessPolicies
 {
