@@ -18,54 +18,80 @@ using System.Text.Json;
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(app =>
     {
-        app.UseMiddleware<CorrelationIdMiddleware>();
-        app.UseMiddleware<OperationAuditMiddleware>();
-        app.UseMiddleware<ExceptionHandlingMiddleware>();
-        app.UseMiddleware<InternalApiAuthMiddleware>();
+        ConfigureMiddlewarePipeline(app);
     })
     .ConfigureAppConfiguration((ctx, cfg) =>
     {
-        cfg
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables();
-
-        var built = cfg.Build();
-        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var child in built.GetSection("Values").GetChildren())
-            values[child.Key] = child.Value;
-
-        if (values.Count > 0)
-            cfg.AddInMemoryCollection(values);
-
-
-
+        ConfigureAppConfiguration(cfg);
     })
     .ConfigureServices((ctx, services) =>
     {
-        //services.AddApplicationInsightsTelemetryWorkerService();
-        services.AddAfhCommonErrorsApplicationInsights();
-        services.AddAfhCommonErrorsAzureFunctions();
-        services.AddAfhCommonErrorsEmail(
-            BuildErrorEmailOptions(ctx.Configuration, "[AFH Location Error]"),
-            sp => CreateErrorEmailSender(sp, "location"));
-        services.AddSingleton<LocationExceptionMapper>();
-        services.AddSingleton<IExceptionMapper>(sp => sp.GetRequiredService<LocationExceptionMapper>());
+        AddSharedErrorHandling(services, ctx.Configuration, "[AFH Location Error]", "location");
         services.AddLocationInfrastructure(ctx.Configuration);
-        services.Configure<WorkerOptions>(options =>
-        {
-            options.Serializer = new JsonObjectSerializer(
-                new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-                    PropertyNameCaseInsensitive = true
-                });
-        });
+        ConfigureWorkerSerialization(services, caseInsensitivePropertyNames: true);
     })
     .Build();
 
 host.Run();
+
+static void ConfigureMiddlewarePipeline(dynamic app)
+{
+    app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseMiddleware<OperationAuditMiddleware>();
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseMiddleware<InternalApiAuthMiddleware>();
+}
+
+static void ConfigureAppConfiguration(IConfigurationBuilder cfg)
+{
+    cfg
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+        .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
+        .AddEnvironmentVariables();
+
+    AddFlattenedValuesSection(cfg);
+}
+
+static void AddFlattenedValuesSection(IConfigurationBuilder cfg)
+{
+    var built = cfg.Build();
+    var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    foreach (var child in built.GetSection("Values").GetChildren())
+        values[child.Key] = child.Value;
+
+    if (values.Count > 0)
+        cfg.AddInMemoryCollection(values);
+}
+
+static void AddSharedErrorHandling(
+    IServiceCollection services,
+    IConfiguration configuration,
+    string defaultSubjectPrefix,
+    string serviceName)
+{
+    //services.AddApplicationInsightsTelemetryWorkerService();
+    services.AddAfhCommonErrorsApplicationInsights();
+    services.AddAfhCommonErrorsAzureFunctions();
+    services.AddAfhCommonErrorsEmail(
+        BuildErrorEmailOptions(configuration, defaultSubjectPrefix),
+        sp => CreateErrorEmailSender(sp, serviceName));
+    services.AddSingleton<LocationExceptionMapper>();
+    services.AddSingleton<IExceptionMapper>(sp => sp.GetRequiredService<LocationExceptionMapper>());
+}
+
+static void ConfigureWorkerSerialization(IServiceCollection services, bool caseInsensitivePropertyNames)
+{
+    services.Configure<WorkerOptions>(options =>
+    {
+        options.Serializer = new JsonObjectSerializer(
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = caseInsensitivePropertyNames
+            });
+    });
+}
 
 static ErrorEmailOptions BuildErrorEmailOptions(IConfiguration configuration, string defaultSubjectPrefix)
 {
