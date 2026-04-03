@@ -64,6 +64,7 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             await WriteFailureLogAsync(context, req, mapping, ex);
             await TryWriteErrorRecordAsync(context, mapping.MappingResult);
             TryTrackHandledExceptionTelemetry(context, mapping.MappingResult);
+            await TrySendHandledExceptionEmailAsync(context, mapping.MappingResult);
 
             context.GetInvocationResult().Value = await _errorResponseBuilder.BuildAsync(
                 req,
@@ -171,6 +172,34 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             _logger.LogWarning(
                 telemetryEx,
                 "Failed to emit handled exception telemetry. Function={FunctionName}",
+                context.FunctionDefinition.Name);
+        }
+    }
+
+    private async Task TrySendHandledExceptionEmailAsync(FunctionContext context, ExceptionMappingResult mapping)
+    {
+        if (!LocationHandledErrorEmailPolicy.ShouldNotify(mapping))
+            return;
+
+        try
+        {
+            var notifier = context.InstanceServices.GetService(typeof(IErrorNotifier)) as IErrorNotifier;
+            if (notifier is null)
+                return;
+
+            var record = _errorRecordBuilder.Build(mapping);
+            var request = LocationHandledErrorEmailPolicy.CreateNotificationRequest(
+                context.FunctionDefinition.Name,
+                mapping.StatusCode,
+                record);
+
+            await notifier.NotifyAsync(request, CancellationToken.None);
+        }
+        catch (Exception emailEx)
+        {
+            _logger.LogWarning(
+                emailEx,
+                "Failed to send handled exception email notification. Function={FunctionName}",
                 context.FunctionDefinition.Name);
         }
     }
