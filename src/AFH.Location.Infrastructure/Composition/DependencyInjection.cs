@@ -16,6 +16,7 @@ using AFH.Common.SharePointUtils.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AFH.Location.Infrastructure.Composition;
 
@@ -30,16 +31,24 @@ public static class DependencyInjection
 
         services.AddOptions<CalendarServiceOptions>()
             .Bind(configuration.GetSection(CalendarServiceOptions.SectionName))
+            .Validate(options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _), $"{CalendarServiceOptions.SectionName}:BaseUrl must be an absolute URI.")
+            .Validate(options => options.ScheduleLookbackMinutes > 0, $"{CalendarServiceOptions.SectionName}:ScheduleLookbackMinutes must be greater than zero.")
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<InternalApiAuthOptions>, InternalApiAuthOptionsValidator>();
         services.AddOptions<InternalApiAuthOptions>()
             .Bind(configuration.GetSection(InternalApiAuthOptions.SectionName))
             .ValidateOnStart();
         services.AddOptions<LocationCoverageOptions>()
             .Bind(configuration.GetSection(LocationCoverageOptions.SectionName))
+            .Validate(options => options.AverageTravelSpeedMph > 0, $"{LocationCoverageOptions.SectionName}:AverageTravelSpeedMph must be greater than zero.")
             .ValidateOnStart();
         services.AddOptions<GoogleMapsOptions>()
             .Bind(configuration.GetSection(GoogleMapsOptions.SectionName))
             .Validate(options => !options.Enabled, "Maps:Google:Enabled cannot be set because the Google provider path is intentionally disabled until it is fully implemented.")
+            .ValidateOnStart();
+        services.AddOptions<AdviserFeedOptions>()
+            .Bind(configuration.GetSection(AdviserFeedOptions.SectionName))
+            .Validate(options => !options.Enabled || Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _), $"{AdviserFeedOptions.SectionName}:BaseUrl must be an absolute URI when the adviser feed is enabled.")
             .ValidateOnStart();
 
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
@@ -56,7 +65,6 @@ public static class DependencyInjection
         services.AddSingleton<ICoveragePresentationSettings, CoveragePresentationSettings>();
         services.AddScoped<AvailabilityEvaluator>();
 
-        services.Configure<AdviserFeedOptions>(configuration.GetSection(AdviserFeedOptions.SectionName));
         services.Configure<SharePointAdviserOptions>(configuration.GetSection(SharePointAdviserOptions.SectionName));
         var useAdviserFeed = configuration.GetValue<bool>("AdviserFeed:Enabled");
         if (useAdviserFeed)
@@ -70,9 +78,7 @@ public static class DependencyInjection
 
         services.AddScoped<IOfficeRepository, InMemoryOfficeRepository>();
 
-        var policyDbConnectionString =
-            configuration.GetConnectionString("LocationPolicyDb")
-            ?? configuration["LocationSearch:PolicyStore:ConnectionString"];
+        var policyDbConnectionString = ResolveLocationPolicyDbConnectionString(configuration);
 
         if (!string.IsNullOrWhiteSpace(policyDbConnectionString))
         {
@@ -139,4 +145,11 @@ public static class DependencyInjection
 
         return services;
     }
+
+    internal static string? ResolveLocationPolicyDbConnectionString(IConfiguration configuration) =>
+        configuration.GetConnectionString("LocationPolicyDb")
+        ?? configuration["ConnectionStrings:LocationPolicyDb"]
+        ?? configuration["Values:ConnectionStrings:LocationPolicyDb"]
+        ?? configuration["LocationSearch:PolicyStore:ConnectionString"]
+        ?? configuration["Values:LocationSearch:PolicyStore:ConnectionString"];
 }

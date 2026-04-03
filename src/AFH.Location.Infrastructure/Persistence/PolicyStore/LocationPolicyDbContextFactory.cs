@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using AFH.Location.Infrastructure.Composition;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 
@@ -17,12 +18,7 @@ public sealed class LocationPolicyDbContextFactory : IDesignTimeDbContextFactory
             .AddEnvironmentVariables()
             .Build();
 
-        var connectionString =
-            config.GetConnectionString("LocationPolicyDb")
-            ?? config["ConnectionStrings:LocationPolicyDb"]
-            ?? config["Values:ConnectionStrings:LocationPolicyDb"]
-            ?? config["LocationSearch:PolicyStore:ConnectionString"]
-            ?? config["Values:LocationSearch:PolicyStore:ConnectionString"];
+        var connectionString = DependencyInjection.ResolveLocationPolicyDbConnectionString(config);
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {

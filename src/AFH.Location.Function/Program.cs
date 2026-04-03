@@ -95,17 +95,17 @@ static void ConfigureWorkerSerialization(IServiceCollection services, bool caseI
 
 static ErrorEmailOptions BuildErrorEmailOptions(IConfiguration configuration, string defaultSubjectPrefix)
 {
-    var section = configuration.GetSection("ErrorEmail");
+    var settings = configuration.GetSection("ErrorEmail").Get<ErrorEmailConfiguration>() ?? new ErrorEmailConfiguration();
 
     return new ErrorEmailOptions
     {
-        FromAddress = section["FromAddress"],
-        FromDisplayName = section["FromDisplayName"],
-        ToAddresses = SplitAddresses(section["ToAddresses"]),
-        CcAddresses = SplitAddresses(section["CcAddresses"]),
-        BccAddresses = SplitAddresses(section["BccAddresses"]),
-        SubjectPrefix = string.IsNullOrWhiteSpace(section["SubjectPrefix"]) ? defaultSubjectPrefix : section["SubjectPrefix"]!,
-        IncludeDetails = !bool.TryParse(section["IncludeDetails"], out var includeDetails) || includeDetails
+        FromAddress = settings.FromAddress,
+        FromDisplayName = settings.FromDisplayName,
+        ToAddresses = SplitAddresses(settings.ToAddresses),
+        CcAddresses = SplitAddresses(settings.CcAddresses),
+        BccAddresses = SplitAddresses(settings.BccAddresses),
+        SubjectPrefix = string.IsNullOrWhiteSpace(settings.SubjectPrefix) ? defaultSubjectPrefix : settings.SubjectPrefix!,
+        IncludeDetails = settings.IncludeDetails ?? true
     };
 }
 
@@ -137,4 +137,15 @@ static Func<ErrorEmailTemplateModel, string, CancellationToken, Task> CreateErro
 
         return Task.CompletedTask;
     };
+}
+
+internal sealed class ErrorEmailConfiguration
+{
+    public string? FromAddress { get; init; }
+    public string? FromDisplayName { get; init; }
+    public string? ToAddresses { get; init; }
+    public string? CcAddresses { get; init; }
+    public string? BccAddresses { get; init; }
+    public string? SubjectPrefix { get; init; }
+    public bool? IncludeDetails { get; init; }
 }
