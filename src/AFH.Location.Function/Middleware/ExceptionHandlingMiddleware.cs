@@ -1,12 +1,12 @@
-﻿using AFH.Location.Function.Contracts;
-using AFH.Location.Domain.Errors;
+﻿using AFH.Common.Errors.AzureFunctions.Builders;
+using AFH.Common.Errors.Models;
 using AFH.Location.Infrastructure.Logging;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net;
 
 namespace AFH.Location.Function.Middleware;
 
@@ -14,13 +14,19 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 {
     private readonly ApplicationLoggingOptions _loggingOptions;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+    private readonly LocationExceptionMapper _exceptionMapper;
+    private readonly AzureFunctionErrorResponseBuilder _errorResponseBuilder;
 
     public ExceptionHandlingMiddleware(
         IOptions<ApplicationLoggingOptions> loggingOptions,
-        ILogger<ExceptionHandlingMiddleware> logger)
+        ILogger<ExceptionHandlingMiddleware> logger,
+        LocationExceptionMapper exceptionMapper,
+        AzureFunctionErrorResponseBuilder errorResponseBuilder)
     {
         _loggingOptions = loggingOptions.Value;
         _logger = logger;
+        _exceptionMapper = exceptionMapper;
+        _errorResponseBuilder = errorResponseBuilder;
     }
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
@@ -29,45 +35,38 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         {
             await next(context);
         }
-        catch (DestinationResolveException ex)
-        {
-            var req = await context.GetHttpRequestDataAsync();
-            if (req is null)
-                throw;
-
-            await WriteFailureLogAsync(context, req, HttpStatusCode.UnprocessableEntity, ex.Code, ex.Message, ex);
-
-            var res = await req!.WriteFailureAsync(
-                HttpStatusCode.UnprocessableEntity,
-                new { code = ex.Code, message = ex.Message },
-                CancellationToken.None);
-            context.GetInvocationResult().Value = res;
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception");
             var req = await context.GetHttpRequestDataAsync();
             if (req is null)
                 throw;
 
-            await WriteFailureLogAsync(context, req, HttpStatusCode.InternalServerError, "INTERNAL_ERROR", "Something went wrong.", ex);
+            var mapping = _exceptionMapper.TryMap(ex, CreateErrorContext(context, req));
 
-            var res = req is null
-                ? null
-                : await req.WriteFailureAsync(
-                    HttpStatusCode.InternalServerError,
-                    new { code = "INTERNAL_ERROR", message = "Something went wrong." },
-                    CancellationToken.None);
-            context.GetInvocationResult().Value = res;
+            _logger.Log(
+                mapping.Level,
+                ex,
+                "Location function handled exception. Function={FunctionName} FailureSource={FailureSource} FailureCode={FailureCode} Path={Path} Method={Method} CorrelationId={CorrelationId}",
+                context.FunctionDefinition.Name,
+                mapping.FailureSource,
+                mapping.MappingResult.ErrorCode.Value,
+                req.Url.AbsolutePath,
+                req.Method,
+                context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value) ? value?.ToString() : null);
+
+            await WriteFailureLogAsync(context, req, mapping, ex);
+
+            context.GetInvocationResult().Value = await _errorResponseBuilder.BuildAsync(
+                req,
+                mapping.MappingResult,
+                CancellationToken.None);
         }
     }
 
     private Task WriteFailureLogAsync(
         FunctionContext context,
         HttpRequestData request,
-        HttpStatusCode statusCode,
-        string failureCode,
-        string detail,
+        LocationExceptionMapper.LocationHandledException mapping,
         Exception exception)
     {
         var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value)
@@ -84,25 +83,45 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         return applicationLogSink.WriteAsync(new ApplicationLogEntry
         {
             OccurredUtc = DateTime.UtcNow,
-            Level = statusCode == HttpStatusCode.InternalServerError ? "Error" : "Warning",
+            Level = mapping.Level == LogLevel.Error ? "Error" : "Warning",
             Category = "Exception",
             Operation = context.FunctionDefinition.Name,
             CorrelationId = correlationId,
             ContextId = context.InvocationId,
-            EventType = failureCode,
+            EventType = mapping.MappingResult.ErrorCode.Value,
             Result = "Failure",
-            Message = detail,
+            Message = mapping.MappingResult.Message,
             ExceptionType = exception.GetType().Name,
             ExceptionMessage = exception.Message,
             PayloadJson = ApplicationLogPayloadHelper.Serialize(new
             {
-                FailureSource = nameof(ExceptionHandlingMiddleware),
-                FailureCode = failureCode,
-                StatusCode = (int)statusCode,
+                FailureSource = mapping.FailureSource,
+                FailureCode = mapping.MappingResult.ErrorCode.Value,
+                StatusCode = mapping.MappingResult.StatusCode,
                 Path = request.Url.AbsolutePath,
                 Method = request.Method,
                 CorrelationId = correlationId
             }, _loggingOptions)
         }, CancellationToken.None);
+    }
+
+    private static ErrorContext CreateErrorContext(FunctionContext context, HttpRequestData request)
+    {
+        var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value)
+            ? value?.ToString()
+            : null;
+
+        return new ErrorContext(
+            TraceId: context.InvocationId,
+            CorrelationId: correlationId,
+            Path: request.Url.AbsolutePath,
+            Method: request.Method,
+            Operation: context.FunctionDefinition.Name,
+            Metadata: new Dictionary<string, string?>
+            {
+                ["functionId"] = context.FunctionId,
+                ["invocationId"] = context.InvocationId,
+                ["host"] = request.Url.Host
+            });
     }
 }
