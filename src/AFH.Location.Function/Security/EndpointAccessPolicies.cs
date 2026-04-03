@@ -4,12 +4,28 @@ namespace AFH.Location.Function.Security;
 
 public static class EndpointAccessPolicies
 {
-    public static EndpointAccessPolicy GetPolicy(string functionName) =>
-        functionName switch
+    private static readonly IReadOnlyDictionary<string, EndpointAccessPolicy> Policies =
+        new Dictionary<string, EndpointAccessPolicy>(StringComparer.Ordinal)
         {
-            "OpenApiV1" => EndpointAccessPolicy.Public,
-            "ScalarUi" => EndpointAccessPolicy.Public,
-            "LocationHealthV1" => EndpointAccessPolicy.Public,
-            _ => EndpointAccessPolicy.InternalOnly
+            ["OpenApiV1"] = EndpointAccessPolicy.Public,
+            ["ScalarUi"] = EndpointAccessPolicy.Public,
+            ["LocationHealthV1"] = EndpointAccessPolicy.Public,
+            ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly,
+            ["LicenseListV1"] = EndpointAccessPolicy.InternalOnly,
+            ["LocationSearchV1"] = EndpointAccessPolicy.InternalOnly,
+            ["LocationSearchBatchV1"] = EndpointAccessPolicy.InternalOnly,
+            ["SyncAdviserCacheV1"] = EndpointAccessPolicy.InternalOnly
         };
+
+    internal static IReadOnlyCollection<string> KnownHttpFunctions => Policies.Keys.ToArray();
+
+    public static EndpointAccessPolicy GetPolicy(string functionName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(functionName);
+
+        if (Policies.TryGetValue(functionName, out var policy))
+            return policy;
+
+        throw new InvalidOperationException($"No endpoint access policy is configured for HTTP function '{functionName}'.");
+    }
 }

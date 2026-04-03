@@ -1,7 +1,11 @@
 using AFH.BackendPlatform;
+using AFH.Location.Function.V1;
 using AFH.Location.Function.Middleware;
 using AFH.Location.Function.Security;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
+using System.Reflection;
 
 namespace AFH.Location.Tests;
 
@@ -11,10 +15,41 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("LocationHealthV1", EndpointAccessPolicy.Public)]
     [InlineData("OpenApiV1", EndpointAccessPolicy.Public)]
     [InlineData("ScalarUi", EndpointAccessPolicy.Public)]
+    [InlineData("AdviserCoverageV1", EndpointAccessPolicy.InternalOnly)]
+    [InlineData("LicenseListV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("LocationSearchV1", EndpointAccessPolicy.InternalOnly)]
+    [InlineData("LocationSearchBatchV1", EndpointAccessPolicy.InternalOnly)]
+    [InlineData("SyncAdviserCacheV1", EndpointAccessPolicy.InternalOnly)]
     public void EndpointAccessPolicies_ClassifiesFunctions(string functionName, EndpointAccessPolicy expected)
     {
         Assert.Equal(expected, EndpointAccessPolicies.GetPolicy(functionName));
+    }
+
+    [Fact]
+    public void EndpointAccessPolicies_CoversEveryHttpTriggeredFunctionExplicitly()
+    {
+        var httpFunctionNames = typeof(LocationSearchFunctionV1).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static))
+            .Where(method => method.GetCustomAttribute<FunctionAttribute>() is not null)
+            .Where(method => method.GetParameters().Any(parameter => parameter.GetCustomAttributes<HttpTriggerAttribute>(inherit: false).Any()))
+            .Select(method => method.GetCustomAttribute<FunctionAttribute>()!.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        var configuredNames = EndpointAccessPolicies.KnownHttpFunctions
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(configuredNames, httpFunctionNames);
+    }
+
+    [Fact]
+    public void EndpointAccessPolicies_ThrowsForUnknownFunction()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => EndpointAccessPolicies.GetPolicy("UnmappedHttpFunction"));
+
+        Assert.Contains("No endpoint access policy is configured", exception.Message);
     }
 
     [Fact]
