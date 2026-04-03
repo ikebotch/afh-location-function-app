@@ -1,6 +1,7 @@
 using AFH.Location.Function.Middleware;
 using AFH.Location.Infrastructure.Composition;
 using AFH.Common.Errors.Abstractions;
+using AFH.Common.Errors.ApplicationInsights.DependencyInjection;
 using AFH.Common.Errors.AzureFunctions.DependencyInjection;
 using Azure.Core.Serialization;
 using Microsoft.Azure.Functions.Worker;
@@ -39,6 +40,7 @@ var host = new HostBuilder()
     .ConfigureServices((ctx, services) =>
     {
         //services.AddApplicationInsightsTelemetryWorkerService();
+        services.AddAfhCommonErrorsApplicationInsights();
         services.AddAfhCommonErrorsAzureFunctions();
         services.AddSingleton<LocationExceptionMapper>();
         services.AddSingleton<IExceptionMapper>(sp => sp.GetRequiredService<LocationExceptionMapper>());

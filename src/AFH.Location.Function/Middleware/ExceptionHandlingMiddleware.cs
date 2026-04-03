@@ -1,9 +1,12 @@
 ﻿using AFH.Common.Errors.Abstractions;
+using AFH.Common.Errors.ApplicationInsights.Telemetry;
 using AFH.Common.Errors.Builders;
 using AFH.Common.Errors.AzureFunctions.Builders;
 using AFH.Common.Errors.Mapping;
 using AFH.Common.Errors.Models;
 using AFH.Location.Infrastructure.Logging;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.DataContracts;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
@@ -60,6 +63,7 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 
             await WriteFailureLogAsync(context, req, mapping, ex);
             await TryWriteErrorRecordAsync(context, mapping.MappingResult);
+            TryTrackHandledExceptionTelemetry(context, mapping.MappingResult);
 
             context.GetInvocationResult().Value = await _errorResponseBuilder.BuildAsync(
                 req,
@@ -126,6 +130,47 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             _logger.LogWarning(
                 persistenceEx,
                 "Failed to persist handled exception error record. Function={FunctionName}",
+                context.FunctionDefinition.Name);
+        }
+    }
+
+    private void TryTrackHandledExceptionTelemetry(FunctionContext context, ExceptionMappingResult mapping)
+    {
+        try
+        {
+            var telemetryClient = context.InstanceServices.GetService(typeof(TelemetryClient)) as TelemetryClient;
+            var telemetryBuilder = context.InstanceServices.GetService(typeof(ErrorTelemetryBuilder)) as ErrorTelemetryBuilder;
+            if (telemetryClient is null || telemetryBuilder is null)
+                return;
+
+            var record = _errorRecordBuilder.Build(mapping);
+            var telemetry = telemetryBuilder.Build(record, (properties, _) =>
+            {
+                properties["afh.service"] = "location";
+                properties["afh.function.name"] = context.FunctionDefinition.Name;
+            });
+
+            var eventTelemetry = new EventTelemetry(telemetry.Name)
+            {
+                Timestamp = telemetry.Timestamp
+            };
+
+            foreach (var pair in telemetry.Properties)
+            {
+                if (pair.Value is not null)
+                    eventTelemetry.Properties[pair.Key] = pair.Value;
+            }
+
+            foreach (var metric in telemetry.Metrics)
+                eventTelemetry.Properties[metric.Key] = metric.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            telemetryClient.TrackEvent(eventTelemetry);
+        }
+        catch (Exception telemetryEx)
+        {
+            _logger.LogWarning(
+                telemetryEx,
+                "Failed to emit handled exception telemetry. Function={FunctionName}",
                 context.FunctionDefinition.Name);
         }
     }
