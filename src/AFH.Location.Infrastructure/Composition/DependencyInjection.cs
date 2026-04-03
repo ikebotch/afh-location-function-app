@@ -112,17 +112,7 @@ public static class DependencyInjection
 
         services.AddMemoryCache();
         services.AddSharePoint(configuration);
-
-        services.AddScoped<DestinationCoordinateResolver>();
-        services.AddScoped<AdviserCoordinateResolver>();
-        services.AddScoped<OfficeCoordinateResolver>();
-        services.AddScoped<AdviserCandidateSource>();
-        services.AddScoped<RankingService>();
-        services.AddScoped<ILicenseCatalogService, LicenseCatalogService>();
-        services.AddScoped<IAdviserCoverageService, AdviserCoverageServiceV1>();
-        services.AddScoped<IAdviserCacheSyncService, AdviserCacheSyncService>();
-        services.AddScoped<IAdviserRepository, CachedAdviserRepository>();
-        services.AddScoped<ILocationSearchService, LocationSearchServiceV1>();
+        services.AddSearchModule();
         services.AddScoped<DatabaseApplicationLogSink>(sp => new DatabaseApplicationLogSink(
             sp.GetService<IDbContextFactory<LocationPolicyDbContext>>(),
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DatabaseApplicationLogSink>>()));
