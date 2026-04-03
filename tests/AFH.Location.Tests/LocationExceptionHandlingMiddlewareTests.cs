@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AFH.Location.Tests;
 
-public sealed class ExceptionHandlingMiddlewareTests
+public sealed class LocationExceptionHandlingMiddlewareTests
 {
     [Fact]
     public void LocationExceptionMapper_MapsDestinationResolveException()
