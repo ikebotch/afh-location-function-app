@@ -1,4 +1,5 @@
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
+using AFH.Common.Errors.EntityFramework.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace AFH.Location.Infrastructure.Persistence.PolicyStore;
@@ -26,6 +27,8 @@ public sealed class LocationPolicyDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.AddErrorRecordEntity();
+
         modelBuilder.Entity<CoverageDefaultPolicyEntity>(entity =>
         {
             entity.ToTable("CoverageDefaultPolicies");

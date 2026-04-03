@@ -11,6 +11,7 @@ using AFH.Location.Infrastructure.Options;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;
 using AFH.Location.Infrastructure.Services;
+using AFH.Common.Errors.EntityFramework.DependencyInjection;
 using AFH.Common.SharePointUtils.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,6 +80,7 @@ public static class DependencyInjection
             services.AddDbContextFactory<LocationPolicyDbContext>(
                 options => options.UseSqlServer(policyDbConnectionString),
                 ServiceLifetime.Scoped);
+            services.AddAfhCommonErrorsEntityFramework<LocationPolicyDbContext>();
             services.AddScoped<ICoveragePolicyProvider, SqlCoveragePolicyProvider>();
             services.AddScoped<IAvailabilityPolicyProvider, SqlAvailabilityPolicyProvider>();
             services.AddScoped<ISearchAuditRepository, SqlSearchAuditRepository>();

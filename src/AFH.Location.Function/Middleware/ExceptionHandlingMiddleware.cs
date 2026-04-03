@@ -1,4 +1,7 @@
-﻿using AFH.Common.Errors.AzureFunctions.Builders;
+﻿using AFH.Common.Errors.Abstractions;
+using AFH.Common.Errors.Builders;
+using AFH.Common.Errors.AzureFunctions.Builders;
+using AFH.Common.Errors.Mapping;
 using AFH.Common.Errors.Models;
 using AFH.Location.Infrastructure.Logging;
 using Microsoft.Azure.Functions.Worker;
@@ -12,6 +15,7 @@ namespace AFH.Location.Function.Middleware;
 
 public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 {
+    private readonly ErrorRecordBuilder _errorRecordBuilder = new();
     private readonly ApplicationLoggingOptions _loggingOptions;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
     private readonly LocationExceptionMapper _exceptionMapper;
@@ -55,6 +59,7 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
                 context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value) ? value?.ToString() : null);
 
             await WriteFailureLogAsync(context, req, mapping, ex);
+            await TryWriteErrorRecordAsync(context, mapping.MappingResult);
 
             context.GetInvocationResult().Value = await _errorResponseBuilder.BuildAsync(
                 req,
@@ -103,6 +108,26 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
                 CorrelationId = correlationId
             }, _loggingOptions)
         }, CancellationToken.None);
+    }
+
+    private async Task TryWriteErrorRecordAsync(FunctionContext context, ExceptionMappingResult mapping)
+    {
+        try
+        {
+            var writer = context.InstanceServices.GetService(typeof(IErrorPersistenceWriter)) as IErrorPersistenceWriter;
+            if (writer is null)
+                return;
+
+            var record = _errorRecordBuilder.Build(mapping);
+            await writer.WriteAsync(record, CancellationToken.None);
+        }
+        catch (Exception persistenceEx)
+        {
+            _logger.LogWarning(
+                persistenceEx,
+                "Failed to persist handled exception error record. Function={FunctionName}",
+                context.FunctionDefinition.Name);
+        }
     }
 
     private static ErrorContext CreateErrorContext(FunctionContext context, HttpRequestData request)
