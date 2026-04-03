@@ -1,4 +1,4 @@
-using AFH.Location.Function.Mappings.V1;
+using AFH.Location.Function.Mapping.V1;
 using AFH.Location.Application.Models.V1;
 using AFH.Location.Contract.V1.Requests;
 

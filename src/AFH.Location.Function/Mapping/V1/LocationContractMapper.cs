@@ -2,7 +2,7 @@ using AFH.Location.Application.Models.V1;
 using AFH.Location.Contract.V1.Requests;
 using AFH.Location.Contract.V1.Responses;
 
-namespace AFH.Location.Function.Mappings.V1;
+namespace AFH.Location.Function.Mapping.V1;
 
 public static class LocationContractMapper
 {

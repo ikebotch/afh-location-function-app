@@ -1,5 +1,5 @@
 using AFH.Location.Application.Abstractions;
-using AFH.Location.Function.Mappings.V1;
+using AFH.Location.Function.Mapping.V1;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
