@@ -1,4 +1,5 @@
 using AFH.Location.Function.Middleware;
+using AFH.Location.Function.Security;
 using System.Net;
 
 namespace AFH.Location.Tests;
@@ -6,13 +7,13 @@ namespace AFH.Location.Tests;
 public class InternalApiAuthMiddlewareTests
 {
     [Theory]
-    [InlineData("/api/v1/location/health", true)]
-    [InlineData("/api/openapi/v1.json", true)]
-    [InlineData("/api/scalar", true)]
-    [InlineData("/api/v1/location/inperson/advisers/search", false)]
-    public void IsPublic_ReturnsExpectedValue(string path, bool expected)
+    [InlineData("LocationHealthV1", EndpointAccessPolicy.Public)]
+    [InlineData("OpenApiV1", EndpointAccessPolicy.Public)]
+    [InlineData("ScalarUi", EndpointAccessPolicy.Public)]
+    [InlineData("LocationSearchV1", EndpointAccessPolicy.InternalOnly)]
+    public void EndpointAccessPolicies_ClassifiesFunctions(string functionName, EndpointAccessPolicy expected)
     {
-        Assert.Equal(expected, InternalApiAuthMiddleware.IsPublic(path));
+        Assert.Equal(expected, EndpointAccessPolicies.GetPolicy(functionName));
     }
 
     [Fact]

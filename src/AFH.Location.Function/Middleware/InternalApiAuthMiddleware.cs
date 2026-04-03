@@ -1,4 +1,5 @@
 using AFH.Location.Function.Contracts;
+using AFH.Location.Function.Security;
 using AFH.Location.Infrastructure.Logging;
 using AFH.Location.Infrastructure.Options;
 using Microsoft.Azure.Functions.Worker;
@@ -12,13 +13,6 @@ namespace AFH.Location.Function.Middleware;
 
 public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
 {
-    private static readonly string[] PublicPrefixes =
-    [
-        "/api/v1/location/health",
-        "/api/openapi/",
-        "/api/scalar"
-    ];
-
     private readonly InternalApiAuthOptions _options;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly ApplicationLoggingOptions _loggingOptions;
@@ -45,7 +39,7 @@ public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
             return;
         }
 
-        if (IsPublic(req.Url.AbsolutePath))
+        if (EndpointAccessPolicies.GetPolicy(context.FunctionDefinition.Name) is not EndpointAccessPolicy.InternalOnly)
         {
             await next(context);
             return;
@@ -71,9 +65,6 @@ public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
 
         await next(context);
     }
-
-    public static bool IsPublic(string path) =>
-        PublicPrefixes.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
 
     public static (System.Net.HttpStatusCode StatusCode, string Message)? ValidateAuthorization(
         string? expectedToken,
