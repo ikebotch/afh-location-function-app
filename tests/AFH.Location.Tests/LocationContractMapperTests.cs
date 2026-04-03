@@ -1,6 +1,6 @@
-using AFH.Location.Function.Mapping.V1;
 using AFH.Location.Application.Models.V1;
 using AFH.Location.Contract.V1.Requests;
+using AFH.Location.Function.Mapping.V1;
 
 namespace AFH.Location.Tests;
 
@@ -28,7 +28,7 @@ public class LocationContractMapperTests
                     Country = "UK"
                 }
             },
-            Filters = new LocationSearchFilters
+            Filters = new AFH.Location.Contract.V1.Requests.LocationSearchFilters
             {
                 Regions = ["West Midlands"],
                 PreferredAdviserIds = ["adv-1"],

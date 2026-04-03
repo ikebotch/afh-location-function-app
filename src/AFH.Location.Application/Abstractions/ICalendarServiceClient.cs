@@ -1,7 +1,6 @@
-using AFH.Location.Application.Abstractions;
 using AFH.Location.Application.Models.V1;
 
-namespace AFH.Location.Infrastructure.External.Calendar;
+namespace AFH.Location.Application.Abstractions;
 
 public interface ICalendarServiceClient
 {
