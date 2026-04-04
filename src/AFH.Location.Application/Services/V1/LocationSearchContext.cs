@@ -44,4 +44,7 @@ internal sealed class LocationSearchContext
 
     public ConcurrentDictionary<string, int> OfficeRouteMinutesByOfficeId { get; } =
         new(StringComparer.OrdinalIgnoreCase);
+
+    public ConcurrentDictionary<string, Lazy<Task<RouteResult>>> RouteLookupsByPath { get; } =
+        new(StringComparer.OrdinalIgnoreCase);
 }

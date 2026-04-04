@@ -4,6 +4,7 @@ using AFH.Location.Application.Services.Common;
 using AFH.Location.Domain;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Threading;
 
 namespace AFH.Location.Application.Services.V1;
 
@@ -595,7 +596,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         try
         {
             var (destLat, destLng) = ctx.Destination;
-            var fb = await _routing.GetRouteAsync((origin.Lat, origin.Lng), (destLat, destLng), ct);
+            var fb = await GetOrCreateRouteAsync(ctx, (origin.Lat, origin.Lng), (destLat, destLng), ct);
 
             if (fb.EtaMinutes > 0)
             {
@@ -631,7 +632,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         // client -> home
         if (ctx.AdviserOrigins.TryGetValue(c.Adviser.AdviserId, out var home))
         {
-            result.HomeMinutes = await SafeEtaAsync((destLat, destLng), (home.Lat, home.Lng), "BASE_HOME", reasons, ct);
+            result.HomeMinutes = await SafeEtaAsync(ctx, (destLat, destLng), (home.Lat, home.Lng), "BASE_HOME", reasons, ct);
         }
 
         // client -> base office (region mapping)
@@ -642,7 +643,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         {
             if (!ctx.OfficeRouteMinutesByOfficeId.TryGetValue(baseOfficeId, out var officeMinutes))
             {
-                officeMinutes = await SafeEtaAsync((destLat, destLng), (office.Lat, office.Lng), "BASE_OFFICE", reasons, ct);
+                officeMinutes = await SafeEtaAsync(ctx, (destLat, destLng), (office.Lat, office.Lng), "BASE_OFFICE", reasons, ct);
                 ctx.OfficeRouteMinutesByOfficeId.TryAdd(baseOfficeId, officeMinutes);
             }
 
@@ -657,6 +658,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
     }
 
     private async Task<int> SafeEtaAsync(
+        LocationSearchContext ctx,
         (double Lat, double Lng) origin,
         (double Lat, double Lng) destination,
         string tag,
@@ -665,7 +667,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
     {
         try
         {
-            var rr = await _routing.GetRouteAsync(origin, destination, ct);
+            var rr = await GetOrCreateRouteAsync(ctx, origin, destination, ct);
             if (rr.EtaMinutes > 0) return rr.EtaMinutes;
 
             reasons.Add($"{tag}_ROUTE_ZERO");
@@ -898,6 +900,41 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         }
 
         return nearestId;
+    }
+
+    private Task<RouteResult> GetOrCreateRouteAsync(
+        LocationSearchContext ctx,
+        (double Lat, double Lng) origin,
+        (double Lat, double Lng) destination,
+        CancellationToken ct)
+    {
+        var key = BuildRouteLookupKey(origin, destination);
+        var lazy = ctx.RouteLookupsByPath.GetOrAdd(
+            key,
+            _ => new Lazy<Task<RouteResult>>(
+                () => _routing.GetRouteAsync(origin, destination, ct),
+                LazyThreadSafetyMode.ExecutionAndPublication));
+
+        return AwaitMemoizedRouteAsync(ctx, key, lazy);
+    }
+
+    private static string BuildRouteLookupKey((double Lat, double Lng) origin, (double Lat, double Lng) destination)
+        => $"{origin.Lat:F6}:{origin.Lng:F6}->{destination.Lat:F6}:{destination.Lng:F6}";
+
+    private static async Task<RouteResult> AwaitMemoizedRouteAsync(
+        LocationSearchContext ctx,
+        string key,
+        Lazy<Task<RouteResult>> lazy)
+    {
+        try
+        {
+            return await lazy.Value;
+        }
+        catch
+        {
+            ctx.RouteLookupsByPath.TryRemove(key, out _);
+            throw;
+        }
     }
 
     private async Task PersistSearchAuditAsync(LocationSearchContext ctx, CancellationToken ct)
