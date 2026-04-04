@@ -23,8 +23,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
 
         foreach (var adviser in adviserOrigins)
         {
-            var key = BuildKey(adviser.Value, destination, adviser.Key);
-            if (_cache.TryGet(key, out var route))
+            if (TryGetCachedRoute(adviser.Value, destination, adviser.Key, out var route))
                 cached[adviser.Key] = route;
             else
                 misses[adviser.Key] = adviser.Value;
@@ -36,7 +35,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
             foreach (var item in live)
             {
                 cached[item.Key] = item.Value;
-                _cache.Set(BuildKey(misses[item.Key], destination, item.Key), item.Value, item.Value.EtaMinutes > 0 ? TimeSpan.FromMinutes(30) : TimeSpan.FromMinutes(5));
+                CacheRoute(misses[item.Key], destination, item.Key, item.Value);
             }
         }
 
@@ -53,8 +52,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
 
         foreach (var destination in destinations)
         {
-            var key = BuildKey(origin, destination.Value, destination.Key);
-            if (_cache.TryGet(key, out var route))
+            if (TryGetCachedRoute(origin, destination.Value, destination.Key, out var route))
                 cached[destination.Key] = route;
             else
                 misses[destination.Key] = destination.Value;
@@ -66,13 +64,51 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
             foreach (var item in live)
             {
                 cached[item.Key] = item.Value;
-                _cache.Set(BuildKey(origin, misses[item.Key], item.Key), item.Value, item.Value.EtaMinutes > 0 ? TimeSpan.FromMinutes(30) : TimeSpan.FromMinutes(5));
+                CacheRoute(origin, misses[item.Key], item.Key, item.Value);
             }
         }
 
         return cached;
     }
 
+    private bool TryGetCachedRoute(
+        (double Lat, double Lng) origin,
+        (double Lat, double Lng) destination,
+        string id,
+        out RouteResult route)
+    {
+        var specificKey = BuildKey(origin, destination, id);
+        if (_cache.TryGet(specificKey, out route))
+            return true;
+
+        var singleKey = BuildSingleKey(origin, destination);
+        if (_cache.TryGet(singleKey, out route))
+        {
+            _cache.Set(specificKey, route, GetTtl(route));
+            return true;
+        }
+
+        route = default!;
+        return false;
+    }
+
+    private void CacheRoute(
+        (double Lat, double Lng) origin,
+        (double Lat, double Lng) destination,
+        string id,
+        RouteResult route)
+    {
+        var ttl = GetTtl(route);
+        _cache.Set(BuildKey(origin, destination, id), route, ttl);
+        _cache.Set(BuildSingleKey(origin, destination), route, ttl);
+    }
+
+    private static TimeSpan GetTtl(RouteResult route)
+        => route.EtaMinutes > 0 ? TimeSpan.FromMinutes(30) : TimeSpan.FromMinutes(5);
+
     private static string BuildKey((double Lat, double Lng) origin, (double Lat, double Lng) destination, string id)
         => $"{id}:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}".ToLowerInvariant();
+
+    private static string BuildSingleKey((double Lat, double Lng) origin, (double Lat, double Lng) destination)
+        => $"single:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}".ToLowerInvariant();
 }
