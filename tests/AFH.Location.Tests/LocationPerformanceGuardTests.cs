@@ -129,9 +129,21 @@ public sealed class LocationPerformanceGuardTests
         ]));
 
         var routing = new RecordingRoutingService();
+        var routingCoordinator = new LocationSearchRoutingCoordinator(
+            routing,
+            NullLogger<LocationSearchRoutingCoordinator>.Instance);
+        var responseCandidateBuilder = new LocationResponseCandidateBuilder(
+            new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
+            routingCoordinator);
+        var auditWriter = new LocationSearchAuditWriter(
+            new StubSearchAuditRepository(),
+            NullLogger<LocationSearchAuditWriter>.Instance);
         var sut = new LocationSearchServiceV1(
             candidateSource,
             new StubCalendarAvailabilityService(),
+            responseCandidateBuilder,
+            auditWriter,
+            routingCoordinator,
             destinationResolver,
             adviserResolver,
             new StubCoveragePolicyProvider(),
@@ -139,11 +151,8 @@ public sealed class LocationPerformanceGuardTests
             officeResolver,
             new StubBaseOfficePolicyProvider(),
             new StubAvailabilityPolicyProvider(),
-            routing,
             new StubRankingPolicyProvider(),
             new RankingService(),
-            new StubSearchAuditRepository(),
-            new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
             NullLogger<LocationSearchServiceV1>.Instance);
 
         var result = await sut.SearchInPersonAsync(searchRequest, CancellationToken.None);
