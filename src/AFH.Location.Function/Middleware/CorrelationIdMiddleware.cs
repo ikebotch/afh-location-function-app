@@ -6,18 +6,19 @@ namespace AFH.Location.Function.Middleware;
 
 public sealed class CorrelationIdMiddleware : IFunctionsWorkerMiddleware
 {
-    public const string Header = "x-correlation-id";
+    public const string HeaderName = "x-correlation-id";
+    public const string ItemKey = "correlation-id";
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
         var req = await context.GetHttpRequestDataAsync();
         if (req is not null)
         {
-            var cid = req.Headers.TryGetValues(Header, out var values)
+            var cid = req.Headers.TryGetValues(HeaderName, out var values)
                 ? values.FirstOrDefault()
                 : null;
 
-            context.Items[Header] = string.IsNullOrWhiteSpace(cid)
+            context.Items[ItemKey] = string.IsNullOrWhiteSpace(cid)
                 ? Guid.NewGuid().ToString("N")
                 : cid!;
         }
@@ -26,11 +27,11 @@ public sealed class CorrelationIdMiddleware : IFunctionsWorkerMiddleware
 
         var response = context.GetInvocationResult().Value as HttpResponseData;
         if (response is not null &&
-            context.Items.TryGetValue(Header, out var value) &&
+            context.Items.TryGetValue(ItemKey, out var value) &&
             value is string correlationId &&
-            !response.Headers.TryGetValues(Header, out _))
+            !response.Headers.TryGetValues(HeaderName, out _))
         {
-            response.Headers.Add(Header, correlationId);
+            response.Headers.Add(HeaderName, correlationId);
         }
     }
 }

@@ -59,7 +59,7 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
                 mapping.MappingResult.ErrorCode.Value,
                 req.Url.AbsolutePath,
                 req.Method,
-                context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value) ? value?.ToString() : null);
+                context.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var value) ? value?.ToString() : null);
 
             await WriteFailureLogAsync(context, req, mapping, ex);
             await TryWriteErrorRecordAsync(context, mapping.MappingResult);
@@ -79,7 +79,7 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         LocationExceptionMapper.LocationHandledException mapping,
         Exception exception)
     {
-        var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value)
+        var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var value)
             ? value?.ToString()
             : null;
 
@@ -206,7 +206,7 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 
     private static ErrorContext CreateErrorContext(FunctionContext context, HttpRequestData request)
     {
-        var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value)
+        var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var value)
             ? value?.ToString()
             : null;
 

@@ -104,7 +104,7 @@ public sealed class InternalApiAuthMiddleware : IFunctionsWorkerMiddleware
         string failureCode,
         string detail)
     {
-        var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var value)
+        var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var value)
             ? value?.ToString()
             : null;
 

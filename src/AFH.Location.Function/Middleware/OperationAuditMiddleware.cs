@@ -43,7 +43,7 @@ public sealed class OperationAuditMiddleware : IFunctionsWorkerMiddleware
             var response = context.GetInvocationResult().Value as HttpResponseData;
             var statusCode = (int)(response?.StatusCode ?? (unhandled is null ? HttpStatusCode.OK : HttpStatusCode.InternalServerError));
 
-            context.Items.TryGetValue(CorrelationIdMiddleware.Header, out var cid);
+            context.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var cid);
             var correlationId = cid?.ToString();
 
             try

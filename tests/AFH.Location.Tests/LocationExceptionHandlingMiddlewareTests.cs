@@ -125,7 +125,7 @@ internal sealed class TestHttpRequestData(FunctionContext functionContext, Uri? 
     public static TestHttpRequestData Create()
     {
         var context = new TestFunctionContext();
-        context.Items[CorrelationIdMiddleware.Header] = "ctx-correlation";
+        context.Items[CorrelationIdMiddleware.ItemKey] = "ctx-correlation";
         return new TestHttpRequestData(context);
     }
 }
