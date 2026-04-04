@@ -240,7 +240,8 @@ public sealed class LocationSearchService : ILocationSearchService
     {
         var (destLat, destLng) = ctx.Destination;
 
-        var withinCoverage = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
+        var adviserRouteKeyById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var uniqueOrigins = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var c in ctx.Candidates)
         {
@@ -251,16 +252,26 @@ public sealed class LocationSearchService : ILocationSearchService
                 continue;
 
             if (IsWithinCoverage(ctx, c.Adviser.AdviserId, c.Adviser.Region))
-                withinCoverage[c.Adviser.AdviserId] = origin;
+            {
+                var routeKey = BuildCoordinateLookupKey(origin);
+                adviserRouteKeyById[c.Adviser.AdviserId] = routeKey;
+                uniqueOrigins.TryAdd(routeKey, origin);
+            }
         }
 
-        if (withinCoverage.Count == 0)
+        if (uniqueOrigins.Count == 0)
         {
             ctx.RoutesToClient = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
             return;
         }
 
-        ctx.RoutesToClient = await _matrixCoordinator.GetRoutesAsync(withinCoverage, (destLat, destLng), ct);
+        var routesByOriginKey = await _matrixCoordinator.GetRoutesAsync(uniqueOrigins, (destLat, destLng), ct);
+        ctx.RoutesToClient = adviserRouteKeyById
+            .Where(x => routesByOriginKey.ContainsKey(x.Value))
+            .ToDictionary(
+                x => x.Key,
+                x => routesByOriginKey[x.Value],
+                StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task LoadOfficeDataAsync(LocationSearchContext ctx, CancellationToken ct)

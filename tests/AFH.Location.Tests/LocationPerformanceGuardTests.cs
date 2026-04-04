@@ -258,6 +258,100 @@ public sealed class LocationPerformanceGuardTests
         Assert.Equal(2, routeMatrix.OneToManyCalls);
     }
 
+    [Fact]
+    public async Task LocationSearchService_DeduplicatesSharedOriginsBeforeClientMatrixRouting()
+    {
+        var geoPolicyProvider = new StubGeoCachePolicyProvider();
+        var geocoding = new StubGeocodingService(new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["AB1 2CD, United Kingdom"] = (51.500001, -0.100001)
+        });
+        var destinationResolver = new DestinationCoordinateResolver(
+            new StubGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var adviserResolver = new AdviserCoordinateResolver(
+            new StubAdviserGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var officeResolver = new OfficeCoordinateResolver(
+            new StubOfficeRepository(),
+            geocoding,
+            geoPolicyProvider,
+            new StubGeoCache());
+
+        var searchRequest = new LocationSearchRequest
+        {
+            RequestId = "req-matrix-client-dedupe",
+            Destination = new SearchDestination
+            {
+                Coordinates = new SearchCoordinates
+                {
+                    Lat = 51.600001,
+                    Lng = -0.200001
+                }
+            },
+            Meeting = new LocationMeetingWindow
+            {
+                RequestedStartUtc = new DateTime(2026, 04, 06, 10, 0, 0, DateTimeKind.Utc),
+                DurationMinutes = 60,
+                SearchHorizonMinutes = 120
+            },
+            Filters = new LocationSearchFilters()
+        };
+
+        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository(
+        [
+            NewAdviser("adv-1"),
+            NewAdviser("adv-2")
+        ]));
+
+        var routing = new RecordingRoutingService();
+        var routingCoordinator = new LocationSearchRoutingCoordinator(
+            routing,
+            NullLogger<LocationSearchRoutingCoordinator>.Instance);
+        var responseCandidateBuilder = new LocationResponseCandidateBuilder(
+            new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
+            routingCoordinator);
+        var auditWriter = new LocationSearchAuditWriter(
+            new LocationSearchAuditEntryFactory(),
+            new StubSearchAuditRepository(),
+            NullLogger<LocationSearchAuditWriter>.Instance);
+        var routeMatrix = new SharedOriginRouteMatrixService();
+        var sut = new LocationSearchService(
+            candidateSource,
+            new StubCalendarAvailabilityService(),
+            responseCandidateBuilder,
+            auditWriter,
+            routingCoordinator,
+            destinationResolver,
+            adviserResolver,
+            new StubCoveragePolicyProvider(),
+            new RouteMatrixCoordinator(routeMatrix, new StubRouteMatrixPolicyProvider(new RouteMatrixPolicy())),
+            officeResolver,
+            new StubBaseOfficePolicyProvider(),
+            new StubAvailabilityPolicyProvider(),
+            new StubRankingPolicyProvider(),
+            new RankingService(),
+            NullLogger<LocationSearchService>.Instance);
+
+        var result = await sut.SearchInPersonAsync(searchRequest, CancellationToken.None);
+
+        Assert.Equal(2, result.Candidates.Count);
+        Assert.All(result.Candidates, candidate =>
+        {
+            Assert.Equal(14, candidate.TravelToClient.EtaMinutes);
+            Assert.Equal(18, candidate.TravelToBase.HomeMinutes);
+        });
+        Assert.Equal(1, routeMatrix.LastAdviserToDestinationOriginCount);
+        Assert.Equal(1, routing.CallCount);
+        Assert.Equal(
+        [
+            "51.600001:-0.200001->51.500001:-0.100001"
+        ],
+        routing.RouteKeys);
+    }
+
     private static Adviser NewAdviser(string adviserId) => new()
     {
         AdviserId = adviserId,
@@ -437,6 +531,31 @@ public sealed class LocationPerformanceGuardTests
                 StringComparer.OrdinalIgnoreCase);
             return Task.FromResult(result);
         }
+    }
+
+    private sealed class SharedOriginRouteMatrixService : IRouteMatrixService
+    {
+        public int LastAdviserToDestinationOriginCount { get; private set; }
+
+        public Task<IReadOnlyDictionary<string, RouteResult>> GetAdviserToDestinationAsync(
+            IReadOnlyDictionary<string, (double Lat, double Lng)> adviserOrigins,
+            (double Lat, double Lng) destination,
+            CancellationToken ct)
+        {
+            LastAdviserToDestinationOriginCount = adviserOrigins.Count;
+            IReadOnlyDictionary<string, RouteResult> result = adviserOrigins.ToDictionary(
+                x => x.Key,
+                _ => new RouteResult(14, 6.5, "High"),
+                StringComparer.OrdinalIgnoreCase);
+            return Task.FromResult(result);
+        }
+
+        public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
+            (double Lat, double Lng) origin,
+            IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
+            CancellationToken ct)
+            => Task.FromResult<IReadOnlyDictionary<string, RouteResult>>(
+                new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
     }
 
     private sealed class StubAdviserRepository : IAdviserRepository
