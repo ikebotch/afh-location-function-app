@@ -14,6 +14,7 @@ internal static class SearchModuleServiceCollectionExtensions
         services.AddScoped<AdviserCoordinateResolver>();
         services.AddScoped<OfficeCoordinateResolver>();
         services.AddScoped<AdviserCandidateSource>();
+        services.AddSingleton<AdviserSourceRefreshCoordinator>();
         services.AddScoped<LocationSearchRoutingCoordinator>();
         services.AddScoped<LocationResponseCandidateBuilder>();
         services.AddScoped<LocationSearchAuditEntryFactory>();
