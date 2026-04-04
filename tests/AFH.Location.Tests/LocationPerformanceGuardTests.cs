@@ -136,6 +136,7 @@ public sealed class LocationPerformanceGuardTests
             new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
             routingCoordinator);
         var auditWriter = new LocationSearchAuditWriter(
+            new LocationSearchAuditEntryFactory(),
             new StubSearchAuditRepository(),
             NullLogger<LocationSearchAuditWriter>.Instance);
         var sut = new LocationSearchService(
