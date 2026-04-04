@@ -138,7 +138,7 @@ public sealed class LocationPerformanceGuardTests
         var auditWriter = new LocationSearchAuditWriter(
             new StubSearchAuditRepository(),
             NullLogger<LocationSearchAuditWriter>.Instance);
-        var sut = new LocationSearchServiceV1(
+        var sut = new LocationSearchService(
             candidateSource,
             new StubCalendarAvailabilityService(),
             responseCandidateBuilder,
@@ -153,7 +153,7 @@ public sealed class LocationPerformanceGuardTests
             new StubAvailabilityPolicyProvider(),
             new StubRankingPolicyProvider(),
             new RankingService(),
-            NullLogger<LocationSearchServiceV1>.Instance);
+            NullLogger<LocationSearchService>.Instance);
 
         var result = await sut.SearchInPersonAsync(searchRequest, CancellationToken.None);
 

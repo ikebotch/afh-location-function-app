@@ -6,7 +6,7 @@ using AFH.Location.Domain.Entities;
 
 namespace AFH.Location.Application.Services.V1;
 
-public sealed class AdviserCoverageServiceV1 : IAdviserCoverageService
+public sealed class AdviserCoverageService : IAdviserCoverageService
 {
     private static readonly ConcurrentDictionary<string, (double Lat, double Lng)> CoordinateCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly SemaphoreSlim CacheRefreshGate = new(1, 1);
@@ -21,7 +21,7 @@ public sealed class AdviserCoverageServiceV1 : IAdviserCoverageService
     private readonly ICoveragePolicyProvider _coveragePolicyProvider;
     private readonly ICoveragePresentationSettings _settings;
 
-    public AdviserCoverageServiceV1(
+    public AdviserCoverageService(
         IAdviserRepository adviserRepository,
         IOfficeRepository officeRepository,
         IGeocodingService geocodingService,

@@ -5,12 +5,12 @@ using AFH.Location.Domain.Entities;
 
 namespace AFH.Location.Tests;
 
-public class AdviserCoverageServiceV1Tests
+public class AdviserCoverageServiceTests
 {
     [Fact]
     public async Task GetCoverageAsync_RejectsInvalidZeroCoordinates()
     {
-        var sut = new AdviserCoverageServiceV1(
+        var sut = new AdviserCoverageService(
             new StubAdviserRepository(),
             new StubOfficeRepository(),
             new StubGeocodingService(),

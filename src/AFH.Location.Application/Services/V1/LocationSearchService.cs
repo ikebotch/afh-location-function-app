@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Application.Services.V1;
 
-public sealed class LocationSearchServiceV1 : ILocationSearchService
+public sealed class LocationSearchService : ILocationSearchService
 {
     private const int MaxParallelOriginResolutions = 8;
     private readonly AdviserCandidateSource _candidateSource;
@@ -28,9 +28,9 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
     private readonly IRankingPolicyProvider _rankingPolicyProvider;
     private readonly RankingService _ranking;
 
-    private readonly ILogger<LocationSearchServiceV1> _logger;
+    private readonly ILogger<LocationSearchService> _logger;
 
-    public LocationSearchServiceV1(
+    public LocationSearchService(
         AdviserCandidateSource candidateSource,
         ICalendarAvailabilityService calendar,
         LocationResponseCandidateBuilder responseCandidateBuilder,
@@ -45,7 +45,7 @@ public sealed class LocationSearchServiceV1 : ILocationSearchService
         IAvailabilityPolicyProvider availabilityPolicyProvider,
         IRankingPolicyProvider rankingPolicyProvider,
         RankingService ranking,
-        ILogger<LocationSearchServiceV1> logger)
+        ILogger<LocationSearchService> logger)
     {
         _candidateSource = candidateSource;
         _calendar = calendar;

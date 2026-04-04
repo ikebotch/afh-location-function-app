@@ -19,10 +19,10 @@ internal static class SearchModuleServiceCollectionExtensions
         services.AddScoped<LocationSearchAuditWriter>();
         services.AddScoped<RankingService>();
         services.AddScoped<ILicenseCatalogService, LicenseCatalogService>();
-        services.AddScoped<IAdviserCoverageService, AdviserCoverageServiceV1>();
+        services.AddScoped<IAdviserCoverageService, AdviserCoverageService>();
         services.AddScoped<IAdviserCacheSyncService, AdviserCacheSyncService>();
         services.AddScoped<IAdviserRepository, CachedAdviserRepository>();
-        services.AddScoped<ILocationSearchService, LocationSearchServiceV1>();
+        services.AddScoped<ILocationSearchService, LocationSearchService>();
 
         return services;
     }
