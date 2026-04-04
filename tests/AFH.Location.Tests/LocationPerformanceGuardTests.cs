@@ -252,8 +252,8 @@ public sealed class LocationPerformanceGuardTests
         Assert.Equal(15, candidate.TravelToClient.EtaMinutes);
         Assert.Equal(18, candidate.TravelToBase.HomeMinutes);
         Assert.Equal(12, candidate.TravelToBase.OfficeMinutes);
-        Assert.Equal(12, candidate.TravelToNearestOffice.EtaMinutes);
-        Assert.Equal(0, routing.CallCount);
+        Assert.Equal(15, candidate.TravelToNearestOffice.EtaMinutes);
+        Assert.Equal(1, routing.CallCount);
         Assert.Equal(1, routeMatrix.AdviserToDestinationCalls);
         Assert.Equal(2, routeMatrix.OneToManyCalls);
     }
@@ -493,7 +493,7 @@ public sealed class LocationPerformanceGuardTests
         var result = await sut.SearchInPersonAsync(NewSearchRequest("req-enrichment-precompute"), CancellationToken.None);
 
         Assert.Equal(4, result.Candidates.Count);
-        Assert.Equal(0, routing.CallCount);
+        Assert.Equal(1, routing.CallCount);
         Assert.Equal(1, routeMatrix.AdviserToDestinationCalls);
         Assert.Equal(2, routeMatrix.OneToManyCalls);
         Assert.Equal([2, 2], routeMatrix.OneToManyDestinationCounts);
@@ -574,6 +574,82 @@ public sealed class LocationPerformanceGuardTests
         routing.RouteKeys.OrderBy(x => x, StringComparer.Ordinal).ToArray());
     }
 
+    [Fact]
+    public async Task LocationSearchService_AppliesReturnTravelEnrichmentOnlyToTopTenRankedCandidates()
+    {
+        var geoPolicyProvider = new StubGeoCachePolicyProvider();
+        var geocodingResults = Enumerable.Range(1, 12)
+            .ToDictionary(
+                i => $"PC{i:00} 1AA, United Kingdom",
+                i => (51.400000 + (i * 0.01), -0.100000 - (i * 0.01)),
+                StringComparer.OrdinalIgnoreCase);
+        var geocoding = new StubGeocodingService(geocodingResults);
+        var destinationResolver = new DestinationCoordinateResolver(
+            new StubGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var adviserResolver = new AdviserCoordinateResolver(
+            new StubAdviserGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var officeResolver = new OfficeCoordinateResolver(
+            new StubOfficeRepository(),
+            geocoding,
+            geoPolicyProvider,
+            new StubGeoCache());
+
+        var advisers = Enumerable.Range(1, 12)
+            .Select(i => NewAdviser(
+                $"adv-{i:00}",
+                $"PC{i:00} 1AA",
+                "Region-1",
+                5.0 - ((i - 1) * 0.1)))
+            .ToList();
+
+        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository(advisers));
+        var routing = new RecordingRoutingService();
+        var routingCoordinator = new LocationSearchRoutingCoordinator(
+            routing,
+            NullLogger<LocationSearchRoutingCoordinator>.Instance);
+        var responseCandidateBuilder = new LocationResponseCandidateBuilder(
+            new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
+            routingCoordinator);
+        var auditWriter = new LocationSearchAuditWriter(
+            new LocationSearchAuditEntryFactory(),
+            new StubSearchAuditRepository(),
+            NullLogger<LocationSearchAuditWriter>.Instance);
+        var sut = new LocationSearchService(
+            candidateSource,
+            new StubCalendarAvailabilityService(),
+            responseCandidateBuilder,
+            auditWriter,
+            routingCoordinator,
+            destinationResolver,
+            adviserResolver,
+            new StubCoveragePolicyProvider(),
+            new RouteMatrixCoordinator(new ClientOnlyRouteMatrixService(), new StubRouteMatrixPolicyProvider(new RouteMatrixPolicy())),
+            officeResolver,
+            new StubBaseOfficePolicyProvider(),
+            new StubAvailabilityPolicyProvider(),
+            new StubRankingPolicyProvider(),
+            new RankingService(),
+            NullLogger<LocationSearchService>.Instance);
+
+        var result = await sut.SearchInPersonAsync(NewSearchRequest("req-top-n-enrichment"), CancellationToken.None);
+
+        var expectedOrder = Enumerable.Range(1, 12).Select(i => $"adv-{i:00}").ToArray();
+        Assert.Equal(expectedOrder, result.Candidates.Select(x => x.AdviserId).ToArray());
+
+        Assert.All(result.Candidates.Take(10), candidate => Assert.True(candidate.TravelToBase.HomeMinutes > 0));
+        Assert.All(result.Candidates.Take(10), candidate => Assert.Equal(0, candidate.TravelToBase.OfficeMinutes));
+        Assert.All(result.Candidates.Skip(10), candidate =>
+        {
+            Assert.Equal(0, candidate.TravelToBase.HomeMinutes);
+            Assert.Equal(0, candidate.TravelToBase.OfficeMinutes);
+        });
+        Assert.Equal(10, routing.CallCount);
+    }
+
     private static LocationSearchRequest NewSearchRequest(string requestId) => new()
     {
         RequestId = requestId,
@@ -594,16 +670,19 @@ public sealed class LocationPerformanceGuardTests
         Filters = new LocationSearchFilters()
     };
 
-    private static Adviser NewAdviser(string adviserId) => NewAdviser(adviserId, "AB1 2CD", "Region-1");
+    private static Adviser NewAdviser(string adviserId) => NewAdviser(adviserId, "AB1 2CD", "Region-1", 4.5);
 
-    private static Adviser NewAdviser(string adviserId, string homePostcode, string region) => new()
+    private static Adviser NewAdviser(string adviserId, string homePostcode, string region)
+        => NewAdviser(adviserId, homePostcode, region, 4.5);
+
+    private static Adviser NewAdviser(string adviserId, string homePostcode, string region, double rating) => new()
     {
         AdviserId = adviserId,
         DisplayName = adviserId.ToUpperInvariant(),
         MailboxUserId = adviserId,
         HomePostcode = homePostcode,
         Region = region,
-        Rating = 4.5,
+        Rating = rating,
         IsActive = true,
         IsBookable = true
     };

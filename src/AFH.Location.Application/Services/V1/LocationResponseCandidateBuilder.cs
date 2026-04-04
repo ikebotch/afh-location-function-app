@@ -76,9 +76,7 @@ public sealed class LocationResponseCandidateBuilder
                     ref proposedStartUtc,
                     reasons);
 
-                var travelToBase = unavailableForRouting
-                    ? new TravelToBaseResult { HomeMinutes = 0, OfficeMinutes = 0 }
-                    : await _routingCoordinator.BuildTravelToBaseAsync(ctx, candidate, reasons, ct);
+                var travelToBase = new TravelToBaseResult { HomeMinutes = 0, OfficeMinutes = 0 };
 
                 var travelToNearestOffice = new TravelToNearestOfficeResult
                 {
