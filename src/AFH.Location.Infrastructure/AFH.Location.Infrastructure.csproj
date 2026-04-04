@@ -5,6 +5,7 @@
 		<ProjectReference Include="..\AFH.Location.Domain\AFH.Location.Domain.csproj" />
 		<ProjectReference Include="..\..\..\..\sdk\afh-common-sharepoint\src\AFH.Common.SharePointUtils.csproj" />
 		<ProjectReference Include="..\..\..\..\sdk\afh-common-error\src\AFH.Common.Errors.Email\AFH.Common.Errors.Email.csproj" />
+		<ProjectReference Include="..\..\..\..\sdk\afh-common-error\src\AFH.Common.Errors.ApplicationInsights\AFH.Common.Errors.ApplicationInsights.csproj" />
 		<ProjectReference Include="..\..\..\..\sdk\afh-common-error\src\AFH.Common.Errors.EntityFramework\AFH.Common.Errors.EntityFramework.csproj" />
 	</ItemGroup>
 

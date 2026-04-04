@@ -11,6 +11,7 @@ using AFH.Location.Infrastructure.Options;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;
 using AFH.Location.Infrastructure.Services;
+using AFH.Common.Errors.ApplicationInsights.DependencyInjection;
 using AFH.Common.Errors.EntityFramework.DependencyInjection;
 using AFH.Common.SharePointUtils.Extensions;
 using Microsoft.Extensions.Configuration;
@@ -51,6 +52,7 @@ public static class DependencyInjection
             .Validate(options => !options.Enabled || Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _), $"{AdviserFeedOptions.SectionName}:BaseUrl must be an absolute URI when the adviser feed is enabled.")
             .ValidateOnStart();
 
+        services.AddAfhCommonErrorsApplicationInsights();
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
         services.AddScoped<ICalendarAvailabilityService, CalendarAvailabilityService>();
         services.AddScoped<AzureMapsGeocodingService>();
@@ -84,6 +86,7 @@ public static class DependencyInjection
         services.AddSharePoint(configuration);
         services.AddSearchModule();
         services.AddLoggingModule();
+        services.AddScoped<LocationHandledErrorTelemetryEmitter>();
 
         return services;
     }

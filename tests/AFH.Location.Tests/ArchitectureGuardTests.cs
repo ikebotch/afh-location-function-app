@@ -29,14 +29,14 @@ public sealed class ArchitectureGuardTests
     {
         AssertReferences("AFH.Location.Function", "AFH.Common.Errors");
         AssertReferences("AFH.Location.Function", "AFH.Common.Errors.AzureFunctions");
-        AssertReferences("AFH.Location.Function", "AFH.Common.Errors.ApplicationInsights");
+        AssertDoesNotReference("AFH.Location.Function", "AFH.Common.Errors.ApplicationInsights");
         AssertDoesNotReference("AFH.Location.Function", "AFH.Common.Errors.Email");
         AssertDoesNotReference("AFH.Location.Function", "AFH.Common.Errors.EntityFramework");
 
         AssertReferences("AFH.Location.Infrastructure", "AFH.Common.Errors.EntityFramework");
         AssertReferences("AFH.Location.Infrastructure", "AFH.Common.Errors.Email");
+        AssertReferences("AFH.Location.Infrastructure", "AFH.Common.Errors.ApplicationInsights");
         AssertDoesNotReference("AFH.Location.Infrastructure", "AFH.Common.Errors.AzureFunctions");
-        AssertDoesNotReference("AFH.Location.Infrastructure", "AFH.Common.Errors.ApplicationInsights");
     }
 
     [Fact]
