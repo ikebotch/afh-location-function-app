@@ -428,13 +428,181 @@ public sealed class LocationPerformanceGuardTests
         Assert.Empty(result.Candidates);
     }
 
-    private static Adviser NewAdviser(string adviserId) => new()
+    [Fact]
+    public async Task LocationSearchService_ReturnEnrichmentPrecomputeScalesWithUniqueHomesAndOffices()
+    {
+        var geoPolicyProvider = new StubGeoCachePolicyProvider();
+        var geocoding = new StubGeocodingService(new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["AB1 2CD, United Kingdom"] = (51.500001, -0.100001),
+            ["CD3 4EF, United Kingdom"] = (51.700001, -0.300001),
+            ["ZX1 1ZZ, United Kingdom"] = (51.650001, -0.250001),
+            ["ZX2 2ZZ, United Kingdom"] = (51.800001, -0.350001)
+        });
+        var destinationResolver = new DestinationCoordinateResolver(
+            new StubGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var adviserResolver = new AdviserCoordinateResolver(
+            new StubAdviserGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var officeResolver = new OfficeCoordinateResolver(
+            new MultiOfficeRepository(),
+            geocoding,
+            geoPolicyProvider,
+            new StubGeoCache());
+
+        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository(
+        [
+            NewAdviser("adv-1", "AB1 2CD", "Region-1"),
+            NewAdviser("adv-2", "AB1 2CD", "Region-1"),
+            NewAdviser("adv-3", "CD3 4EF", "Region-2"),
+            NewAdviser("adv-4", "CD3 4EF", "Region-2")
+        ]));
+
+        var routing = new RecordingRoutingService();
+        var routingCoordinator = new LocationSearchRoutingCoordinator(
+            routing,
+            NullLogger<LocationSearchRoutingCoordinator>.Instance);
+        var responseCandidateBuilder = new LocationResponseCandidateBuilder(
+            new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
+            routingCoordinator);
+        var auditWriter = new LocationSearchAuditWriter(
+            new LocationSearchAuditEntryFactory(),
+            new StubSearchAuditRepository(),
+            NullLogger<LocationSearchAuditWriter>.Instance);
+        var routeMatrix = new EnrichmentMeasurementRouteMatrixService();
+        var sut = new LocationSearchService(
+            candidateSource,
+            new StubCalendarAvailabilityService(),
+            responseCandidateBuilder,
+            auditWriter,
+            routingCoordinator,
+            destinationResolver,
+            adviserResolver,
+            new StubCoveragePolicyProvider(),
+            new RouteMatrixCoordinator(routeMatrix, new StubRouteMatrixPolicyProvider(new RouteMatrixPolicy())),
+            officeResolver,
+            new MultiRegionBaseOfficePolicyProvider(),
+            new StubAvailabilityPolicyProvider(),
+            new StubRankingPolicyProvider(),
+            new RankingService(),
+            NullLogger<LocationSearchService>.Instance);
+
+        var result = await sut.SearchInPersonAsync(NewSearchRequest("req-enrichment-precompute"), CancellationToken.None);
+
+        Assert.Equal(4, result.Candidates.Count);
+        Assert.Equal(0, routing.CallCount);
+        Assert.Equal(1, routeMatrix.AdviserToDestinationCalls);
+        Assert.Equal(2, routeMatrix.OneToManyCalls);
+        Assert.Equal([2, 2], routeMatrix.OneToManyDestinationCounts);
+    }
+
+    [Fact]
+    public async Task LocationSearchService_ReturnEnrichmentFallbackScalesWithUniqueHomesAndOffices()
+    {
+        var geoPolicyProvider = new StubGeoCachePolicyProvider();
+        var geocoding = new StubGeocodingService(new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["AB1 2CD, United Kingdom"] = (51.500001, -0.100001),
+            ["CD3 4EF, United Kingdom"] = (51.700001, -0.300001),
+            ["ZX1 1ZZ, United Kingdom"] = (51.650001, -0.250001),
+            ["ZX2 2ZZ, United Kingdom"] = (51.800001, -0.350001)
+        });
+        var destinationResolver = new DestinationCoordinateResolver(
+            new StubGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var adviserResolver = new AdviserCoordinateResolver(
+            new StubAdviserGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var officeResolver = new OfficeCoordinateResolver(
+            new MultiOfficeRepository(),
+            geocoding,
+            geoPolicyProvider,
+            new StubGeoCache());
+
+        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository(
+        [
+            NewAdviser("adv-1", "AB1 2CD", "Region-1"),
+            NewAdviser("adv-2", "AB1 2CD", "Region-1"),
+            NewAdviser("adv-3", "CD3 4EF", "Region-2"),
+            NewAdviser("adv-4", "CD3 4EF", "Region-2")
+        ]));
+
+        var routing = new RecordingRoutingService();
+        var routingCoordinator = new LocationSearchRoutingCoordinator(
+            routing,
+            NullLogger<LocationSearchRoutingCoordinator>.Instance);
+        var responseCandidateBuilder = new LocationResponseCandidateBuilder(
+            new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
+            routingCoordinator);
+        var auditWriter = new LocationSearchAuditWriter(
+            new LocationSearchAuditEntryFactory(),
+            new StubSearchAuditRepository(),
+            NullLogger<LocationSearchAuditWriter>.Instance);
+        var sut = new LocationSearchService(
+            candidateSource,
+            new StubCalendarAvailabilityService(),
+            responseCandidateBuilder,
+            auditWriter,
+            routingCoordinator,
+            destinationResolver,
+            adviserResolver,
+            new StubCoveragePolicyProvider(),
+            new RouteMatrixCoordinator(new ClientOnlyRouteMatrixService(), new StubRouteMatrixPolicyProvider(new RouteMatrixPolicy())),
+            officeResolver,
+            new MultiRegionBaseOfficePolicyProvider(),
+            new StubAvailabilityPolicyProvider(),
+            new StubRankingPolicyProvider(),
+            new RankingService(),
+            NullLogger<LocationSearchService>.Instance);
+
+        var result = await sut.SearchInPersonAsync(NewSearchRequest("req-enrichment-fallback"), CancellationToken.None);
+
+        Assert.Equal(4, result.Candidates.Count);
+        Assert.Equal(4, routing.CallCount);
+        Assert.Equal(
+        [
+            "51.600001:-0.200001->51.500001:-0.100001",
+            "51.600001:-0.200001->51.650001:-0.250001",
+            "51.600001:-0.200001->51.700001:-0.300001",
+            "51.600001:-0.200001->51.800001:-0.350001"
+        ],
+        routing.RouteKeys.OrderBy(x => x, StringComparer.Ordinal).ToArray());
+    }
+
+    private static LocationSearchRequest NewSearchRequest(string requestId) => new()
+    {
+        RequestId = requestId,
+        Destination = new SearchDestination
+        {
+            Coordinates = new SearchCoordinates
+            {
+                Lat = 51.600001,
+                Lng = -0.200001
+            }
+        },
+        Meeting = new LocationMeetingWindow
+        {
+            RequestedStartUtc = new DateTime(2026, 04, 06, 10, 0, 0, DateTimeKind.Utc),
+            DurationMinutes = 60,
+            SearchHorizonMinutes = 120
+        },
+        Filters = new LocationSearchFilters()
+    };
+
+    private static Adviser NewAdviser(string adviserId) => NewAdviser(adviserId, "AB1 2CD", "Region-1");
+
+    private static Adviser NewAdviser(string adviserId, string homePostcode, string region) => new()
     {
         AdviserId = adviserId,
         DisplayName = adviserId.ToUpperInvariant(),
         MailboxUserId = adviserId,
-        HomePostcode = "AB1 2CD",
-        Region = "Region-1",
+        HomePostcode = homePostcode,
+        Region = region,
         Rating = 4.5,
         IsActive = true,
         IsBookable = true
@@ -634,6 +802,68 @@ public sealed class LocationPerformanceGuardTests
                 new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
     }
 
+    private sealed class EnrichmentMeasurementRouteMatrixService : IRouteMatrixService
+    {
+        public int AdviserToDestinationCalls { get; private set; }
+        public int OneToManyCalls { get; private set; }
+        public List<int> OneToManyDestinationCounts { get; } = [];
+
+        public Task<IReadOnlyDictionary<string, RouteResult>> GetAdviserToDestinationAsync(
+            IReadOnlyDictionary<string, (double Lat, double Lng)> adviserOrigins,
+            (double Lat, double Lng) destination,
+            CancellationToken ct)
+        {
+            AdviserToDestinationCalls++;
+            IReadOnlyDictionary<string, RouteResult> result = adviserOrigins.ToDictionary(
+                x => x.Key,
+                _ => new RouteResult(15, 7.5, "High"),
+                StringComparer.OrdinalIgnoreCase);
+            return Task.FromResult(result);
+        }
+
+        public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
+            (double Lat, double Lng) origin,
+            IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
+            CancellationToken ct)
+        {
+            OneToManyCalls++;
+            OneToManyDestinationCounts.Add(destinations.Count);
+            IReadOnlyDictionary<string, RouteResult> result = destinations.ToDictionary(
+                x => x.Key,
+                x => x.Key.Contains("51.500001:", StringComparison.OrdinalIgnoreCase)
+                    ? new RouteResult(18, 7.5, "High")
+                    : x.Key.Contains("51.700001:", StringComparison.OrdinalIgnoreCase)
+                        ? new RouteResult(21, 9.0, "High")
+                        : x.Key.Equals("OFF-1", StringComparison.OrdinalIgnoreCase)
+                            ? new RouteResult(12, 9.5, "High")
+                            : new RouteResult(16, 12.0, "High"),
+                StringComparer.OrdinalIgnoreCase);
+            return Task.FromResult(result);
+        }
+    }
+
+    private sealed class ClientOnlyRouteMatrixService : IRouteMatrixService
+    {
+        public Task<IReadOnlyDictionary<string, RouteResult>> GetAdviserToDestinationAsync(
+            IReadOnlyDictionary<string, (double Lat, double Lng)> adviserOrigins,
+            (double Lat, double Lng) destination,
+            CancellationToken ct)
+        {
+            IReadOnlyDictionary<string, RouteResult> result = adviserOrigins.ToDictionary(
+                x => x.Key,
+                _ => new RouteResult(15, 7.5, "High"),
+                StringComparer.OrdinalIgnoreCase);
+            return Task.FromResult(result);
+        }
+
+        public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
+            (double Lat, double Lng) origin,
+            IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
+            CancellationToken ct)
+            => Task.FromResult<IReadOnlyDictionary<string, RouteResult>>(
+                new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
+    }
+
     private sealed class PolicyLoadProbe
     {
         private readonly int _expectedStarts;
@@ -782,6 +1012,20 @@ public sealed class LocationPerformanceGuardTests
             });
     }
 
+    private sealed class MultiRegionBaseOfficePolicyProvider : IBaseOfficePolicyProvider
+    {
+        public Task<BaseOfficePolicy> GetAsync(CancellationToken ct)
+            => Task.FromResult(new BaseOfficePolicy
+            {
+                DefaultOfficeId = "OFF-1",
+                RegionOfficeMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Region-1"] = "OFF-1",
+                    ["Region-2"] = "OFF-2"
+                }
+            });
+    }
+
     private sealed class StubAvailabilityPolicyProvider : IAvailabilityPolicyProvider
     {
         public Task<AvailabilityPolicy> GetAsync(CancellationToken ct)
@@ -824,6 +1068,28 @@ public sealed class LocationPerformanceGuardTests
                     Name = "Office 1",
                     Postcode = "ZX1 1ZZ",
                     Region = "Region-1"
+                }
+            ]);
+    }
+
+    private sealed class MultiOfficeRepository : IOfficeRepository
+    {
+        public Task<IReadOnlyList<Office>> GetAllAsync(CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<Office>>(
+            [
+                new Office
+                {
+                    OfficeId = "OFF-1",
+                    Name = "Office 1",
+                    Postcode = "ZX1 1ZZ",
+                    Region = "Region-1"
+                },
+                new Office
+                {
+                    OfficeId = "OFF-2",
+                    Name = "Office 2",
+                    Postcode = "ZX2 2ZZ",
+                    Region = "Region-2"
                 }
             ]);
     }
