@@ -1,5 +1,4 @@
 using AFH.Location.Function.Middleware;
-using AFH.Location.Function.Notifications;
 using AFH.Location.Infrastructure.Composition;
 using AFH.Common.Errors.Abstractions;
 using AFH.Common.Errors.ApplicationInsights.DependencyInjection;

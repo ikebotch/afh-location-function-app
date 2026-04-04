@@ -5,11 +5,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace AFH.Location.Function.Notifications;
+namespace AFH.Location.Infrastructure.Composition;
 
-internal static class ErrorNotificationModuleServiceCollectionExtensions
+public static class ErrorNotificationModuleServiceCollectionExtensions
 {
-    internal static IServiceCollection AddLocationErrorNotificationModule(
+    public static IServiceCollection AddLocationErrorNotificationModule(
         this IServiceCollection services,
         IConfiguration configuration,
         string defaultSubjectPrefix,
