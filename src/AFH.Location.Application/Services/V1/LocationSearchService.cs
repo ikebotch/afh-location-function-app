@@ -177,12 +177,17 @@ public sealed class LocationSearchService : ILocationSearchService
 
     private async Task LoadPoliciesAsync(LocationSearchContext ctx, CancellationToken ct)
     {
-        // Keep these sequential because SQL-backed policy providers share the same scoped DbContext.
-        // Parallel queries on one DbContext trigger EF Core concurrency exceptions.
-        ctx.CoveragePolicy = await _coveragePolicyProvider.GetAsync(ct);
-        ctx.BaseOfficePolicy = await _baseOfficePolicyProvider.GetAsync(ct);
-        ctx.RankingPolicy = await _rankingPolicyProvider.GetAsync(ct);
-        ctx.AvailabilityPolicy = await _availabilityPolicyProvider.GetAsync(ct);
+        var coverageTask = _coveragePolicyProvider.GetAsync(ct);
+        var baseOfficeTask = _baseOfficePolicyProvider.GetAsync(ct);
+        var rankingTask = _rankingPolicyProvider.GetAsync(ct);
+        var availabilityTask = _availabilityPolicyProvider.GetAsync(ct);
+
+        await Task.WhenAll(coverageTask, baseOfficeTask, rankingTask, availabilityTask);
+
+        ctx.CoveragePolicy = await coverageTask;
+        ctx.BaseOfficePolicy = await baseOfficeTask;
+        ctx.RankingPolicy = await rankingTask;
+        ctx.AvailabilityPolicy = await availabilityTask;
     }
 
     private async Task ResolveAdviserOriginsAsync(LocationSearchContext ctx, CancellationToken ct)

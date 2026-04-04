@@ -352,6 +352,82 @@ public sealed class LocationPerformanceGuardTests
         routing.RouteKeys);
     }
 
+    [Fact]
+    public async Task LocationSearchService_StartsPolicyLoadsTogetherBeforeContinuing()
+    {
+        var geoPolicyProvider = new StubGeoCachePolicyProvider();
+        var destinationResolver = new DestinationCoordinateResolver(
+            new StubGeoCache(),
+            new StubGeocodingService(new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase)),
+            geoPolicyProvider);
+        var adviserResolver = new AdviserCoordinateResolver(
+            new StubAdviserGeoCache(),
+            new StubGeocodingService(new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase)),
+            geoPolicyProvider);
+        var officeResolver = new OfficeCoordinateResolver(
+            new StubOfficeRepository(),
+            new StubGeocodingService(new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase)),
+            geoPolicyProvider,
+            new StubGeoCache());
+
+        var probe = new PolicyLoadProbe(expectedStarts: 4);
+        var sut = new LocationSearchService(
+            new AdviserCandidateSource(new StubAdviserRepository([])),
+            new StubCalendarAvailabilityService(),
+            new LocationResponseCandidateBuilder(
+                new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
+                new LocationSearchRoutingCoordinator(
+                    new RecordingRoutingService(),
+                    NullLogger<LocationSearchRoutingCoordinator>.Instance)),
+            new LocationSearchAuditWriter(
+                new LocationSearchAuditEntryFactory(),
+                new StubSearchAuditRepository(),
+                NullLogger<LocationSearchAuditWriter>.Instance),
+            new LocationSearchRoutingCoordinator(
+                new RecordingRoutingService(),
+                NullLogger<LocationSearchRoutingCoordinator>.Instance),
+            destinationResolver,
+            adviserResolver,
+            new BlockingCoveragePolicyProvider(probe),
+            new RouteMatrixCoordinator(new EmptyRouteMatrixService(), new StubRouteMatrixPolicyProvider(new RouteMatrixPolicy())),
+            officeResolver,
+            new BlockingBaseOfficePolicyProvider(probe),
+            new BlockingAvailabilityPolicyProvider(probe),
+            new BlockingRankingPolicyProvider(probe),
+            new RankingService(),
+            NullLogger<LocationSearchService>.Instance);
+
+        var searchTask = sut.SearchInPersonAsync(
+            new LocationSearchRequest
+            {
+                RequestId = "req-policy-loads",
+                Destination = new SearchDestination
+                {
+                    Coordinates = new SearchCoordinates
+                    {
+                        Lat = 51.600001,
+                        Lng = -0.200001
+                    }
+                },
+                Meeting = new LocationMeetingWindow
+                {
+                    RequestedStartUtc = new DateTime(2026, 04, 06, 10, 0, 0, DateTimeKind.Utc),
+                    DurationMinutes = 60,
+                    SearchHorizonMinutes = 120
+                },
+                Filters = new LocationSearchFilters()
+            },
+            CancellationToken.None);
+
+        await probe.WhenAllStarted;
+        Assert.Equal(4, probe.StartCount);
+
+        probe.Release();
+
+        var result = await searchTask;
+        Assert.Empty(result.Candidates);
+    }
+
     private static Adviser NewAdviser(string adviserId) => new()
     {
         AdviserId = adviserId,
@@ -556,6 +632,103 @@ public sealed class LocationPerformanceGuardTests
             CancellationToken ct)
             => Task.FromResult<IReadOnlyDictionary<string, RouteResult>>(
                 new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
+    }
+
+    private sealed class PolicyLoadProbe
+    {
+        private readonly int _expectedStarts;
+        private readonly TaskCompletionSource _allStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _startCount;
+
+        public PolicyLoadProbe(int expectedStarts)
+        {
+            _expectedStarts = expectedStarts;
+        }
+
+        public int StartCount => _startCount;
+        public Task WhenAllStarted => _allStarted.Task;
+
+        public async Task WaitForReleaseAsync()
+        {
+            if (Interlocked.Increment(ref _startCount) == _expectedStarts)
+                _allStarted.TrySetResult();
+
+            await _release.Task;
+        }
+
+        public void Release() => _release.TrySetResult();
+    }
+
+    private sealed class BlockingCoveragePolicyProvider : ICoveragePolicyProvider
+    {
+        private readonly PolicyLoadProbe _probe;
+
+        public BlockingCoveragePolicyProvider(PolicyLoadProbe probe)
+        {
+            _probe = probe;
+        }
+
+        public async Task<CoveragePolicy> GetAsync(CancellationToken ct)
+        {
+            await _probe.WaitForReleaseAsync();
+            return new CoveragePolicy
+            {
+                DefaultRadiusMiles = 100,
+                DefaultMaxTravelTimeMinutes = 120
+            };
+        }
+    }
+
+    private sealed class BlockingBaseOfficePolicyProvider : IBaseOfficePolicyProvider
+    {
+        private readonly PolicyLoadProbe _probe;
+
+        public BlockingBaseOfficePolicyProvider(PolicyLoadProbe probe)
+        {
+            _probe = probe;
+        }
+
+        public async Task<BaseOfficePolicy> GetAsync(CancellationToken ct)
+        {
+            await _probe.WaitForReleaseAsync();
+            return new BaseOfficePolicy();
+        }
+    }
+
+    private sealed class BlockingAvailabilityPolicyProvider : IAvailabilityPolicyProvider
+    {
+        private readonly PolicyLoadProbe _probe;
+
+        public BlockingAvailabilityPolicyProvider(PolicyLoadProbe probe)
+        {
+            _probe = probe;
+        }
+
+        public async Task<AvailabilityPolicy> GetAsync(CancellationToken ct)
+        {
+            await _probe.WaitForReleaseAsync();
+            return new AvailabilityPolicy
+            {
+                RequireCalendarAvailability = false
+            };
+        }
+    }
+
+    private sealed class BlockingRankingPolicyProvider : IRankingPolicyProvider
+    {
+        private readonly PolicyLoadProbe _probe;
+
+        public BlockingRankingPolicyProvider(PolicyLoadProbe probe)
+        {
+            _probe = probe;
+        }
+
+        public async Task<RankingOptions> GetAsync(CancellationToken ct)
+        {
+            await _probe.WaitForReleaseAsync();
+            return new RankingOptions();
+        }
     }
 
     private sealed class StubAdviserRepository : IAdviserRepository

@@ -11,17 +11,19 @@ namespace AFH.Location.Infrastructure.Persistence.Repositories;
 /// </summary>
 public sealed class SqlCoveragePolicyProvider : ICoveragePolicyProvider
 {
-    private readonly LocationPolicyDbContext _db;
+    private readonly IDbContextFactory<LocationPolicyDbContext> _dbContextFactory;
     private readonly IConfiguration _configuration;
 
-    public SqlCoveragePolicyProvider(LocationPolicyDbContext db, IConfiguration configuration)
+    public SqlCoveragePolicyProvider(IDbContextFactory<LocationPolicyDbContext> dbContextFactory, IConfiguration configuration)
     {
-        _db = db;
+        _dbContextFactory = dbContextFactory;
         _configuration = configuration;
     }
 
     public async Task<CoveragePolicy> GetAsync(CancellationToken ct)
     {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
+
         var policy = new CoveragePolicy
         {
             DefaultRadiusMiles = _configuration.GetValue<double?>("LocationSearch:Coverage:DefaultRadiusMiles") ?? 100,
@@ -52,7 +54,7 @@ public sealed class SqlCoveragePolicyProvider : ICoveragePolicyProvider
                 policy.RegionMaxTravelTimeMinutes[child.Key] = value;
         }
 
-        var coverageDefault = await _db.CoverageDefaults
+        var coverageDefault = await db.CoverageDefaults
             .AsNoTracking()
             .OrderBy(x => x.Id)
             .FirstOrDefaultAsync(ct);
@@ -63,7 +65,7 @@ public sealed class SqlCoveragePolicyProvider : ICoveragePolicyProvider
             policy.DefaultMaxTravelTimeMinutes = Math.Max(1, coverageDefault.DefaultMaxTravelTimeMinutes);
         }
 
-        var regionOverrides = await _db.CoverageRegions
+        var regionOverrides = await db.CoverageRegions
             .AsNoTracking()
             .ToListAsync(ct);
 
@@ -78,7 +80,7 @@ public sealed class SqlCoveragePolicyProvider : ICoveragePolicyProvider
             }
         }
 
-        var adviserOverrides = await _db.CoverageAdvisers
+        var adviserOverrides = await db.CoverageAdvisers
             .AsNoTracking()
             .ToListAsync(ct);
 

@@ -11,17 +11,19 @@ namespace AFH.Location.Infrastructure.Persistence.Repositories;
 /// </summary>
 public sealed class SqlAvailabilityPolicyProvider : IAvailabilityPolicyProvider
 {
-    private readonly LocationPolicyDbContext _db;
+    private readonly IDbContextFactory<LocationPolicyDbContext> _dbContextFactory;
     private readonly IConfiguration _configuration;
 
-    public SqlAvailabilityPolicyProvider(LocationPolicyDbContext db, IConfiguration configuration)
+    public SqlAvailabilityPolicyProvider(IDbContextFactory<LocationPolicyDbContext> dbContextFactory, IConfiguration configuration)
     {
-        _db = db;
+        _dbContextFactory = dbContextFactory;
         _configuration = configuration;
     }
 
     public async Task<AvailabilityPolicy> GetAsync(CancellationToken ct)
     {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(ct);
+
         var defaultBuffer = _configuration.GetValue<int?>("LocationSearch:Availability:DefaultBufferMinutes") ?? 0;
         var maxBuffer = _configuration.GetValue<int?>("LocationSearch:Availability:MaxBufferMinutes") ?? 180;
         var defaultCompanyBuffer = _configuration.GetValue<int?>("LocationSearch:Availability:DefaultCompanyBufferMinutes") ?? 30;
@@ -39,7 +41,7 @@ public sealed class SqlAvailabilityPolicyProvider : IAvailabilityPolicyProvider
             RequireCalendarAvailability = requireCalendarAvailability
         };
 
-        var dbDefault = await _db.AvailabilityDefaults
+        var dbDefault = await db.AvailabilityDefaults
             .AsNoTracking()
             .OrderBy(x => x.Id)
             .FirstOrDefaultAsync(ct);
