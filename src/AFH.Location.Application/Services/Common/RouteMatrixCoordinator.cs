@@ -33,6 +33,20 @@ public sealed class RouteMatrixCoordinator
         return result;
     }
 
+    public Task<IReadOnlyDictionary<string, RouteResult>> GetRoutesFromOriginAsync(
+        (double Lat, double Lng) origin,
+        IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
+        CancellationToken ct)
+    {
+        if (destinations.Count == 0)
+        {
+            return Task.FromResult<IReadOnlyDictionary<string, RouteResult>>(
+                new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        return _matrix.GetOneToManyAsync(origin, destinations, ct);
+    }
+
     private static IEnumerable<IReadOnlyDictionary<string, (double Lat, double Lng)>> Batch(
         IReadOnlyDictionary<string, (double Lat, double Lng)> input,
         int batchSize)

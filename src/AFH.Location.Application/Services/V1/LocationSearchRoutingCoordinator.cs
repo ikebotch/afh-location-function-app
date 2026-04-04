@@ -22,6 +22,9 @@ public sealed class LocationSearchRoutingCoordinator
 
     internal async Task ComputeNearestOfficeRouteAsync(LocationSearchContext ctx, CancellationToken ct)
     {
+        if (ctx.NearestOfficeRoute is not null)
+            return;
+
         if (ctx.AvailabilityPolicy.RequireCalendarAvailability &&
             !ctx.Candidates.Any(c =>
                 ctx.AvailabilityById.TryGetValue(c.Adviser.AdviserId, out var a) &&
@@ -109,7 +112,11 @@ public sealed class LocationSearchRoutingCoordinator
         var (destLat, destLng) = ctx.Destination;
         var result = new TravelToBaseResult { HomeMinutes = 0, OfficeMinutes = 0 };
 
-        if (ctx.AdviserOrigins.TryGetValue(candidate.Adviser.AdviserId, out var home))
+        if (TryGetPositivePrecomputedRoute(ctx.RoutesToHomeByAdviserId, candidate.Adviser.AdviserId, out var precomputedHomeRoute))
+        {
+            result.HomeMinutes = precomputedHomeRoute.EtaMinutes;
+        }
+        else if (ctx.AdviserOrigins.TryGetValue(candidate.Adviser.AdviserId, out var home))
         {
             result.HomeMinutes = await SafeEtaAsync(ctx, (destLat, destLng), (home.Lat, home.Lng), "BASE_HOME", reasons, ct);
         }
@@ -119,13 +126,21 @@ public sealed class LocationSearchRoutingCoordinator
             ctx.OfficeCoords.TryGetValue(baseOfficeId, out var office) &&
             !IsZero(office))
         {
-            if (!ctx.OfficeRouteMinutesByOfficeId.TryGetValue(baseOfficeId, out var officeMinutes))
+            if (TryGetPositivePrecomputedRoute(ctx.RoutesToOfficeByOfficeId, baseOfficeId, out var precomputedOfficeRoute))
             {
-                officeMinutes = await SafeEtaAsync(ctx, (destLat, destLng), (office.Lat, office.Lng), "BASE_OFFICE", reasons, ct);
-                ctx.OfficeRouteMinutesByOfficeId.TryAdd(baseOfficeId, officeMinutes);
+                result.OfficeMinutes = precomputedOfficeRoute.EtaMinutes;
+                ctx.OfficeRouteMinutesByOfficeId.TryAdd(baseOfficeId, precomputedOfficeRoute.EtaMinutes);
             }
+            else
+            {
+                if (!ctx.OfficeRouteMinutesByOfficeId.TryGetValue(baseOfficeId, out var officeMinutes))
+                {
+                    officeMinutes = await SafeEtaAsync(ctx, (destLat, destLng), (office.Lat, office.Lng), "BASE_OFFICE", reasons, ct);
+                    ctx.OfficeRouteMinutesByOfficeId.TryAdd(baseOfficeId, officeMinutes);
+                }
 
-            result.OfficeMinutes = officeMinutes;
+                result.OfficeMinutes = officeMinutes;
+            }
         }
         else
         {
@@ -156,6 +171,21 @@ public sealed class LocationSearchRoutingCoordinator
             reasons.Add($"{tag}_ROUTE_FAILED");
             return 0;
         }
+    }
+
+    private static bool TryGetPositivePrecomputedRoute(
+        IReadOnlyDictionary<string, RouteResult> routes,
+        string key,
+        out RouteResult route)
+    {
+        if (routes.TryGetValue(key, out var foundRoute) && foundRoute is not null && foundRoute.EtaMinutes > 0)
+        {
+            route = foundRoute;
+            return true;
+        }
+
+        route = default!;
+        return false;
     }
 
     private Task<RouteResult> GetOrCreateRouteAsync(

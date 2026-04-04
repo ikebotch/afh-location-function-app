@@ -28,6 +28,12 @@ internal sealed class LocationSearchContext
     public IReadOnlyDictionary<string, RouteResult> RoutesToClient { get; set; } =
         new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
 
+    public IReadOnlyDictionary<string, RouteResult> RoutesToHomeByAdviserId { get; set; } =
+        new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyDictionary<string, RouteResult> RoutesToOfficeByOfficeId { get; set; } =
+        new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
+
     public IReadOnlyDictionary<string, AdviserAvailability> AvailabilityById { get; set; } =
         new Dictionary<string, AdviserAvailability>(StringComparer.OrdinalIgnoreCase);
 

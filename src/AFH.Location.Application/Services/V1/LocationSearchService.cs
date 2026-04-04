@@ -91,6 +91,7 @@ public sealed class LocationSearchService : ILocationSearchService
         await ComputeMatrixRoutesToClientAsync(ctx, ct);
 
         await LoadOfficeDataAsync(ctx, ct);
+        await PrecomputeTravelToBaseRoutesAsync(ctx, ct);
         await _routingCoordinator.ComputeNearestOfficeRouteAsync(ctx, ct);
 
         await _responseCandidateBuilder.BuildAsync(ctx, ct);
@@ -270,6 +271,57 @@ public sealed class LocationSearchService : ILocationSearchService
         ctx.NearestOfficeId = FindNearestOfficeId(destLat, destLng, ctx.OfficeCoords);
     }
 
+    private async Task PrecomputeTravelToBaseRoutesAsync(LocationSearchContext ctx, CancellationToken ct)
+    {
+        var adviserRouteKeyById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var uniqueHomeDestinations = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var candidate in ctx.Candidates)
+        {
+            if (!ctx.AdviserOrigins.TryGetValue(candidate.Adviser.AdviserId, out var origin))
+                continue;
+
+            var routeKey = BuildCoordinateLookupKey(origin);
+            adviserRouteKeyById[candidate.Adviser.AdviserId] = routeKey;
+            uniqueHomeDestinations.TryAdd(routeKey, origin);
+        }
+
+        var homeRoutesByKey = await _matrixCoordinator.GetRoutesFromOriginAsync(ctx.Destination, uniqueHomeDestinations, ct);
+        ctx.RoutesToHomeByAdviserId = adviserRouteKeyById
+            .Where(x => homeRoutesByKey.ContainsKey(x.Value))
+            .ToDictionary(
+                x => x.Key,
+                x => homeRoutesByKey[x.Value],
+                StringComparer.OrdinalIgnoreCase);
+
+        var officeDestinations = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in ctx.Candidates)
+        {
+            var officeId = ResolveBaseOfficeId(candidate.Adviser.Region, ctx.BaseOfficePolicy);
+            if (string.IsNullOrWhiteSpace(officeId))
+                continue;
+
+            if (ctx.OfficeCoords.TryGetValue(officeId, out var officeCoords) && !IsZero(officeCoords))
+                officeDestinations.TryAdd(officeId, officeCoords);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ctx.NearestOfficeId) &&
+            ctx.OfficeCoords.TryGetValue(ctx.NearestOfficeId, out var nearestOfficeCoords) &&
+            !IsZero(nearestOfficeCoords))
+        {
+            officeDestinations.TryAdd(ctx.NearestOfficeId, nearestOfficeCoords);
+        }
+
+        ctx.RoutesToOfficeByOfficeId = await _matrixCoordinator.GetRoutesFromOriginAsync(ctx.Destination, officeDestinations, ct);
+
+        if (!string.IsNullOrWhiteSpace(ctx.NearestOfficeId) &&
+            ctx.RoutesToOfficeByOfficeId.TryGetValue(ctx.NearestOfficeId, out var nearestOfficeRoute) &&
+            nearestOfficeRoute.EtaMinutes > 0)
+        {
+            ctx.NearestOfficeRoute = nearestOfficeRoute;
+        }
+    }
+
     private void RankAndApplyCandidates(LocationSearchContext ctx)
     {
         var ranked = ctx.Response.Candidates
@@ -305,6 +357,9 @@ public sealed class LocationSearchService : ILocationSearchService
     // ----------------------------
 
     private static bool IsZero((double Lat, double Lng) x) => x.Lat == 0d && x.Lng == 0d;
+
+    private static string BuildCoordinateLookupKey((double Lat, double Lng) coordinates)
+        => $"{coordinates.Lat:F6}:{coordinates.Lng:F6}";
 
     private static int GetAvailabilitySearchExtensionMinutes(LocationSearchContext ctx)
     {
@@ -359,6 +414,14 @@ public sealed class LocationSearchService : ILocationSearchService
             return false;
 
         return availability.State == CalendarAvailabilityState.Ok;
+    }
+
+    private static string ResolveBaseOfficeId(string region, BaseOfficePolicy policy)
+    {
+        if (policy.RegionOfficeMap.TryGetValue(region, out var officeId) && !string.IsNullOrWhiteSpace(officeId))
+            return officeId;
+
+        return policy.DefaultOfficeId;
     }
 
     private static (string? OriginPostcode, string Source, int? GapFromPreviousMinutes) SelectOriginPostcode(
