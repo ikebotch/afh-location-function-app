@@ -32,11 +32,25 @@ public sealed class RankingService
                 break;
         }
 
-        score += c.TravelToClient.EtaMinutes * opt.EtaMinuteWeight;
-        reasons.Add($"RANK_ETA_{c.TravelToClient.EtaMinutes}");
+        if (c.TravelToClient.EtaMinutes.HasValue && c.TravelToClient.EtaMinutes.Value > 0)
+        {
+            score += c.TravelToClient.EtaMinutes.Value * opt.EtaMinuteWeight;
+            reasons.Add($"RANK_ETA_{c.TravelToClient.EtaMinutes.Value}");
+        }
+        else
+        {
+            reasons.Add("RANK_ETA_UNVERIFIED");
+        }
 
-        score += c.TravelToClient.DistanceMiles * opt.DistanceMileWeight;
-        reasons.Add($"RANK_DISTANCE_{c.TravelToClient.DistanceMiles}");
+        if (c.TravelToClient.DistanceMiles.HasValue && c.TravelToClient.DistanceMiles.Value > 0)
+        {
+            score += c.TravelToClient.DistanceMiles.Value * opt.DistanceMileWeight;
+            reasons.Add($"RANK_DISTANCE_{c.TravelToClient.DistanceMiles.Value}");
+        }
+        else
+        {
+            reasons.Add("RANK_DISTANCE_UNVERIFIED");
+        }
 
         if (c.Preferred)
         {

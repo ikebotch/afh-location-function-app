@@ -49,7 +49,7 @@ public sealed class LocationResponseCandidateBuilder
                 reasons.Add($"MAX_TRAVEL_TIME_{maxTravelTimeMinutes}");
 
                 var travelToClient = unavailableForRouting
-                    ? new TravelToClientResult { EtaMinutes = 0, DistanceMiles = 0, Confidence = "Low" }
+                    ? new TravelToClientResult { EtaMinutes = null, DistanceMiles = null, Confidence = "Low" }
                     : await _routingCoordinator.BuildTravelToClientAsync(ctx, candidate, withinCoverageByRadius, reasons, ct);
 
                 if (unavailableForRouting)
@@ -59,12 +59,12 @@ public sealed class LocationResponseCandidateBuilder
                 var withinCoverage = withinCoverageByRadius && withinCoverageByTravelTime;
 
                 var coverageDistanceMiles = travelToClient.DistanceMiles > 0
-                    ? travelToClient.DistanceMiles
+                    ? travelToClient.DistanceMiles.Value
                     : (ctx.AirMilesById.TryGetValue(candidate.Adviser.AdviserId, out var air) ? Math.Round(air, 2) : 0d);
 
                 var travelBufferMinutes = GetTravelBufferMinutes(ctx);
                 var companyBufferMinutes = GetCompanyBufferMinutes(ctx);
-                var preMeetingBufferMinutes = travelToClient.EtaMinutes + companyBufferMinutes;
+                var preMeetingBufferMinutes = (travelToClient.EtaMinutes ?? 0) + companyBufferMinutes;
                 var postMeetingBufferMinutes = companyBufferMinutes;
 
                 ApplyCompanyBufferAvailabilityRules(
@@ -87,8 +87,12 @@ public sealed class LocationResponseCandidateBuilder
                 };
 
                 reasons.Add($"RANK_AVAILABLE_{(availabilityStatus == "Available" ? "Y" : "N")}");
-                reasons.Add($"RANK_ETA_{travelToClient.EtaMinutes}");
-                reasons.Add($"RANK_DISTANCE_{travelToClient.DistanceMiles:0.##}");
+                reasons.Add(travelToClient.EtaMinutes.HasValue
+                    ? $"RANK_ETA_{travelToClient.EtaMinutes.Value}"
+                    : "RANK_ETA_UNVERIFIED");
+                reasons.Add(travelToClient.DistanceMiles.HasValue
+                    ? $"RANK_DISTANCE_{travelToClient.DistanceMiles.Value:0.##}"
+                    : "RANK_DISTANCE_UNVERIFIED");
 
                 var responseCandidate = new LocationSearchCandidate
                 {
@@ -292,16 +296,16 @@ public sealed class LocationResponseCandidateBuilder
 
     private static bool IsWithinMaxTravelTime(TravelToClientResult travelToClient, int maxTravelTimeMinutes, List<string> reasons)
     {
-        if (travelToClient.EtaMinutes <= 0)
+        if (!travelToClient.EtaMinutes.HasValue || travelToClient.EtaMinutes.Value <= 0)
         {
             reasons.Add("MAX_TRAVEL_TIME_UNVERIFIED");
             return false;
         }
 
-        var within = travelToClient.EtaMinutes <= maxTravelTimeMinutes;
+        var within = travelToClient.EtaMinutes.Value <= maxTravelTimeMinutes;
         reasons.Add(within
-            ? $"MAX_TRAVEL_TIME_OK_{travelToClient.EtaMinutes}"
-            : $"MAX_TRAVEL_TIME_EXCEEDED_{travelToClient.EtaMinutes}");
+            ? $"MAX_TRAVEL_TIME_OK_{travelToClient.EtaMinutes.Value}"
+            : $"MAX_TRAVEL_TIME_EXCEEDED_{travelToClient.EtaMinutes.Value}");
 
         return within;
     }

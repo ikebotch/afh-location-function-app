@@ -650,6 +650,70 @@ public sealed class LocationPerformanceGuardTests
         Assert.Equal(10, routing.CallCount);
     }
 
+    [Fact]
+    public async Task LocationSearchService_LeavesFailedClientRoutingUnverifiedAndDoesNotRankItAsZero()
+    {
+        var geoPolicyProvider = new StubGeoCachePolicyProvider();
+        var geocoding = new StubGeocodingService(new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["AB1 2CD, United Kingdom"] = (51.500001, -0.100001)
+        });
+        var destinationResolver = new DestinationCoordinateResolver(
+            new StubGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var adviserResolver = new AdviserCoordinateResolver(
+            new StubAdviserGeoCache(),
+            geocoding,
+            geoPolicyProvider);
+        var officeResolver = new OfficeCoordinateResolver(
+            new SingleOfficeRepository(),
+            geocoding,
+            geoPolicyProvider,
+            new StubGeoCache());
+
+        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository([NewAdviser("adv-1")]));
+        var routingCoordinator = new LocationSearchRoutingCoordinator(
+            new ThrowingRoutingService(),
+            NullLogger<LocationSearchRoutingCoordinator>.Instance);
+        var responseCandidateBuilder = new LocationResponseCandidateBuilder(
+            new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
+            routingCoordinator);
+        var auditWriter = new LocationSearchAuditWriter(
+            new LocationSearchAuditEntryFactory(),
+            new StubSearchAuditRepository(),
+            NullLogger<LocationSearchAuditWriter>.Instance);
+        var sut = new LocationSearchService(
+            candidateSource,
+            new StubCalendarAvailabilityService(),
+            responseCandidateBuilder,
+            auditWriter,
+            routingCoordinator,
+            destinationResolver,
+            adviserResolver,
+            new StubCoveragePolicyProvider(),
+            new RouteMatrixCoordinator(new EmptyRouteMatrixService(), new StubRouteMatrixPolicyProvider(new RouteMatrixPolicy())),
+            officeResolver,
+            new StubBaseOfficePolicyProvider(),
+            new StubAvailabilityPolicyProvider(),
+            new StubRankingPolicyProvider(),
+            new RankingService(),
+            NullLogger<LocationSearchService>.Instance);
+
+        var result = await sut.SearchInPersonAsync(NewSearchRequest("req-routing-failure"), CancellationToken.None);
+
+        var candidate = Assert.Single(result.Candidates);
+        Assert.Null(candidate.TravelToClient.EtaMinutes);
+        Assert.Null(candidate.TravelToClient.DistanceMiles);
+        Assert.Equal("Low", candidate.TravelToClient.Confidence);
+        Assert.Contains("ROUTING_FAILED", candidate.Reasons);
+        Assert.Contains("MAX_TRAVEL_TIME_UNVERIFIED", candidate.Reasons);
+        Assert.Contains("RANK_ETA_UNVERIFIED", candidate.Reasons);
+        Assert.Contains("RANK_DISTANCE_UNVERIFIED", candidate.Reasons);
+        Assert.DoesNotContain("RANK_ETA_0", candidate.Reasons);
+        Assert.DoesNotContain("RANK_DISTANCE_0", candidate.Reasons);
+    }
+
     private static LocationSearchRequest NewSearchRequest(string requestId) => new()
     {
         RequestId = requestId,
@@ -803,6 +867,15 @@ public sealed class LocationPerformanceGuardTests
             var etaMinutes = origin.Lat < destination.Lat ? 15 : 18;
             return Task.FromResult(new RouteResult(etaMinutes, 7.5, "High"));
         }
+    }
+
+    private sealed class ThrowingRoutingService : IRoutingService
+    {
+        public Task<RouteResult> GetRouteAsync(
+            (double Lat, double Lng) origin,
+            (double Lat, double Lng) destination,
+            CancellationToken ct)
+            => throw new InvalidOperationException("Route provider failed.");
     }
 
     private sealed class EmptyRouteMatrixService : IRouteMatrixService

@@ -56,12 +56,38 @@ public sealed class LocationSearchRoutingCoordinator
         List<string> reasons,
         CancellationToken ct)
     {
-        if (!withinCoverage)
-            return new TravelToClientResult { EtaMinutes = 0, DistanceMiles = 0, Confidence = "Low" };
+        var adviserId = candidate.Adviser.AdviserId;
 
-        if (ctx.RoutesToClient.TryGetValue(candidate.Adviser.AdviserId, out var route) && route.EtaMinutes > 0)
+        if (!withinCoverage)
+        {
+            _logger.LogInformation(
+                "Travel-to-client routing skipped. AdviserId={AdviserId} WithinCoverage={WithinCoverage} MatrixAttempted={MatrixAttempted} DirectFallbackAttempted={DirectFallbackAttempted} AppliedFallback={AppliedFallback}",
+                adviserId,
+                false,
+                false,
+                false,
+                "UnverifiedTravel");
+            return new TravelToClientResult { EtaMinutes = null, DistanceMiles = null, Confidence = "Low" };
+        }
+
+        var matrixAttempted = ctx.RoutesToClient.TryGetValue(adviserId, out var route);
+        var hasOrigin = ctx.AdviserOrigins.TryGetValue(adviserId, out var routedOrigin);
+        if (matrixAttempted && route is not null && route.EtaMinutes > 0)
         {
             reasons.Add("ROUTE_OK");
+            _logger.LogInformation(
+                "Travel-to-client routing resolved from matrix. AdviserId={AdviserId} OriginLat={OriginLat} OriginLng={OriginLng} DestinationLat={DestinationLat} DestinationLng={DestinationLng} MatrixAttempted={MatrixAttempted} DirectFallbackAttempted={DirectFallbackAttempted} RoutingStatus={RoutingStatus} EtaMinutes={EtaMinutes} DistanceMiles={DistanceMiles} Confidence={Confidence}",
+                adviserId,
+                hasOrigin ? routedOrigin.Lat : (double?)null,
+                hasOrigin ? routedOrigin.Lng : (double?)null,
+                ctx.Destination.Lat,
+                ctx.Destination.Lng,
+                true,
+                false,
+                "RouteOk",
+                route.EtaMinutes,
+                route.DistanceMiles,
+                route.Confidence);
             return new TravelToClientResult
             {
                 EtaMinutes = route.EtaMinutes,
@@ -70,20 +96,42 @@ public sealed class LocationSearchRoutingCoordinator
             };
         }
 
-        if (!ctx.AdviserOrigins.TryGetValue(candidate.Adviser.AdviserId, out var origin))
+        if (!hasOrigin)
         {
             reasons.Add("ROUTING_UNAVAILABLE");
-            return new TravelToClientResult { EtaMinutes = 0, DistanceMiles = 0, Confidence = "Low" };
+            _logger.LogWarning(
+                "Travel-to-client routing unavailable. AdviserId={AdviserId} DestinationLat={DestinationLat} DestinationLng={DestinationLng} MatrixAttempted={MatrixAttempted} DirectFallbackAttempted={DirectFallbackAttempted} RoutingStatus={RoutingStatus} AppliedFallback={AppliedFallback}",
+                adviserId,
+                ctx.Destination.Lat,
+                ctx.Destination.Lng,
+                matrixAttempted,
+                false,
+                "OriginMissing",
+                "UnverifiedTravel");
+            return new TravelToClientResult { EtaMinutes = null, DistanceMiles = null, Confidence = "Low" };
         }
 
         try
         {
             var (destLat, destLng) = ctx.Destination;
-            var fallbackRoute = await GetOrCreateRouteAsync(ctx, (origin.Lat, origin.Lng), (destLat, destLng), ct);
+            var fallbackRoute = await GetOrCreateRouteAsync(ctx, (routedOrigin.Lat, routedOrigin.Lng), (destLat, destLng), ct);
 
             if (fallbackRoute.EtaMinutes > 0)
             {
                 reasons.Add("ROUTE_FALLBACK_OK");
+                _logger.LogInformation(
+                    "Travel-to-client routing resolved from direct fallback. AdviserId={AdviserId} OriginLat={OriginLat} OriginLng={OriginLng} DestinationLat={DestinationLat} DestinationLng={DestinationLng} MatrixAttempted={MatrixAttempted} DirectFallbackAttempted={DirectFallbackAttempted} RoutingStatus={RoutingStatus} EtaMinutes={EtaMinutes} DistanceMiles={DistanceMiles} Confidence={Confidence}",
+                    adviserId,
+                    routedOrigin.Lat,
+                    routedOrigin.Lng,
+                    destLat,
+                    destLng,
+                    matrixAttempted,
+                    true,
+                    "RouteFallbackOk",
+                    fallbackRoute.EtaMinutes,
+                    fallbackRoute.DistanceMiles,
+                    fallbackRoute.Confidence);
                 return new TravelToClientResult
                 {
                     EtaMinutes = fallbackRoute.EtaMinutes,
@@ -93,13 +141,36 @@ public sealed class LocationSearchRoutingCoordinator
             }
 
             reasons.Add("ROUTING_FAILED");
-            return new TravelToClientResult { EtaMinutes = 0, DistanceMiles = 0, Confidence = "Low" };
+            _logger.LogWarning(
+                "Travel-to-client routing returned no usable route. AdviserId={AdviserId} OriginLat={OriginLat} OriginLng={OriginLng} DestinationLat={DestinationLat} DestinationLng={DestinationLng} MatrixAttempted={MatrixAttempted} DirectFallbackAttempted={DirectFallbackAttempted} RoutingStatus={RoutingStatus} ProviderEtaMinutes={ProviderEtaMinutes} ProviderDistanceMiles={ProviderDistanceMiles} AppliedFallback={AppliedFallback}",
+                adviserId,
+                routedOrigin.Lat,
+                routedOrigin.Lng,
+                destLat,
+                destLng,
+                matrixAttempted,
+                true,
+                "RouteZero",
+                fallbackRoute.EtaMinutes,
+                fallbackRoute.DistanceMiles,
+                "UnverifiedTravel");
+            return new TravelToClientResult { EtaMinutes = null, DistanceMiles = null, Confidence = "Low" };
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Fallback routing failed AdviserId={AdviserId}", candidate.Adviser.AdviserId);
+            _logger.LogWarning(
+                ex,
+                "Travel-to-client routing failed. AdviserId={AdviserId} OriginLat={OriginLat} OriginLng={OriginLng} DestinationLat={DestinationLat} DestinationLng={DestinationLng} MatrixAttempted={MatrixAttempted} DirectFallbackAttempted={DirectFallbackAttempted} AppliedFallback={AppliedFallback}",
+                adviserId,
+                routedOrigin.Lat,
+                routedOrigin.Lng,
+                ctx.Destination.Lat,
+                ctx.Destination.Lng,
+                matrixAttempted,
+                true,
+                "UnverifiedTravel");
             reasons.Add("ROUTING_FAILED");
-            return new TravelToClientResult { EtaMinutes = 0, DistanceMiles = 0, Confidence = "Low" };
+            return new TravelToClientResult { EtaMinutes = null, DistanceMiles = null, Confidence = "Low" };
         }
     }
 

@@ -61,7 +61,10 @@ public sealed class LocationSearchAuditEntryFactory
             writer.WriteBoolean(nameof(candidate.GoldStar), candidate.GoldStar);
             writer.WriteString(nameof(candidate.Availability), candidate.Availability);
             writer.WriteBoolean(nameof(candidate.Coverage.WithinCoverage), candidate.Coverage.WithinCoverage);
-            writer.WriteNumber("TravelEtaMinutes", candidate.TravelToClient.EtaMinutes);
+            if (candidate.TravelToClient.EtaMinutes.HasValue)
+                writer.WriteNumber("TravelEtaMinutes", candidate.TravelToClient.EtaMinutes.Value);
+            else
+                writer.WriteNull("TravelEtaMinutes");
             writer.WriteNumber(nameof(candidate.Buffers.MaxTravelTimeMinutes), candidate.Buffers.MaxTravelTimeMinutes);
             writer.WriteNumber(nameof(candidate.Buffers.CompanyBufferMinutes), candidate.Buffers.CompanyBufferMinutes);
             writer.WriteNumber(nameof(candidate.Buffers.TravelBufferMinutes), candidate.Buffers.TravelBufferMinutes);
