@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using AFH.Location.Application.Abstractions.Calendar;
 using AFH.Location.Application.Abstractions.Advisers;
 using AFH.Location.Application.Abstractions.Geo;
@@ -65,8 +66,14 @@ public static class DependencyInjection
         services.AddScoped<AzureMapsRouteMatrixService>();
         services.AddScoped<IGeocodingService, AzureMapsGeocodingService>();
         services.AddScoped<IRouteCache, SqlRouteCache>();
-        services.AddScoped<IRoutingService>(sp => new CachedRoutingService(sp.GetRequiredService<AzureMapsRoutingService>(), sp.GetRequiredService<IRouteCache>()));
-        services.AddScoped<IRouteMatrixService>(sp => new CachedRouteMatrixService(sp.GetRequiredService<AzureMapsRouteMatrixService>(), sp.GetRequiredService<IRouteCache>()));
+        services.AddScoped<IRoutingService>(sp => new CachedRoutingService(
+            sp.GetRequiredService<AzureMapsRoutingService>(),
+            sp.GetRequiredService<IRouteCache>(),
+            sp.GetRequiredService<ILogger<CachedRoutingService>>()));
+        services.AddScoped<IRouteMatrixService>(sp => new CachedRouteMatrixService(
+            sp.GetRequiredService<AzureMapsRouteMatrixService>(),
+            sp.GetRequiredService<IRouteCache>(),
+            sp.GetRequiredService<ILogger<CachedRouteMatrixService>>()));
         services.AddScoped<RouteMatrixCoordinator>();
         services.AddSingleton<IBusinessTimeZoneProvider, BusinessTimeZoneProvider>();
         services.AddSingleton<ICoveragePresentationSettings, CoveragePresentationSettings>();

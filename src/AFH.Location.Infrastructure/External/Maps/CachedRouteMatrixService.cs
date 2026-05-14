@@ -1,5 +1,6 @@
 using AFH.Location.Application.Abstractions;
 using AFH.Location.Application.Abstractions.Geo;
+using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Infrastructure.External.Maps;
 
@@ -7,11 +8,16 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
 {
     private readonly IRouteMatrixService _inner;
     private readonly IRouteCache _cache;
+    private readonly ILogger<CachedRouteMatrixService>? _logger;
 
-    public CachedRouteMatrixService(IRouteMatrixService inner, IRouteCache cache)
+    public CachedRouteMatrixService(
+        IRouteMatrixService inner,
+        IRouteCache cache,
+        ILogger<CachedRouteMatrixService>? logger = null)
     {
         _inner = inner;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyDictionary<string, RouteResult>> GetAdviserToDestinationAsync(
@@ -32,12 +38,17 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
 
         if (misses.Count > 0)
         {
+            LogCacheSummary("AdviserToDestination", cached.Count, misses.Count, 1);
             var live = await _inner.GetAdviserToDestinationAsync(misses, destination, ct);
             foreach (var item in live)
             {
                 cached[item.Key] = item.Value;
                 CacheRoute(misses[item.Key], destination, item.Key, item.Value);
             }
+        }
+        else
+        {
+            LogCacheSummary("AdviserToDestination", cached.Count, 0, 0);
         }
 
         return cached;
@@ -61,12 +72,17 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
 
         if (misses.Count > 0)
         {
+            LogCacheSummary("OneToMany", cached.Count, misses.Count, 1);
             var live = await _inner.GetOneToManyAsync(origin, misses, ct);
             foreach (var item in live)
             {
                 cached[item.Key] = item.Value;
                 CacheRoute(origin, misses[item.Key], item.Key, item.Value);
             }
+        }
+        else
+        {
+            LogCacheSummary("OneToMany", cached.Count, 0, 0);
         }
 
         return cached;
@@ -112,4 +128,14 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
 
     private static string BuildSingleKey((double Lat, double Lng) origin, (double Lat, double Lng) destination)
         => $"single:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}".ToLowerInvariant();
+
+    private void LogCacheSummary(string direction, int hitCount, int missCount, int providerCallCount)
+    {
+        _logger?.LogInformation(
+            "Location route matrix cache summary. Direction={Direction} HitCount={HitCount} MissCount={MissCount} ProviderCallCount={ProviderCallCount}",
+            direction,
+            hitCount,
+            missCount,
+            providerCallCount);
+    }
 }

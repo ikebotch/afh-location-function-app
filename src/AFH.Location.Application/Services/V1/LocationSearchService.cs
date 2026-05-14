@@ -70,6 +70,7 @@ public sealed class LocationSearchService : ILocationSearchService
 
     public async Task<LocationSearchResult> SearchInPersonAsync(LocationSearchRequest req, CancellationToken ct)
     {
+        var started = System.Diagnostics.Stopwatch.StartNew();
         var response = new LocationSearchResult
         {
             RequestId = req.RequestId,
@@ -87,7 +88,12 @@ public sealed class LocationSearchService : ILocationSearchService
         await ResolveDestinationAsync(ctx, ct);
         await LoadPoliciesAsync(ctx, ct);
         await SourceCandidatesAsync(ctx, ct);
-        if (ctx.Candidates.Count == 0) return response;
+        var sourcedCandidateCount = ctx.Candidates.Count;
+        if (ctx.Candidates.Count == 0)
+        {
+            LogSearchCompleted(ctx, sourcedCandidateCount, started);
+            return response;
+        }
 
         await LoadAvailabilityAsync(ctx, ct);
 
@@ -101,6 +107,8 @@ public sealed class LocationSearchService : ILocationSearchService
         await _responseCandidateBuilder.BuildAsync(ctx, ct);
         RankAndApplyCandidates(ctx);
         await _searchAuditWriter.WriteAsync(ctx, ct);
+
+        LogSearchCompleted(ctx, sourcedCandidateCount, started);
 
         return response;
     }
@@ -271,8 +279,20 @@ public sealed class LocationSearchService : ILocationSearchService
         if (uniqueOrigins.Count == 0)
         {
             ctx.RoutesToClient = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
+            _logger.LogInformation(
+                "Location route matrix skipped. RequestId={RequestId} CandidateCount={CandidateCount} UniqueOriginCount={UniqueOriginCount}",
+                ctx.Request.RequestId,
+                ctx.Candidates.Count,
+                0);
             return;
         }
+
+        _logger.LogInformation(
+            "Location route matrix request prepared. RequestId={RequestId} CandidateCount={CandidateCount} RoutableCandidateCount={RoutableCandidateCount} UniqueOriginCount={UniqueOriginCount}",
+            ctx.Request.RequestId,
+            ctx.Candidates.Count,
+            adviserRouteKeyById.Count,
+            uniqueOrigins.Count);
 
         var routesByOriginKey = await _matrixCoordinator.GetRoutesAsync(uniqueOrigins, (destLat, destLng), ct);
         ctx.RoutesToClient = adviserRouteKeyById
@@ -281,6 +301,11 @@ public sealed class LocationSearchService : ILocationSearchService
                 x => x.Key,
                 x => routesByOriginKey[x.Value],
                 StringComparer.OrdinalIgnoreCase);
+
+        _logger.LogInformation(
+            "Location route matrix response mapped. RequestId={RequestId} RouteCount={RouteCount}",
+            ctx.Request.RequestId,
+            ctx.RoutesToClient.Count);
     }
 
     private async Task LoadOfficeDataAsync(LocationSearchContext ctx, CancellationToken ct)
@@ -380,6 +405,22 @@ public sealed class LocationSearchService : ILocationSearchService
 
     private static string BuildCoordinateLookupKey((double Lat, double Lng) coordinates)
         => $"{coordinates.Lat:F6}:{coordinates.Lng:F6}";
+
+    private void LogSearchCompleted(
+        LocationSearchContext ctx,
+        int sourcedCandidateCount,
+        System.Diagnostics.Stopwatch started)
+    {
+        started.Stop();
+        _logger.LogInformation(
+            "Location availability search complete. RequestId={RequestId} CandidateCountBeforeFiltering={CandidateCountBeforeFiltering} CandidateCountAfterFiltering={CandidateCountAfterFiltering} CalendarProviderCallCount={CalendarProviderCallCount} RouteResultCount={RouteResultCount} DurationMs={DurationMs}",
+            ctx.Request.RequestId,
+            sourcedCandidateCount,
+            ctx.Response.Candidates.Count,
+            sourcedCandidateCount > 0 ? 1 : 0,
+            ctx.RoutesToClient.Count,
+            started.ElapsedMilliseconds);
+    }
 
     private static int GetAvailabilitySearchExtensionMinutes(LocationSearchContext ctx)
     {

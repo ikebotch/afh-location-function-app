@@ -1,4 +1,5 @@
 using AFH.Location.Application.Abstractions.Geo;
+using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Infrastructure.External.Maps;
 
@@ -6,11 +7,16 @@ public sealed class CachedRoutingService : IRoutingService
 {
     private readonly IRoutingService _inner;
     private readonly IRouteCache _cache;
+    private readonly ILogger<CachedRoutingService>? _logger;
 
-    public CachedRoutingService(IRoutingService inner, IRouteCache cache)
+    public CachedRoutingService(
+        IRoutingService inner,
+        IRouteCache cache,
+        ILogger<CachedRoutingService>? logger = null)
     {
         _inner = inner;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<RouteResult> GetRouteAsync(
@@ -22,8 +28,17 @@ public sealed class CachedRoutingService : IRoutingService
 
         if (_cache.TryGet(key, out var cached) && IsUsable(cached))
         {
+            _logger?.LogInformation(
+                "Location route cache hit. CacheKey={CacheKey} ProviderCallCount={ProviderCallCount}",
+                key,
+                0);
             return cached;
         }
+
+        _logger?.LogInformation(
+            "Location route cache miss. CacheKey={CacheKey} ProviderCallCount={ProviderCallCount}",
+            key,
+            1);
 
         var live = await _inner.GetRouteAsync(origin, destination, ct);
 
