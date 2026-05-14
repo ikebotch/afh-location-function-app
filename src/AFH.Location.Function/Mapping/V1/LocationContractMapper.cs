@@ -173,6 +173,20 @@ public static class LocationContractMapper
                 PostMeetingBufferMinutes = candidate.Buffers.PostMeetingBufferMinutes,
                 MaxTravelTimeMinutes = candidate.Buffers.MaxTravelTimeMinutes
             },
+            TravelSnapshot = candidate.TravelSnapshot is null
+                ? null
+                : new AFH.Location.Contract.V1.Responses.TravelSnapshotResult
+                {
+                    SourceLocationRef = candidate.TravelSnapshot.SourceLocationRef,
+                    SourcePostcode = candidate.TravelSnapshot.SourcePostcode,
+                    DestinationLocationRef = candidate.TravelSnapshot.DestinationLocationRef,
+                    DestinationPostcode = candidate.TravelSnapshot.DestinationPostcode,
+                    TravelMinutes = candidate.TravelSnapshot.TravelMinutes,
+                    DistanceMiles = candidate.TravelSnapshot.DistanceMiles,
+                    Provider = candidate.TravelSnapshot.Provider,
+                    Confidence = candidate.TravelSnapshot.Confidence,
+                    CalculatedUtc = candidate.TravelSnapshot.CalculatedUtc
+                },
             Reasons = candidate.Reasons.ToList(),
             Rank = candidate.Rank,
             Score = candidate.Score

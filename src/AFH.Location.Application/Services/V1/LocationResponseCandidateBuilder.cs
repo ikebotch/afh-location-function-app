@@ -126,6 +126,18 @@ public sealed class LocationResponseCandidateBuilder
                         PostMeetingBufferMinutes = postMeetingBufferMinutes,
                         MaxTravelTimeMinutes = maxTravelTimeMinutes
                     },
+                    TravelSnapshot = new TravelSnapshotResult
+                    {
+                        SourceLocationRef = candidate.Adviser.AdviserId,
+                        SourcePostcode = candidate.Adviser.HomePostcode,
+                        DestinationLocationRef = ctx.Request.RequestId,
+                        DestinationPostcode = ctx.Request.Destination.Address?.Postcode,
+                        TravelMinutes = travelToClient.EtaMinutes,
+                        DistanceMiles = travelToClient.DistanceMiles,
+                        Provider = "LocationService",
+                        Confidence = travelToClient.Confidence,
+                        CalculatedUtc = DateTime.UtcNow
+                    },
                     Reasons = reasons
                 };
 

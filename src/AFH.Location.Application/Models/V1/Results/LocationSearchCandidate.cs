@@ -14,6 +14,7 @@ public sealed class LocationSearchCandidate
     public TravelToBaseResult TravelToBase { get; set; } = new();
     public TravelToNearestOfficeResult TravelToNearestOffice { get; set; } = new();
     public BufferResult Buffers { get; set; } = new();
+    public TravelSnapshotResult? TravelSnapshot { get; set; }
     public List<string> Reasons { get; set; } = [];
     public int Rank { get; set; }
     public double? Score { get; set; }
