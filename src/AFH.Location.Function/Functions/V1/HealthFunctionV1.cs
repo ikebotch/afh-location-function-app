@@ -1,8 +1,8 @@
-﻿using AFH.Location.Function.Contracts;
+﻿using AFH.Location.Function.Functions.Common;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 
-namespace AFH.Location.Function.V1;
+namespace AFH.Location.Function.Functions.V1;
 
 public sealed class HealthFunctionV1
 {

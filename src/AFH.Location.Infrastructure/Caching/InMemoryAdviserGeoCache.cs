@@ -1,4 +1,4 @@
-﻿using AFH.Location.Application.Abstractions;
+﻿using AFH.Location.Application.Abstractions.Advisers;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace AFH.Location.Infrastructure.Caching;

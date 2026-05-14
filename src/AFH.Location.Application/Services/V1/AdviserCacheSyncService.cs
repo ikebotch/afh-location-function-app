@@ -1,4 +1,5 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Abstractions.Calendar;
 using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Application.Services.V1;

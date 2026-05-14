@@ -1,4 +1,4 @@
-namespace AFH.Location.Application.Abstractions;
+namespace AFH.Location.Application.Abstractions.Common;
 
 public interface IBusinessTimeZoneProvider
 {

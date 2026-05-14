@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Geo;
 
 namespace AFH.Location.Infrastructure.External.Maps;
 
@@ -13,17 +13,30 @@ public sealed class CachedRoutingService : IRoutingService
         _cache = cache;
     }
 
-    public async Task<RouteResult> GetRouteAsync((double Lat, double Lng) origin, (double Lat, double Lng) destination, CancellationToken ct)
+    public async Task<RouteResult> GetRouteAsync(
+     (double Lat, double Lng) origin,
+     (double Lat, double Lng) destination,
+     CancellationToken ct)
     {
         var key = BuildKey(origin, destination, "single");
-        if (_cache.TryGet(key, out var cached))
+
+        if (_cache.TryGet(key, out var cached) && IsUsable(cached))
+        {
             return cached;
+        }
 
         var live = await _inner.GetRouteAsync(origin, destination, ct);
-        var ttl = live.EtaMinutes > 0 ? TimeSpan.FromMinutes(30) : TimeSpan.FromMinutes(5);
-        _cache.Set(key, live, ttl);
+
+        if (IsUsable(live))
+        {
+            _cache.Set(key, live, TimeSpan.FromMinutes(30));
+        }
+
         return live;
     }
+
+    private static bool IsUsable(RouteResult route) =>
+        route.EtaMinutes > 0 && route.DistanceMiles > 0;
 
     private static string BuildKey((double Lat, double Lng) origin, (double Lat, double Lng) destination, string suffix)
         => $"{suffix}:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}".ToLowerInvariant();

@@ -1,8 +1,8 @@
-using AFH.Location.Application.Abstractions;
 using AFH.Location.Domain.Entities;
 using AFH.Location.Infrastructure.Persistence.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using AFH.Location.Application.Abstractions.Advisers;
 
 namespace AFH.Location.Tests;
 

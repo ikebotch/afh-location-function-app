@@ -1,5 +1,8 @@
-using AFH.Location.Application.Abstractions;
+﻿using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Application.Models.V1;
+using AFH.Location.Application.Models.V1.Requests;
+using AFH.Location.Application.Models.V1.Results;
 using AFH.Location.Application.Services.V1;
 using AFH.Location.Domain;
 using System.Reflection;

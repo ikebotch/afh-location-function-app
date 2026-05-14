@@ -1,5 +1,3 @@
-using AFH.Location.Application.Abstractions;
-using AFH.Location.Application.Models.V1;
 using AFH.Location.Infrastructure.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,6 +6,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AFH.Location.Application.Abstractions.Calendar;
+using AFH.Location.Application.Models.V1.Requests;
 
 namespace AFH.Location.Infrastructure.External.Calendar;
 

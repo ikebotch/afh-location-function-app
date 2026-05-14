@@ -1,8 +1,7 @@
-﻿using AFH.Location.Function.Common;
-using Microsoft.Azure.Functions.Worker.Http;
+﻿using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 
-namespace AFH.Location.Function.Contracts;
+namespace AFH.Location.Function.Functions.Common;
 
 public static class ApiEnvelopeExtensions
 {

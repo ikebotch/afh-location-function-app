@@ -1,4 +1,4 @@
-namespace AFH.Location.Application.Models.V1;
+namespace AFH.Location.Application.Models.V1.Requests;
 
 public sealed class SearchCoordinates
 {

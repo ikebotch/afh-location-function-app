@@ -3,11 +3,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\AFH.Location.Application\AFH.Location.Application.csproj" />
 		<ProjectReference Include="..\AFH.Location.Domain\AFH.Location.Domain.csproj" />
-		<ProjectReference Include="..\..\..\..\sdk\afh-common-sharepoint\src\AFH.Common.SharePointUtils.csproj" />
-		<ProjectReference Include="..\..\..\..\sdk\afh-common-error\src\AFH.Common.Errors.Email\AFH.Common.Errors.Email.csproj" />
-		<ProjectReference Include="..\..\..\..\sdk\afh-common-error\src\AFH.Common.Errors.ApplicationInsights\AFH.Common.Errors.ApplicationInsights.csproj" />
-		<ProjectReference Include="..\..\..\..\sdk\afh-common-error\src\AFH.Common.Errors.EntityFramework\AFH.Common.Errors.EntityFramework.csproj" />
-	</ItemGroup>
+		</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.ApplicationInsights" Version="3.0.0" />
@@ -17,7 +13,13 @@
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
-		
+
+
+		<PackageReference Include="AFH.Common.SharePointUtils" Version="2.0.1" />
+		<PackageReference Include="AFH.Common.Errors.Email" Version="1.0.2"/>
+		<PackageReference Include="AFH.Common.Errors.ApplicationInsights" Version="1.0.2" />
+		<PackageReference Include="AFH.Common.Errors.EntityFramework" Version="1.0.2" />
+
 
 	</ItemGroup>
 

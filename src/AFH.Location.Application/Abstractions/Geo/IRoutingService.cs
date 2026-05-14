@@ -1,4 +1,4 @@
-﻿namespace AFH.Location.Application.Abstractions;
+﻿namespace AFH.Location.Application.Abstractions.Geo;
 
 public interface IRoutingService
 {

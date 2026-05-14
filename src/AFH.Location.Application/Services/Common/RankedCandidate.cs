@@ -1,4 +1,4 @@
-using AFH.Location.Application.Models.V1;
+using AFH.Location.Application.Models.V1.Results;
 
 namespace AFH.Location.Application.Services.Common;
 

@@ -1,6 +1,6 @@
 ﻿using AFH.Location.Domain;
 
-namespace AFH.Location.Application.Abstractions;
+namespace AFH.Location.Application.Abstractions.Geo;
 
 public interface IGeoCachePolicyProvider
 {

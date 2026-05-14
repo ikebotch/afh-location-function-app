@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Advisers;
 using AFH.Location.Domain.Entities;
 
 namespace AFH.Location.Infrastructure.Persistence.Repositories;

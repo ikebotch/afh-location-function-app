@@ -1,4 +1,7 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Abstractions.Coverage;
+using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Application.Services.V1;
 using AFH.Location.Domain;
 using AFH.Location.Domain.Entities;

@@ -1,4 +1,4 @@
-﻿using AFH.Location.Application.Models.V1;
+﻿using AFH.Location.Application.Models.V1.Requests;
 
 namespace AFH.Location.Application.Validation.V1;
 

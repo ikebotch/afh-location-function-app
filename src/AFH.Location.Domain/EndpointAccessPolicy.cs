@@ -1,4 +1,4 @@
-namespace AFH.BackendPlatform
+namespace AFH.Location.Domain
 {
     public enum EndpointAccessPolicy
     {

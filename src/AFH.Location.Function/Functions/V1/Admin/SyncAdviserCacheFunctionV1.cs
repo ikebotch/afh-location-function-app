@@ -1,9 +1,9 @@
-using AFH.Location.Application.Abstractions;
-using AFH.Location.Function.Contracts;
+using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Function.Functions.Common;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 
-namespace AFH.Location.Function.V1.Admin;
+namespace AFH.Location.Function.Functions.V1.Admin;
 
 public sealed class SyncAdviserCacheFunctionV1
 {

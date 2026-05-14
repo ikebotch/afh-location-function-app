@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Infrastructure.Options;
 using Microsoft.Extensions.Options;
 

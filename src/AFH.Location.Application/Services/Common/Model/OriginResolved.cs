@@ -1,6 +1,6 @@
-﻿using AFH.Location.Domain.Enums;
+﻿using AFH.Location.Application.Services.Common.Enums;
 
-namespace AFH.Location.Domain.Models;
+namespace AFH.Location.Application.Services.Common.Model;
 
 
 

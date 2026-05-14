@@ -1,4 +1,4 @@
-﻿using AFH.Location.Application.Models.V1;
+﻿using AFH.Location.Application.Models.V1.Results;
 using AFH.Location.Domain;
 
 namespace AFH.Location.Application.Services.Common;
@@ -70,7 +70,7 @@ public sealed class RankingService
             reasons.Add("RANK_LOW_CONFIDENCE");
         }
 
-      
+
         return new RankedCandidate
         {
             Candidate = c,

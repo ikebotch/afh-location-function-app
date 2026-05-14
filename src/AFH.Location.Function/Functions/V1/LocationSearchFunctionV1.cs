@@ -1,13 +1,13 @@
-﻿using AFH.Location.Function.Contracts;
-using AFH.Location.Application.Abstractions;
-using AFH.Location.Function.Mapping.V1;
+﻿using AFH.Location.Function.Mapping.V1;
 using AFH.Location.Contract.V1.Requests;
 using AFH.Location.Application.Validation.V1;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
+using AFH.Location.Application.Abstractions.Search;
+using AFH.Location.Function.Functions.Common;
 
-namespace AFH.Location.Function.V1;
+namespace AFH.Location.Function.Functions.V1;
 
 public sealed class LocationSearchFunctionV1
 {

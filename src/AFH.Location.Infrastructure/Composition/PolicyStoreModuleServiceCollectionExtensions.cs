@@ -1,5 +1,8 @@
 using AFH.Common.Errors.EntityFramework.DependencyInjection;
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Abstractions.Coverage;
+using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Infrastructure.Caching;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;

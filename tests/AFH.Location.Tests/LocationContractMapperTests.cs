@@ -1,4 +1,5 @@
 using AFH.Location.Application.Models.V1;
+using AFH.Location.Application.Models.V1.Results;
 using AFH.Location.Contract.V1.Requests;
 using AFH.Location.Function.Mapping.V1;
 

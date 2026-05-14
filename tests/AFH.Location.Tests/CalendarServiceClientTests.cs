@@ -1,4 +1,5 @@
 using AFH.Location.Application.Models.V1;
+using AFH.Location.Application.Models.V1.Requests;
 using AFH.Location.Infrastructure.External.Calendar;
 using AFH.Location.Infrastructure.Options;
 using Microsoft.Extensions.Logging.Abstractions;

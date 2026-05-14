@@ -1,11 +1,11 @@
-using AFH.BackendPlatform;
-using AFH.Location.Function.V1;
 using AFH.Location.Function.Middleware;
 using AFH.Location.Function.Security;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 using System.Reflection;
+using AFH.Location.Domain;
+using AFH.Location.Function.Functions.V1;
 
 namespace AFH.Location.Tests;
 

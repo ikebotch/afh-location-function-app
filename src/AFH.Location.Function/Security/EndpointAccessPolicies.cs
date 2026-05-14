@@ -1,4 +1,4 @@
-using AFH.BackendPlatform;
+using AFH.Location.Domain;
 
 namespace AFH.Location.Function.Security;
 

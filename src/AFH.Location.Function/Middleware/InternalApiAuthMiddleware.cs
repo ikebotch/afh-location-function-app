@@ -1,5 +1,5 @@
-using AFH.BackendPlatform;
-using AFH.Location.Function.Contracts;
+using AFH.Location.Domain;
+using AFH.Location.Function.Functions.Common;
 using AFH.Location.Function.Security;
 using AFH.Location.Infrastructure.Logging;
 using AFH.Location.Infrastructure.Options;

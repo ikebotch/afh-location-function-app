@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Search;
 using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Application.Services.V1;

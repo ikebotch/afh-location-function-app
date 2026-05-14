@@ -1,5 +1,9 @@
-﻿using AFH.Location.Application.Abstractions;
-using AFH.Location.Application.Models.V1;
+﻿using AFH.Location.Application.Abstractions.Calendar;
+using AFH.Location.Application.Abstractions.Coverage;
+using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Abstractions.Search;
+using AFH.Location.Application.Models.V1.Requests;
+using AFH.Location.Application.Models.V1.Results;
 using AFH.Location.Application.Services.Common;
 using AFH.Location.Domain;
 using Microsoft.Extensions.Logging;
@@ -9,7 +13,6 @@ namespace AFH.Location.Application.Services.V1;
 public sealed class LocationSearchService : ILocationSearchService
 {
     private const int MaxParallelOriginResolutions = 8;
-    private const int TopNSecondaryReturnTravelEnrichmentCount = 10;
     private readonly AdviserCandidateSource _candidateSource;
     private readonly ICalendarAvailabilityService _calendar;
     private readonly LocationResponseCandidateBuilder _responseCandidateBuilder;
@@ -92,11 +95,11 @@ public sealed class LocationSearchService : ILocationSearchService
         await ComputeMatrixRoutesToClientAsync(ctx, ct);
 
         await LoadOfficeDataAsync(ctx, ct);
+        await PrecomputeTravelToBaseRoutesAsync(ctx, ct);
         await _routingCoordinator.ComputeNearestOfficeRouteAsync(ctx, ct);
 
         await _responseCandidateBuilder.BuildAsync(ctx, ct);
         RankAndApplyCandidates(ctx);
-        await EnrichTopCandidatesWithReturnTravelAsync(ctx, ct);
         await _searchAuditWriter.WriteAsync(ctx, ct);
 
         return response;
@@ -288,52 +291,12 @@ public sealed class LocationSearchService : ILocationSearchService
         ctx.NearestOfficeId = FindNearestOfficeId(destLat, destLng, ctx.OfficeCoords);
     }
 
-    private async Task EnrichTopCandidatesWithReturnTravelAsync(LocationSearchContext ctx, CancellationToken ct)
+    private async Task PrecomputeTravelToBaseRoutesAsync(LocationSearchContext ctx, CancellationToken ct)
     {
-        var candidatesToEnrich = ctx.Response.Candidates
-            .Take(TopNSecondaryReturnTravelEnrichmentCount)
-            .ToList();
-
-        if (candidatesToEnrich.Count == 0)
-            return;
-
-        var adviserCandidatesById = ctx.Candidates.ToDictionary(x => x.Adviser.AdviserId, StringComparer.OrdinalIgnoreCase);
-        var adviserCandidates = candidatesToEnrich
-            .Where(x => adviserCandidatesById.ContainsKey(x.AdviserId))
-            .Select(x => adviserCandidatesById[x.AdviserId])
-            .ToList();
-
-        if (adviserCandidates.Count == 0)
-            return;
-
-        await PrecomputeTravelToBaseRoutesAsync(ctx, adviserCandidates, ct);
-
-        foreach (var candidate in candidatesToEnrich)
-        {
-            if (string.Equals(candidate.Availability, "Unavailable", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(candidate.Availability, "Busy", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (!adviserCandidatesById.TryGetValue(candidate.AdviserId, out var adviserCandidate))
-                continue;
-
-            candidate.TravelToBase = await _routingCoordinator.BuildTravelToBaseAsync(ctx, adviserCandidate, candidate.Reasons, ct);
-        }
-    }
-
-    private async Task PrecomputeTravelToBaseRoutesAsync(
-        LocationSearchContext ctx,
-        IReadOnlyList<AdviserCandidate> candidatesToEnrich,
-        CancellationToken ct)
-    {
-        ctx.OfficeRouteMinutesByOfficeId.Clear();
-
         var adviserRouteKeyById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var uniqueHomeDestinations = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var candidate in candidatesToEnrich)
+        foreach (var candidate in ctx.Candidates)
         {
             if (!ctx.AdviserOrigins.TryGetValue(candidate.Adviser.AdviserId, out var origin))
                 continue;
@@ -352,7 +315,7 @@ public sealed class LocationSearchService : ILocationSearchService
                 StringComparer.OrdinalIgnoreCase);
 
         var officeDestinations = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var candidate in candidatesToEnrich)
+        foreach (var candidate in ctx.Candidates)
         {
             var officeId = ResolveBaseOfficeId(candidate.Adviser.Region, ctx.BaseOfficePolicy);
             if (string.IsNullOrWhiteSpace(officeId))
@@ -362,7 +325,21 @@ public sealed class LocationSearchService : ILocationSearchService
                 officeDestinations.TryAdd(officeId, officeCoords);
         }
 
+        if (!string.IsNullOrWhiteSpace(ctx.NearestOfficeId) &&
+            ctx.OfficeCoords.TryGetValue(ctx.NearestOfficeId, out var nearestOfficeCoords) &&
+            !IsZero(nearestOfficeCoords))
+        {
+            officeDestinations.TryAdd(ctx.NearestOfficeId, nearestOfficeCoords);
+        }
+
         ctx.RoutesToOfficeByOfficeId = await _matrixCoordinator.GetRoutesFromOriginAsync(ctx.Destination, officeDestinations, ct);
+
+        if (!string.IsNullOrWhiteSpace(ctx.NearestOfficeId) &&
+            ctx.RoutesToOfficeByOfficeId.TryGetValue(ctx.NearestOfficeId, out var nearestOfficeRoute) &&
+            nearestOfficeRoute.EtaMinutes > 0)
+        {
+            ctx.NearestOfficeRoute = nearestOfficeRoute;
+        }
     }
 
     private void RankAndApplyCandidates(LocationSearchContext ctx)

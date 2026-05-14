@@ -1,4 +1,6 @@
-namespace AFH.Location.Application.Models.V1;
+using AFH.Location.Application.Models.V1.Results;
+
+namespace AFH.Location.Application.Models.V1.Batch;
 
 public sealed class LocationSearchBatchItemResult
 {

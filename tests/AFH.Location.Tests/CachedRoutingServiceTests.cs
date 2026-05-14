@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Infrastructure.External.Maps;
 
 namespace AFH.Location.Tests;

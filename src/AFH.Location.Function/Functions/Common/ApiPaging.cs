@@ -1,4 +1,4 @@
-namespace AFH.Location.Function.Common;
+namespace AFH.Location.Function.Functions.Common;
 
 public sealed class ApiPaging
 {

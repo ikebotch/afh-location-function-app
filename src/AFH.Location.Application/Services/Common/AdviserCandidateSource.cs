@@ -1,5 +1,5 @@
-﻿using AFH.Location.Application.Abstractions;
-using AFH.Location.Application.Models.V1;
+﻿using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Models.V1.Requests;
 using AFH.Location.Domain.Entities;
 namespace AFH.Location.Application.Services.Common;
 

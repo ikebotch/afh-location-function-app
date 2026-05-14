@@ -3,7 +3,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 using System.Text.Json;
 
-namespace AFH.Location.Function.V1;
+namespace AFH.Location.Function.Functions.V1;
 
 public sealed class ApiDocsFunctions
 {

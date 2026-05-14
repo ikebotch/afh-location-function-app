@@ -1,5 +1,7 @@
-﻿using AFH.Location.Application.Abstractions;
-using AFH.Location.Application.Models.V1;
+﻿using AFH.Location.Application.Abstractions.Calendar;
+using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Models.V1.Requests;
+using AFH.Location.Application.Models.V1.Results;
 using AFH.Location.Application.Services.Common;
 using AFH.Location.Domain;
 using System.Collections.Concurrent;

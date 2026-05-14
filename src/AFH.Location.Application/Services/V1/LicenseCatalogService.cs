@@ -1,4 +1,5 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Application.Models.V1;
 
 namespace AFH.Location.Application.Services.V1;

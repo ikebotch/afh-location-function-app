@@ -4,10 +4,10 @@ using AFH.Common.Errors.Abstractions;
 using AFH.Common.Errors.AzureFunctions.DependencyInjection;
 using Azure.Core.Serialization;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Text.Json;
 
@@ -30,7 +30,7 @@ var host = new HostBuilder()
 
 host.Run();
 
-static void ConfigureMiddlewarePipeline(dynamic app)
+static void ConfigureMiddlewarePipeline(IFunctionsWorkerApplicationBuilder app)
 {
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<OperationAuditMiddleware>();
@@ -65,7 +65,7 @@ static void AddSharedErrorHandling(
     string defaultSubjectPrefix,
     string serviceName)
 {
-    //services.AddApplicationInsightsTelemetryWorkerService();
+    services.AddApplicationInsightsTelemetryWorkerService();
     services.AddAfhCommonErrorsAzureFunctions();
     services.AddLocationErrorNotificationModule(configuration, defaultSubjectPrefix, serviceName);
     services.AddSingleton<LocationExceptionMapper>();

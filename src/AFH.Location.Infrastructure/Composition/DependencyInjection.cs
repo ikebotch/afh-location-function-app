@@ -1,5 +1,4 @@
-﻿using AFH.Location.Application.Abstractions;
-using AFH.Location.Application.Services.Common;
+﻿using AFH.Location.Application.Services.Common;
 using AFH.Location.Application.Services.V1;
 using AFH.Location.Infrastructure.Caching;
 using AFH.Location.Infrastructure.External.Calendar;
@@ -18,6 +17,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using AFH.Location.Application.Abstractions.Calendar;
+using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Abstractions.Common;
+using AFH.Location.Application.Abstractions.Coverage;
+using AFH.Location.Application.Abstractions.Search;
 
 namespace AFH.Location.Infrastructure.Composition;
 

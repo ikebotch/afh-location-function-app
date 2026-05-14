@@ -1,11 +1,11 @@
-﻿using AFH.Location.Application.Abstractions;
-using AFH.Location.Domain.Entities;
+﻿using AFH.Location.Domain.Entities;
 using AFH.Location.Infrastructure.Options;
 using AFH.Common.SharePointUtils.Abstractions;
 using AFH.Common.SharePointUtils.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Graph.Models;
+using AFH.Location.Application.Abstractions.Advisers;
 
 namespace AFH.Location.Infrastructure.Persistence.Repositories;
 

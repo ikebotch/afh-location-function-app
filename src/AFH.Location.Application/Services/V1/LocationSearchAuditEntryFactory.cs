@@ -1,4 +1,6 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Search;
+
+using AFH.Location.Application.Models.V1.Results;
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
@@ -35,11 +37,11 @@ public sealed class LocationSearchAuditEntryFactory
         };
     }
 
-    private static string? GetOriginSource(Models.V1.LocationSearchCandidate? candidate)
+    private static string? GetOriginSource(LocationSearchCandidate? candidate)
         => candidate?.Reasons.FirstOrDefault(r =>
             r.StartsWith("ORIGIN_SOURCE_", StringComparison.OrdinalIgnoreCase));
 
-    private static string BuildPayloadJson(IReadOnlyList<Models.V1.LocationSearchCandidate> candidates)
+    private static string BuildPayloadJson(IReadOnlyList<LocationSearchCandidate> candidates)
     {
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new Utf8JsonWriter(buffer);

@@ -1,10 +1,10 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Function.Mapping.V1;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 
-namespace AFH.Location.Function.V1;
+namespace AFH.Location.Function.Functions.V1;
 
 public sealed class LicenseListFunctionV1
 {

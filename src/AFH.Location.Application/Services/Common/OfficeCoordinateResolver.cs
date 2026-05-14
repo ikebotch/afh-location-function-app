@@ -1,4 +1,5 @@
-﻿using AFH.Location.Application.Abstractions;
+﻿using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Domain.Entities;
 
 namespace AFH.Location.Application.Services.Common;

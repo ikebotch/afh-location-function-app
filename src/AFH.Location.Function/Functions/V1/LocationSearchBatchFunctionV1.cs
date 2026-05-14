@@ -1,5 +1,3 @@
-using AFH.Location.Function.Contracts;
-using AFH.Location.Application.Abstractions;
 using AFH.Location.Function.Mapping.V1;
 using AFH.Location.Application.Models.V1;
 using AFH.Location.Contract.V1.Requests;
@@ -8,8 +6,11 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Configuration;
 using System.Net;
+using AFH.Location.Application.Models.V1.Batch;
+using AFH.Location.Application.Abstractions.Search;
+using AFH.Location.Function.Functions.Common;
 
-namespace AFH.Location.Function.V1;
+namespace AFH.Location.Function.Functions.V1;
 
 public sealed class LocationSearchBatchFunctionV1
 {

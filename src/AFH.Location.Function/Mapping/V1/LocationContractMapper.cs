@@ -1,4 +1,7 @@
 using AFH.Location.Application.Models.V1;
+using AFH.Location.Application.Models.V1.Batch;
+using AFH.Location.Application.Models.V1.Requests;
+using AFH.Location.Application.Models.V1.Results;
 using AFH.Location.Contract.V1.Requests;
 using AFH.Location.Contract.V1.Responses;
 
@@ -37,7 +40,7 @@ public static class LocationContractMapper
                         Country = contract.Destination.Address.Country
                     }
             },
-            Filters = new Application.Models.V1.LocationSearchFilters
+            Filters = new Application.Models.V1.Requests.LocationSearchFilters
             {
                 Regions = contract.Filters?.Regions ?? [],
                 AdviserIds = contract.Filters?.AdviserIds ?? [],

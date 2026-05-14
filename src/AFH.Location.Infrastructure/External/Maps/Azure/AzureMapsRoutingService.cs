@@ -1,4 +1,4 @@
-﻿using AFH.Location.Application.Abstractions;
+﻿using AFH.Location.Application.Abstractions.Geo;
 using Microsoft.Extensions.Configuration;
 using System.Text.Encodings.Web;
 using System.Text.Json;

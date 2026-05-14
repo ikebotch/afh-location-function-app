@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Common;
 using Microsoft.Extensions.Configuration;
 
 namespace AFH.Location.Infrastructure.Services;
