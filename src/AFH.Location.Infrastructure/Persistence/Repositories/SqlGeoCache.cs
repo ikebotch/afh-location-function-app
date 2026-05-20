@@ -3,16 +3,21 @@ using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Infrastructure.Persistence.Repositories;
 
 public sealed class SqlGeoCache : IGeoCache, IAdviserGeoCache
 {
     private readonly IDbContextFactory<LocationPolicyDbContext> _dbContextFactory;
+    private readonly ILogger<SqlGeoCache>? _logger;
 
-    public SqlGeoCache(IDbContextFactory<LocationPolicyDbContext> dbContextFactory)
+    public SqlGeoCache(
+        IDbContextFactory<LocationPolicyDbContext> dbContextFactory,
+        ILogger<SqlGeoCache>? logger = null)
     {
         _dbContextFactory = dbContextFactory;
+        _logger = logger;
     }
 
     public bool TryGet(string key, out (double Lat, double Lng) coords)
@@ -21,10 +26,12 @@ public sealed class SqlGeoCache : IGeoCache, IAdviserGeoCache
         var entry = db.GeoCacheEntries.AsNoTracking().FirstOrDefault(x => x.CacheKey == key);
         if (entry is null || entry.ExpiresUtc <= DateTime.UtcNow)
         {
+            _logger?.LogInformation("Durable SQL geocode cache miss. Key={Key}", key);
             coords = default;
             return false;
         }
 
+        _logger?.LogInformation("Durable SQL geocode cache hit. Key={Key}", key);
         coords = (entry.Latitude, entry.Longitude);
         return true;
     }
@@ -44,6 +51,8 @@ public sealed class SqlGeoCache : IGeoCache, IAdviserGeoCache
         entry.UpdatedUtc = DateTime.UtcNow;
         entry.ExpiresUtc = DateTime.UtcNow.Add(ttl <= TimeSpan.Zero ? TimeSpan.FromMinutes(10) : ttl);
         db.SaveChanges();
+
+        _logger?.LogInformation("Durable SQL geocode cache write. Key={Key} Ttl={Ttl}", key, ttl);
     }
 
     public async Task<IReadOnlyDictionary<string, (double Lat, double Lng)>> TryGetManyAsync(
@@ -65,10 +74,17 @@ public sealed class SqlGeoCache : IGeoCache, IAdviserGeoCache
             .Where(x => distinctKeys.Contains(x.CacheKey) && x.ExpiresUtc > now)
             .ToListAsync(ct);
 
-        return entries.ToDictionary(
+        var result = entries.ToDictionary(
             entry => entry.CacheKey,
             entry => (entry.Latitude, entry.Longitude),
             StringComparer.OrdinalIgnoreCase);
+
+        _logger?.LogInformation(
+            "Durable SQL geocode cache bulk read. Requested={RequestedCount} Hits={HitCount}",
+            distinctKeys.Length,
+            result.Count);
+
+        return result;
     }
 
     public async Task SetManyAsync(
@@ -106,5 +122,9 @@ public sealed class SqlGeoCache : IGeoCache, IAdviserGeoCache
         }
 
         await db.SaveChangesAsync(ct);
+
+        _logger?.LogInformation(
+            "Durable SQL geocode cache bulk write. KeysCount={KeysCount}",
+            distinctEntries.Count);
     }
 }

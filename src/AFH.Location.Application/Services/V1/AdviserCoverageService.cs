@@ -3,6 +3,7 @@ using AFH.Location.Application.Abstractions.Advisers;
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Search;
+using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Application.Models.V1;
 using AFH.Location.Domain;
 using AFH.Location.Domain.Entities;
@@ -11,60 +12,29 @@ namespace AFH.Location.Application.Services.V1;
 
 public sealed class AdviserCoverageService : IAdviserCoverageService
 {
-    private static readonly ConcurrentDictionary<string, (double Lat, double Lng)> CoordinateCache = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly SemaphoreSlim CacheRefreshGate = new(1, 1);
-    private static readonly TimeSpan CoverageCacheTtl = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan BuildTimeout = TimeSpan.FromSeconds(20);
-    private static DateTime _cachedAtUtc = DateTime.MinValue;
-    private static AdviserCoverageResult? _cachedResponse;
-
     private readonly IAdviserRepository _adviserRepository;
     private readonly IOfficeRepository _officeRepository;
-    private readonly IGeocodingService _geocodingService;
+    private readonly IPostcodeCoordinateResolver _postcodeCoordinateResolver;
     private readonly ICoveragePolicyProvider _coveragePolicyProvider;
     private readonly ICoveragePresentationSettings _settings;
 
     public AdviserCoverageService(
         IAdviserRepository adviserRepository,
         IOfficeRepository officeRepository,
-        IGeocodingService geocodingService,
+        IPostcodeCoordinateResolver postcodeCoordinateResolver,
         ICoveragePolicyProvider coveragePolicyProvider,
         ICoveragePresentationSettings settings)
     {
         _adviserRepository = adviserRepository;
         _officeRepository = officeRepository;
-        _geocodingService = geocodingService;
+        _postcodeCoordinateResolver = postcodeCoordinateResolver;
         _coveragePolicyProvider = coveragePolicyProvider;
         _settings = settings;
     }
 
     public async Task<AdviserCoverageResult> GetCoverageAsync(CancellationToken ct)
     {
-        if (_cachedResponse is not null && DateTime.UtcNow - _cachedAtUtc < CoverageCacheTtl)
-            return _cachedResponse;
-
-        await CacheRefreshGate.WaitAsync(ct);
-        try
-        {
-            if (_cachedResponse is not null && DateTime.UtcNow - _cachedAtUtc < CoverageCacheTtl)
-                return _cachedResponse;
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(BuildTimeout);
-
-            var response = await BuildCoverageAsync(timeoutCts.Token);
-            _cachedResponse = response;
-            _cachedAtUtc = DateTime.UtcNow;
-            return response;
-        }
-        catch (OperationCanceledException) when (_cachedResponse is not null)
-        {
-            return _cachedResponse;
-        }
-        finally
-        {
-            CacheRefreshGate.Release();
-        }
+        return await BuildCoverageAsync(ct);
     }
 
     private async Task<AdviserCoverageResult> BuildCoverageAsync(CancellationToken ct)
@@ -165,39 +135,20 @@ public sealed class AdviserCoverageService : IAdviserCoverageService
         IReadOnlyList<string> postcodes,
         CancellationToken ct)
     {
-        var result = new ConcurrentDictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
-        var throttler = new SemaphoreSlim(6, 6);
+        var postcodeMap = postcodes.ToDictionary(p => p, p => p, StringComparer.OrdinalIgnoreCase);
+        var resolutions = await _postcodeCoordinateResolver.ResolveManyAsync(postcodeMap, ct);
+        var coordinates = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
 
-        var tasks = postcodes.Select(async postcode =>
+        foreach (var postcode in postcodes)
         {
-            await throttler.WaitAsync(ct);
-            try
+            if (!resolutions.TryGetValue(postcode, out var res) || res.Coordinates == null)
             {
-                var value = await ResolveSingleCoordinateAsync(postcode, ct);
-                result[postcode] = value;
+                throw new InvalidOperationException($"Geocoding returned invalid coordinates for postcode '{postcode}'.");
             }
-            finally
-            {
-                throttler.Release();
-            }
-        });
+            coordinates[postcode] = (res.Coordinates.Latitude, res.Coordinates.Longitude);
+        }
 
-        await Task.WhenAll(tasks);
-        return result.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
-    }
-
-    private async Task<(double Lat, double Lng)> ResolveSingleCoordinateAsync(string postcode, CancellationToken ct)
-    {
-        var key = postcode.Trim().ToUpperInvariant();
-        if (CoordinateCache.TryGetValue(key, out var cached))
-            return cached;
-
-        var value = await _geocodingService.GeocodeAsync($"{key}, United Kingdom", ct);
-        if (IsZero(value))
-            throw new InvalidOperationException($"Geocoding returned invalid coordinates for postcode '{key}'.");
-
-        CoordinateCache[key] = value;
-        return value;
+        return coordinates;
     }
 
     private static int ResolveMaxTravelTimeMinutes(Adviser adviser, CoveragePolicy coveragePolicy)

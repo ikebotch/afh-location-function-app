@@ -3,16 +3,21 @@ using AFH.Location.Domain.Travel;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Infrastructure.Persistence.Repositories;
 
 public sealed class SqlRouteCache : IRouteCache
 {
     private readonly IDbContextFactory<LocationPolicyDbContext> _dbContextFactory;
+    private readonly ILogger<SqlRouteCache>? _logger;
 
-    public SqlRouteCache(IDbContextFactory<LocationPolicyDbContext> dbContextFactory)
+    public SqlRouteCache(
+        IDbContextFactory<LocationPolicyDbContext> dbContextFactory,
+        ILogger<SqlRouteCache>? logger = null)
     {
         _dbContextFactory = dbContextFactory;
+        _logger = logger;
     }
 
     public bool TryGet(string key, out RouteResult result)
@@ -21,10 +26,12 @@ public sealed class SqlRouteCache : IRouteCache
         var entry = db.RouteCacheEntries.AsNoTracking().FirstOrDefault(x => x.CacheKey == key);
         if (entry is null || entry.ExpiresUtc <= DateTime.UtcNow)
         {
+            _logger?.LogInformation("Durable SQL route cache miss. Key={Key}", key);
             result = default!;
             return false;
         }
 
+        _logger?.LogInformation("Durable SQL route cache hit. Key={Key}", key);
         result = new RouteResult(
             entry.EtaMinutes,
             entry.DistanceMiles,
@@ -49,6 +56,8 @@ public sealed class SqlRouteCache : IRouteCache
         entry.UpdatedUtc = DateTime.UtcNow;
         entry.ExpiresUtc = DateTime.UtcNow.Add(ttl <= TimeSpan.Zero ? TimeSpan.FromMinutes(10) : ttl);
         db.SaveChanges();
+
+        _logger?.LogInformation("Durable SQL route cache write. Key={Key} Ttl={Ttl}", key, ttl);
     }
 
     public async Task<IReadOnlyDictionary<string, RouteResult>> TryGetManyAsync(
@@ -70,7 +79,7 @@ public sealed class SqlRouteCache : IRouteCache
             .Where(x => distinctKeys.Contains(x.CacheKey) && x.ExpiresUtc > now)
             .ToListAsync(ct);
 
-        return entries.ToDictionary(
+        var result = entries.ToDictionary(
             entry => entry.CacheKey,
             entry => new RouteResult(
                 entry.EtaMinutes,
@@ -78,6 +87,13 @@ public sealed class SqlRouteCache : IRouteCache
                 entry.Confidence,
                 TravelRouteResolutionSource.Database),
             StringComparer.OrdinalIgnoreCase);
+
+        _logger?.LogInformation(
+            "Durable SQL route cache bulk read. Requested={RequestedCount} Hits={HitCount}",
+            distinctKeys.Length,
+            result.Count);
+
+        return result;
     }
 
     public async Task SetManyAsync(
@@ -116,5 +132,9 @@ public sealed class SqlRouteCache : IRouteCache
         }
 
         await db.SaveChangesAsync(ct);
+
+        _logger?.LogInformation(
+            "Durable SQL route cache bulk write. KeysCount={KeysCount}",
+            distinctEntries.Count);
     }
 }

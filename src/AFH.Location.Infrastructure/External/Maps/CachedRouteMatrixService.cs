@@ -81,6 +81,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
             if (_requestCache.TryGetValue(keys.SpecificKey, out var route) ||
                 _requestCache.TryGetValue(keys.SingleKey, out route!))
             {
+                _logger?.LogInformation("Request-scoped route cache hit. SpecificKey={SpecificKey}", keys.SpecificKey);
                 cached[destination.Key] = route;
                 _requestCache[keys.SpecificKey] = route;
                 continue;

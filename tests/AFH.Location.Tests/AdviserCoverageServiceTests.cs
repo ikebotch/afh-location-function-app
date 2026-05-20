@@ -2,6 +2,8 @@ using AFH.Location.Application.Abstractions.Advisers;
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Search;
+using AFH.Location.Application.Abstractions.Travel;
+using AFH.Location.Application.Models.V1.Travel;
 using AFH.Location.Application.Services.V1;
 using AFH.Location.Domain;
 using AFH.Location.Domain.Entities;
@@ -16,7 +18,7 @@ public class AdviserCoverageServiceTests
         var sut = new AdviserCoverageService(
             new StubAdviserRepository(),
             new StubOfficeRepository(),
-            new StubGeocodingService(),
+            new StubPostcodeCoordinateResolver(),
             new StubCoveragePolicyProvider(),
             new StubCoverageSettings());
 
@@ -60,9 +62,16 @@ public class AdviserCoverageServiceTests
         }
     }
 
-    private sealed class StubGeocodingService : IGeocodingService
+    private sealed class StubPostcodeCoordinateResolver : IPostcodeCoordinateResolver
     {
-        public Task<(double Lat, double Lng)> GeocodeAsync(string address, CancellationToken ct) => Task.FromResult((0d, 0d));
+        public Task<PostcodeCoordinateResolution> ResolveAsync(string postcode, CancellationToken ct)
+        {
+            return Task.FromResult(new PostcodeCoordinateResolution
+            {
+                Postcode = postcode,
+                Coordinates = null
+            });
+        }
     }
 
     private sealed class StubCoveragePolicyProvider : ICoveragePolicyProvider
