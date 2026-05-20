@@ -2,8 +2,8 @@
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Models.V1.Requests;
 using AFH.Location.Application.Models.V1.Results;
-using AFH.Location.Application.Services.Common;
 using AFH.Location.Domain;
+using AFH.Location.Domain.Entities;
 using System.Collections.Concurrent;
 
 namespace AFH.Location.Application.Services.V1;

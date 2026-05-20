@@ -1,4 +1,4 @@
-namespace AFH.Location.Application.Models.V1.Results;
+﻿namespace AFH.Location.Application.Models.V1.Results;
 
 public sealed class TravelSnapshotResult
 {

@@ -1,4 +1,4 @@
-namespace AFH.Location.Contract.V1.Responses;
+﻿namespace AFH.Location.Contract.V1.Responses;
 
 public sealed class TravelSnapshotResult
 {

@@ -456,14 +456,41 @@ public sealed class LocationSearchService : ILocationSearchService
         return ctx.CoveragePolicy.DefaultRadiusMiles;
     }
 
-    private static void ApplyCandidateEligibilityFilters(LocationSearchContext ctx)
+    private void ApplyCandidateEligibilityFilters(LocationSearchContext ctx)
     {
-        var minRating = ctx.Request.Filters?.MinAdviserRating ?? ctx.RankingPolicy.DefaultMinAdviserRating;
-        if (minRating <= 0) return;
+        var minRating =
+            ctx.Request.Filters?.MinAdviserRating
+            ?? ctx.RankingPolicy.DefaultMinAdviserRating;
+
+        _logger.LogInformation(
+            "Applying candidate eligibility filters. IncomingCount={IncomingCount} MinRating={MinRating}",
+            ctx.Candidates.Count,
+            minRating);
+
+        foreach (var candidate in ctx.Candidates)
+        {
+            _logger.LogInformation(
+                "Candidate eligibility check. AdviserId={AdviserId} Rating={Rating} Skills={Skills}",
+                candidate.Adviser.AdviserId,
+                candidate.Adviser.Rating,
+                candidate.Adviser.Skills);
+        }
+
+        if (minRating <= 0)
+        {
+            _logger.LogInformation(
+                "Candidate eligibility filters skipped because MinRating <= 0");
+
+            return;
+        }
 
         ctx.Candidates = ctx.Candidates
             .Where(c => c.Adviser.Rating >= minRating)
             .ToList();
+
+        _logger.LogInformation(
+            "Candidate eligibility filters applied. RemainingCount={RemainingCount}",
+            ctx.Candidates.Count);
     }
 
     private static bool IsCalendarRoutingEligible(LocationSearchContext ctx, string adviserId)

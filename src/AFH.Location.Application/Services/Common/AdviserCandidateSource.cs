@@ -1,20 +1,27 @@
 ﻿using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Common;
 using AFH.Location.Application.Models.V1.Requests;
 using AFH.Location.Domain.Entities;
+using Microsoft.Extensions.Logging;
+
 namespace AFH.Location.Application.Services.Common;
 
 public sealed class AdviserCandidateSource
 {
     private readonly IAdviserRepository _repo;
+    private readonly ILogger<AdviserCandidateSource> _logger;
 
-    public AdviserCandidateSource(IAdviserRepository repo)
+    public AdviserCandidateSource(
+        IAdviserRepository repo,
+        ILogger<AdviserCandidateSource> logger)
     {
         _repo = repo;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<AdviserCandidate>> GetCandidatesAsync(
-       LocationSearchRequest req,
-       CancellationToken ct)
+        LocationSearchRequest req,
+        CancellationToken ct)
     {
         var all = await _repo.GetAllAsync(req.Filters?.AdviserIds, ct);
 
@@ -32,45 +39,67 @@ public sealed class AdviserCandidateSource
             .ToHashSet(StringComparer.OrdinalIgnoreCase)
             ?? new HashSet<string>();
 
-        var requiredSkills = req.Filters?.RequiredSkills?
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim())
-            .ToArray()
-            ?? Array.Empty<string>();
+        var requiredSkillKeys = SkillKeyNormaliser
+            .ToSkillKeys(req.Filters?.RequiredSkills)
+            .ToArray();
+
+        _logger.LogInformation(
+            "Location adviser candidate skill filtering started. RequiredSkillKeys={RequiredSkillKeys} AdviserCountBefore={AdviserCountBefore}",
+            requiredSkillKeys.Length == 0 ? "NONE" : string.Join(", ", requiredSkillKeys),
+            all.Count);
+
+        foreach (var adviser in all)
+        {
+            var rawSkills = adviser.Skills ?? [];
+
+            var skillKeys = SkillKeyNormaliser
+                .ToSkillKeys(rawSkills)
+                .ToArray();
+
+            _logger.LogInformation(
+                "Location adviser skills. AdviserId={AdviserId} RawSkills={RawSkills} SkillKeys={SkillKeys}",
+                adviser.AdviserId,
+                rawSkills.Count == 0 ? "NONE" : string.Join(", ", rawSkills),
+                skillKeys.Length == 0 ? "NONE" : string.Join(", ", skillKeys));
+        }
 
         var filtered = all
             .Where(a => a.IsActive)
             .Where(a => !excluded.Contains(a.AdviserId))
             .Where(a => regions.Count == 0 || regions.Contains(a.Region))
-            .Where(a => requiredSkills.Length == 0 || HasAllSkills(a.Skills.ToArray(), requiredSkills))
+            .Where(a => requiredSkillKeys.Length == 0 || HasAllSkillKeys(a.Skills, requiredSkillKeys))
             .Select(a => new AdviserCandidate
             {
                 Adviser = a,
                 IsPreferred = preferred.Contains(a.AdviserId)
             })
-            // ORDER FIRST
             .OrderByDescending(x => x.IsPreferred)
             .ThenBy(x => x.Adviser.DisplayName)
             .ThenBy(x => x.Adviser.AdviserId)
-            // CAP LAST
-            //.Take(maxCandidates)
             .ToList();
+
+        _logger.LogInformation(
+            "Location adviser candidate skill filtering complete. AdviserCountAfter={AdviserCountAfter}",
+            filtered.Count);
 
         return filtered;
     }
 
-    private static bool HasAllSkills(string[] adviserSkills, string[] requiredSkills)
+    private static bool HasAllSkillKeys(
+        IEnumerable<string>? adviserSkills,
+        IEnumerable<string>? requiredSkillKeys)
     {
-        if (adviserSkills is null || adviserSkills.Length == 0) return false;
+        var required = SkillKeyNormaliser.ToSkillKeys(requiredSkillKeys);
 
-        var set = new HashSet<string>(adviserSkills, StringComparer.OrdinalIgnoreCase);
-        return requiredSkills.All(set.Contains);
+        if (required.Count == 0)
+            return true;
+
+        var adviserSkillKeys = SkillKeyNormaliser
+            .ToSkillKeys(adviserSkills)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return adviserSkillKeys.Count > 0 &&
+               required.All(adviserSkillKeys.Contains);
     }
 }
 
-public sealed class AdviserCandidate
-{
-    public Adviser Adviser { get; init; } = default!;
-    public bool IsPreferred { get; init; }
-    public List<string> SourceReasons { get; init; } = new();
-}

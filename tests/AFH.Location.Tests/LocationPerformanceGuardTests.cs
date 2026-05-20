@@ -133,7 +133,7 @@ public sealed class LocationPerformanceGuardTests
         [
             NewAdviser("adv-1"),
             NewAdviser("adv-2")
-        ]));
+        ]), NullLogger<AdviserCandidateSource>.Instance);
 
         var routing = new RecordingRoutingService();
         var routingCoordinator = new LocationSearchRoutingCoordinator(
@@ -223,7 +223,7 @@ public sealed class LocationPerformanceGuardTests
             Filters = new LocationSearchFilters()
         };
 
-        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository([NewAdviser("adv-1")]));
+        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository([NewAdviser("adv-1")]), NullLogger<AdviserCandidateSource>.Instance);
         var routing = new RecordingRoutingService();
         var routingCoordinator = new LocationSearchRoutingCoordinator(
             routing,
@@ -259,8 +259,8 @@ public sealed class LocationPerformanceGuardTests
         Assert.Equal(15, candidate.TravelToClient.EtaMinutes);
         Assert.Equal(18, candidate.TravelToBase.HomeMinutes);
         Assert.Equal(12, candidate.TravelToBase.OfficeMinutes);
-        Assert.Equal(15, candidate.TravelToNearestOffice.EtaMinutes);
-        Assert.Equal(1, routing.CallCount);
+        Assert.Equal(12, candidate.TravelToNearestOffice.EtaMinutes);
+        Assert.Equal(0, routing.CallCount);
         Assert.Equal(1, routeMatrix.AdviserToDestinationCalls);
         Assert.Equal(2, routeMatrix.OneToManyCalls);
     }
@@ -311,7 +311,7 @@ public sealed class LocationPerformanceGuardTests
         [
             NewAdviser("adv-1"),
             NewAdviser("adv-2")
-        ]));
+        ]), NullLogger<AdviserCandidateSource>.Instance);
 
         var routing = new RecordingRoutingService();
         var routingCoordinator = new LocationSearchRoutingCoordinator(
@@ -379,7 +379,7 @@ public sealed class LocationPerformanceGuardTests
 
         var probe = new PolicyLoadProbe(expectedStarts: 4);
         var sut = new LocationSearchService(
-            new AdviserCandidateSource(new StubAdviserRepository([])),
+            new AdviserCandidateSource(new StubAdviserRepository([]), NullLogger<AdviserCandidateSource>.Instance),
             new StubCalendarAvailabilityService(),
             new LocationResponseCandidateBuilder(
                 new AvailabilityEvaluator(new StubBusinessTimeZoneProvider()),
@@ -466,7 +466,7 @@ public sealed class LocationPerformanceGuardTests
             NewAdviser("adv-2", "AB1 2CD", "Region-1"),
             NewAdviser("adv-3", "CD3 4EF", "Region-2"),
             NewAdviser("adv-4", "CD3 4EF", "Region-2")
-        ]));
+        ]), NullLogger<AdviserCandidateSource>.Instance);
 
         var routing = new RecordingRoutingService();
         var routingCoordinator = new LocationSearchRoutingCoordinator(
@@ -500,7 +500,7 @@ public sealed class LocationPerformanceGuardTests
         var result = await sut.SearchInPersonAsync(NewSearchRequest("req-enrichment-precompute"), CancellationToken.None);
 
         Assert.Equal(4, result.Candidates.Count);
-        Assert.Equal(1, routing.CallCount);
+        Assert.Equal(0, routing.CallCount);
         Assert.Equal(1, routeMatrix.AdviserToDestinationCalls);
         Assert.Equal(2, routeMatrix.OneToManyCalls);
         Assert.Equal([2, 2], routeMatrix.OneToManyDestinationCounts);
@@ -537,7 +537,7 @@ public sealed class LocationPerformanceGuardTests
             NewAdviser("adv-2", "AB1 2CD", "Region-1"),
             NewAdviser("adv-3", "CD3 4EF", "Region-2"),
             NewAdviser("adv-4", "CD3 4EF", "Region-2")
-        ]));
+        ]), NullLogger<AdviserCandidateSource>.Instance);
 
         var routing = new RecordingRoutingService();
         var routingCoordinator = new LocationSearchRoutingCoordinator(
@@ -582,7 +582,7 @@ public sealed class LocationPerformanceGuardTests
     }
 
     [Fact]
-    public async Task LocationSearchService_AppliesReturnTravelEnrichmentOnlyToTopTenRankedCandidates()
+    public async Task LocationSearchService_AppliesReturnTravelEnrichmentToAllRankedCandidates()
     {
         var geoPolicyProvider = new StubGeoCachePolicyProvider();
         var geocodingResults = Enumerable.Range(1, 12)
@@ -613,7 +613,7 @@ public sealed class LocationPerformanceGuardTests
                 5.0 - ((i - 1) * 0.1)))
             .ToList();
 
-        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository(advisers));
+        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository(advisers), NullLogger<AdviserCandidateSource>.Instance);
         var routing = new RecordingRoutingService();
         var routingCoordinator = new LocationSearchRoutingCoordinator(
             routing,
@@ -647,14 +647,9 @@ public sealed class LocationPerformanceGuardTests
         var expectedOrder = Enumerable.Range(1, 12).Select(i => $"adv-{i:00}").ToArray();
         Assert.Equal(expectedOrder, result.Candidates.Select(x => x.AdviserId).ToArray());
 
-        Assert.All(result.Candidates.Take(10), candidate => Assert.True(candidate.TravelToBase.HomeMinutes > 0));
-        Assert.All(result.Candidates.Take(10), candidate => Assert.Equal(0, candidate.TravelToBase.OfficeMinutes));
-        Assert.All(result.Candidates.Skip(10), candidate =>
-        {
-            Assert.Equal(0, candidate.TravelToBase.HomeMinutes);
-            Assert.Equal(0, candidate.TravelToBase.OfficeMinutes);
-        });
-        Assert.Equal(10, routing.CallCount);
+        Assert.All(result.Candidates, candidate => Assert.True(candidate.TravelToBase.HomeMinutes > 0));
+        Assert.All(result.Candidates, candidate => Assert.Equal(0, candidate.TravelToBase.OfficeMinutes));
+        Assert.Equal(12, routing.CallCount);
     }
 
     [Fact]
@@ -679,7 +674,7 @@ public sealed class LocationPerformanceGuardTests
             geoPolicyProvider,
             new StubGeoCache());
 
-        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository([NewAdviser("adv-1")]));
+        var candidateSource = new AdviserCandidateSource(new StubAdviserRepository([NewAdviser("adv-1")]), NullLogger<AdviserCandidateSource>.Instance);
         var routingCoordinator = new LocationSearchRoutingCoordinator(
             new ThrowingRoutingService(),
             NullLogger<LocationSearchRoutingCoordinator>.Instance);

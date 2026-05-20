@@ -1,8 +1,8 @@
-using AFH.Location.Application.Abstractions;
 using AFH.Location.Application.Abstractions.Calendar;
-using AFH.Location.Application.Models.V1;
+using AFH.Location.Application.Common;
 using AFH.Location.Application.Models.V1.Results;
 using AFH.Location.Application.Services.Common;
+using AFH.Location.Domain.Entities;
 
 namespace AFH.Location.Application.Services.V1;
 
@@ -33,6 +33,38 @@ public sealed class LocationResponseCandidateBuilder
             {
                 var reasons = new List<string>();
                 AddBaseReasons(ctx, candidate, reasons);
+
+                // SKILL FILTER
+
+                var requiredSkillKeys =
+                    SkillKeyNormaliser.ToSkillKeys(
+                        ctx.Request.Filters?.RequiredSkills);
+
+                var adviserSkillKeys =
+                    SkillKeyNormaliser.ToSkillKeys(
+                        candidate.Adviser.Skills);
+
+                var hasRequiredSkills =
+                    requiredSkillKeys.Count == 0 ||
+                    requiredSkillKeys.All(adviserSkillKeys.Contains);
+
+                reasons.Add(
+                    requiredSkillKeys.Count == 0
+                        ? "NO_REQUIRED_SKILLS"
+                        : $"REQUIRED_SKILLS_{string.Join(",", requiredSkillKeys)}");
+
+                reasons.Add(
+                    adviserSkillKeys.Count == 0
+                        ? "ADVISER_SKILLS_NONE"
+                        : $"ADVISER_SKILLS_{string.Join(",", adviserSkillKeys)}");
+
+                if (!hasRequiredSkills)
+                {
+                    reasons.Add("MISSING_REQUIRED_SKILLS");
+                    return;
+                }
+
+                reasons.Add("REQUIRED_SKILLS_MATCHED");
 
                 var (availabilityStatus, proposedStartUtc) = EvaluateAvailability(ctx, candidate, reasons);
                 if (!ShouldIncludeByAvailability(availabilityStatus))
@@ -78,7 +110,9 @@ public sealed class LocationResponseCandidateBuilder
                     ref proposedStartUtc,
                     reasons);
 
-                var travelToBase = new TravelToBaseResult { HomeMinutes = 0, OfficeMinutes = 0 };
+                var travelToBase = unavailableForRouting
+                    ? new TravelToBaseResult { HomeMinutes = 0, OfficeMinutes = 0 }
+                    : await _routingCoordinator.BuildTravelToBaseAsync(ctx, candidate, reasons, ct);
 
                 var travelToNearestOffice = new TravelToNearestOfficeResult
                 {

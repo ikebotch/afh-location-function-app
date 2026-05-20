@@ -1,12 +1,9 @@
-using AFH.Location.Application.Abstractions;
 using AFH.Location.Application.Abstractions.Calendar;
 using AFH.Location.Application.Abstractions.Geo;
-using AFH.Location.Application.Models.V1;
 using AFH.Location.Application.Models.V1.Results;
-using AFH.Location.Application.Services.Common;
 using AFH.Location.Domain;
+using AFH.Location.Domain.Entities;
 using Microsoft.Extensions.Logging;
-using System.Threading;
 
 namespace AFH.Location.Application.Services.V1;
 
@@ -61,17 +58,17 @@ public sealed class LocationSearchRoutingCoordinator
     {
         var adviserId = candidate.Adviser.AdviserId;
 
-        if (!withinCoverage)
-        {
-            _logger.LogInformation(
-                "Travel-to-client routing skipped. AdviserId={AdviserId} WithinCoverage={WithinCoverage} MatrixAttempted={MatrixAttempted} DirectFallbackAttempted={DirectFallbackAttempted} AppliedFallback={AppliedFallback}",
-                adviserId,
-                false,
-                false,
-                false,
-                "UnverifiedTravel");
-            return new TravelToClientResult { EtaMinutes = null, DistanceMiles = null, Confidence = "Low" };
-        }
+        //if (!withinCoverage)
+        //{
+        //    _logger.LogInformation(
+        //        "Travel-to-client routing skipped. AdviserId={AdviserId} WithinCoverage={WithinCoverage} MatrixAttempted={MatrixAttempted} DirectFallbackAttempted={DirectFallbackAttempted} AppliedFallback={AppliedFallback}",
+        //        adviserId,
+        //        false,
+        //        false,
+        //        false,
+        //        "UnverifiedTravel");
+        //    return new TravelToClientResult { EtaMinutes = null, DistanceMiles = null, Confidence = "Low" };
+        //}
 
         var matrixAttempted = ctx.RoutesToClient.TryGetValue(adviserId, out var route);
         var hasOrigin = ctx.AdviserOrigins.TryGetValue(adviserId, out var routedOrigin);

@@ -1,4 +1,5 @@
 using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Services.Common;
 using AFH.Location.Domain.Entities;
 using AFH.Location.Infrastructure.Options;
 using Microsoft.Extensions.Logging;
@@ -62,11 +63,7 @@ public sealed class HttpAdviserFeedRepository : IAdviserSourceRepository
                 MailboxUserId = string.IsNullOrWhiteSpace(x.MailboxUserId) ? x.AdviserId.Trim() : x.MailboxUserId.Trim(),
                 HomePostcode = x.HomePostcode?.Trim() ?? string.Empty,
                 Region = x.Region?.Trim() ?? string.Empty,
-                Skills = (x.Skills ?? [])
-                    .Where(s => !string.IsNullOrWhiteSpace(s))
-                    .Select(s => s.Trim())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToArray(),
+                Skills = SkillNormaliser.NormaliseSkills(x.Skills),
                 Rating = x.Rating,
                 IsActive = x.IsActive,
                 IsBookable = x.IsBookable,

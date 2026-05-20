@@ -1,4 +1,5 @@
 using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Services.Common;
 using AFH.Location.Domain.Entities;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
@@ -49,7 +50,7 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
             row.BaseOfficeId = adviser.BaseOfficeId;
             row.TeamName = adviser.TeamName;
             row.ManagerId = adviser.ManagerId;
-            row.SkillsCsv = string.Join('|', adviser.Skills);
+            row.SkillsCsv = SkillNormaliser.ToCsv(adviser.Skills);
             row.Rating = adviser.Rating;
             row.IsActive = adviser.IsActive;
             row.IsBookable = adviser.IsBookable;
@@ -76,9 +77,7 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
             BaseOfficeId = entity.BaseOfficeId,
             TeamName = entity.TeamName,
             ManagerId = entity.ManagerId,
-            Skills = string.IsNullOrWhiteSpace(entity.SkillsCsv)
-                ? Array.Empty<string>()
-                : entity.SkillsCsv.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            Skills = SkillNormaliser.FromCsv(entity.SkillsCsv),
             Rating = entity.Rating,
             IsActive = entity.IsActive,
             IsBookable = entity.IsBookable,

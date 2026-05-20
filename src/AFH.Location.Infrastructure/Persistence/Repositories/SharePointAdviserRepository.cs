@@ -1,11 +1,12 @@
-﻿using AFH.Location.Domain.Entities;
-using AFH.Location.Infrastructure.Options;
-using AFH.Common.SharePointUtils.Abstractions;
+﻿using AFH.Common.SharePointUtils.Abstractions;
 using AFH.Common.SharePointUtils.Extensions;
+using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Services.Common;
+using AFH.Location.Domain.Entities;
+using AFH.Location.Infrastructure.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Graph.Models;
-using AFH.Location.Application.Abstractions.Advisers;
 
 namespace AFH.Location.Infrastructure.Persistence.Repositories;
 
@@ -117,7 +118,7 @@ public sealed class SharePointAdviserRepository : IAdviserSourceRepository
                 MailboxUserId = fields.GetString(fieldProfile, SharePointAdviserFieldNames.Email) ?? adviserId,
                 HomePostcode = postcode ?? "",
                 Region = region ?? "",
-                Skills = skills.ToArray(),
+                Skills = SkillNormaliser.NormaliseSkills(skills),
                 Rating = rating,
                 IsActive = true,
                 IsBookable = true,

@@ -1,14 +1,13 @@
-using AFH.Location.Function.Middleware;
-using AFH.Location.Infrastructure.Composition;
 using AFH.Common.Errors.Abstractions;
 using AFH.Common.Errors.AzureFunctions.DependencyInjection;
+using AFH.Location.Application.Services.Common;
+using AFH.Location.Function.Middleware;
+using AFH.Location.Infrastructure.Composition;
 using Azure.Core.Serialization;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Collections.Generic;
 using System.Text.Json;
 
 var host = new HostBuilder()
@@ -70,6 +69,8 @@ static void AddSharedErrorHandling(
     services.AddLocationErrorNotificationModule(configuration, defaultSubjectPrefix, serviceName);
     services.AddSingleton<LocationExceptionMapper>();
     services.AddSingleton<IExceptionMapper>(sp => sp.GetRequiredService<LocationExceptionMapper>());
+    services.AddTransient<AdviserCandidateSource>();
+
 }
 
 static void ConfigureWorkerSerialization(IServiceCollection services, bool caseInsensitivePropertyNames)

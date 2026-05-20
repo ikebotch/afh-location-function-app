@@ -4,6 +4,7 @@ using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AFH.Location.Infrastructure.Persistence.PolicyStore.Migrations
 {
     [DbContext(typeof(LocationPolicyDbContext))]
-    partial class LocationPolicyDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260514230722_AddLocationAvailabilityCaching")]
+    partial class AddLocationAvailabilityCaching
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
