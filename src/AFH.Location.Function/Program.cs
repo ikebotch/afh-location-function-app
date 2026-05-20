@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(app =>
@@ -82,7 +83,11 @@ static void ConfigureWorkerSerialization(IServiceCollection services, bool caseI
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-                PropertyNameCaseInsensitive = caseInsensitivePropertyNames
+                PropertyNameCaseInsensitive = caseInsensitivePropertyNames,
+                Converters =
+                {
+                    new JsonStringEnumConverter()
+                }
             });
     });
 }

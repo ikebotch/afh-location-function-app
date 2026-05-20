@@ -1,6 +1,5 @@
 ﻿using AFH.Common.Errors.Abstractions;
 using AFH.Common.Errors.Builders;
-using AFH.Common.Errors.AzureFunctions.Builders;
 using AFH.Common.Errors.Mapping;
 using AFH.Common.Errors.Models;
 using AFH.Location.Infrastructure.Logging;
@@ -19,13 +18,13 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
     private readonly ApplicationLoggingOptions _loggingOptions;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
     private readonly LocationExceptionMapper _exceptionMapper;
-    private readonly AzureFunctionErrorResponseBuilder _errorResponseBuilder;
+    private readonly ErrorResponseBuilder _errorResponseBuilder;
 
     public ExceptionHandlingMiddleware(
         IOptions<ApplicationLoggingOptions> loggingOptions,
         ILogger<ExceptionHandlingMiddleware> logger,
         LocationExceptionMapper exceptionMapper,
-        AzureFunctionErrorResponseBuilder errorResponseBuilder)
+        ErrorResponseBuilder errorResponseBuilder)
     {
         _loggingOptions = loggingOptions.Value;
         _logger = logger;
@@ -63,11 +62,21 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             TryTrackHandledExceptionTelemetry(context, mapping.MappingResult);
             await TrySendHandledExceptionEmailAsync(context, mapping.MappingResult);
 
-            context.GetInvocationResult().Value = await _errorResponseBuilder.BuildAsync(
+            context.GetInvocationResult().Value = await BuildErrorResponseAsync(
                 req,
                 mapping.MappingResult,
                 CancellationToken.None);
         }
+    }
+
+    private async Task<HttpResponseData> BuildErrorResponseAsync(
+        HttpRequestData request,
+        ExceptionMappingResult mapping,
+        CancellationToken ct)
+    {
+        var response = request.CreateResponse((System.Net.HttpStatusCode)mapping.StatusCode);
+        await response.WriteAsJsonAsync(_errorResponseBuilder.Build(mapping), ct);
+        return response;
     }
 
     private Task WriteFailureLogAsync(
