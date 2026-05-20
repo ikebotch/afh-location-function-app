@@ -1,5 +1,6 @@
 using AFH.Location.Application.Abstractions;
 using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Infrastructure.External.Maps;
@@ -74,10 +75,25 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         {
             LogCacheSummary("OneToMany", cached.Count, misses.Count, 1);
             var live = await _inner.GetOneToManyAsync(origin, misses, ct);
+
             foreach (var item in live)
             {
                 cached[item.Key] = item.Value;
-                CacheRoute(origin, misses[item.Key], item.Key, item.Value);
+
+                // Only persist genuine provider results, not synthetic fallback zeros.
+                // A real "Low" confidence result with 0 minutes and 0 miles means the
+                // provider had no route data for this pair — do not cache it, otherwise
+                // a transient provider failure poisons the cache for the failure TTL window.
+                if (!IsSyntheticFallback(item.Value) && misses.TryGetValue(item.Key, out var destCoords))
+                    CacheRoute(origin, destCoords, item.Key, item.Value);
+            }
+
+            // Destinations not returned by the provider at all get the fallback.
+            // These are never written to cache.
+            foreach (var miss in misses)
+            {
+                if (!cached.ContainsKey(miss.Key))
+                    cached[miss.Key] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
             }
         }
         else
@@ -122,6 +138,16 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
 
     private static TimeSpan GetTtl(RouteResult route)
         => route.EtaMinutes > 0 ? TimeSpan.FromMinutes(30) : TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Returns true when the result is the synthetic fallback that the provider
+    /// inserts for destinations it has no data for (EtaMinutes=0, DistanceMiles=0,
+    /// Confidence="Low"). These must not be persisted to cache.
+    /// </summary>
+    private static bool IsSyntheticFallback(RouteResult result)
+        => result.EtaMinutes == 0
+           && result.DistanceMiles == 0d
+           && string.Equals(result.Confidence, "Low", StringComparison.OrdinalIgnoreCase);
 
     private static string BuildKey((double Lat, double Lng) origin, (double Lat, double Lng) destination, string id)
         => $"{id}:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}".ToLowerInvariant();

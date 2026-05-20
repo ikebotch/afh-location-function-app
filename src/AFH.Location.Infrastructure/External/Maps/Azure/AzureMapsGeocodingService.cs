@@ -1,4 +1,4 @@
-﻿using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Abstractions.Geo;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http.Json;
 using System.Text.Encodings.Web;
@@ -29,9 +29,12 @@ public sealed class AzureMapsGeocodingService : IGeocodingService
 
         // Azure Maps Search Address (GET)
         // Key constraints:
-        // - countrySet=GB forces UK
-        // - idxSet=PAD biases towards postal address / postcode results
+        // - countrySet=GB forces UK results only
         // - typeahead=false avoids fuzzy autocomplete-like behaviour
+        // - idxSet=PAD is intentionally NOT set: PAD restricts results to point addresses
+        //   (building-level), which causes postcode queries to match wrong buildings.
+        //   Without idxSet, Azure searches all indexes including PostalCodes, returning
+        //   accurate centroid coordinates for UK postcodes.
         var url =
             $"https://atlas.microsoft.com/search/address/json" +
             $"?api-version=1.0" +
@@ -39,7 +42,6 @@ public sealed class AzureMapsGeocodingService : IGeocodingService
             $"&limit=1" +
             $"&countrySet=GB" +
             $"&typeahead=false" +
-            $"&idxSet=PAD" +
             $"&subscription-key={key}";
 
         AzureMapsSearchResponse? doc;

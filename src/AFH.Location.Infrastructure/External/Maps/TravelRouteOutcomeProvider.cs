@@ -42,9 +42,12 @@ public sealed class TravelRouteOutcomeProvider : ITravelRouteOutcomeProvider
 
             foreach (var route in routes)
             {
+                // Use >= 0 so that a genuine provider result of 0 min / 0 miles
+                // (e.g. same-coordinate or sub-60s route) is preserved as usable.
+                // Only a negative value (sentinel for unavailable) becomes null.
                 results[route.Key] = new TravelRouteOutcome(
-                    route.Value.EtaMinutes > 0 ? route.Value.EtaMinutes : null,
-                    route.Value.DistanceMiles > 0 ? route.Value.DistanceMiles : null,
+                    route.Value.EtaMinutes >= 0 ? route.Value.EtaMinutes : null,
+                    route.Value.DistanceMiles >= 0 ? route.Value.DistanceMiles : null,
                     route.Value.Confidence,
                     route.Value.ResolutionSource);
             }

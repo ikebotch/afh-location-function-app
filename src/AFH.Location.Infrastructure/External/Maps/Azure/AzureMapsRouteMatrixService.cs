@@ -1,4 +1,4 @@
-﻿using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http.Json;
@@ -215,115 +215,103 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
             throw new InvalidOperationException("AzureMaps matrix result body is empty.");
 
         using var doc = JsonDocument.Parse(body);
-
-        // Azure sometimes returns root as array
         var root = doc.RootElement;
+
+        // The async poll endpoint occasionally wraps the response in a root array.
         if (root.ValueKind == JsonValueKind.Array)
         {
             if (root.GetArrayLength() == 0)
                 throw new InvalidOperationException("AzureMaps matrix result root array is empty.");
-
             root = root[0];
         }
 
-        // matrix can be object or array
-        JsonElement matrixEl;
-        if (root.TryGetProperty("matrix", out matrixEl))
-        {
-            if (matrixEl.ValueKind == JsonValueKind.Array)
-            {
-                if (matrixEl.GetArrayLength() == 0)
-                    throw new InvalidOperationException("AzureMaps matrix array is empty.");
-
-                matrixEl = matrixEl[0];
-            }
-        }
-        else
-        {
-            // Some responses may have results at the root
-            matrixEl = root;
-        }
-
-        // results can live under matrix.results OR root.results OR matrix itself can be results array
-        JsonElement resultsEl;
-
-        if (matrixEl.ValueKind == JsonValueKind.Array)
-        {
-            resultsEl = matrixEl;
-        }
-        else if (matrixEl.ValueKind == JsonValueKind.Object && matrixEl.TryGetProperty("results", out resultsEl))
-        {
-            // ok
-        }
-        else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("results", out resultsEl))
-        {
-            // fallback
-        }
-        else
+        // The Azure Route Matrix API returns:
+        // {
+        //   "matrix": [            ← outer array, one element per origin
+        //     [                    ← inner array, one element per destination
+        //       { "statusCode": 200, "response": { "routeSummary": { ... } } },
+        //       ...
+        //     ],
+        //     ...
+        //   ],
+        //   "summary": { ... }
+        // }
+        //
+        // Cells are identified purely by position (rowIdx = originIndex, colIdx = destIndex).
+        // There are NO "originIndex" or "destinationIndex" properties on cells.
+        if (!root.TryGetProperty("matrix", out var matrixRows) ||
+            matrixRows.ValueKind != JsonValueKind.Array)
         {
             var sample = body.Length > 700 ? body[..700] + "..." : body;
-            throw new InvalidOperationException($"AzureMaps matrix response shape unexpected. Body sample: {sample}");
+            throw new InvalidOperationException(
+                $"AzureMaps matrix response is missing the 'matrix' array. Body sample: {sample}");
         }
-
-        if (resultsEl.ValueKind != JsonValueKind.Array)
-            throw new InvalidOperationException("AzureMaps matrix results is not an array.");
 
         var map = new Dictionary<(string OriginId, string DestId), RouteResult>();
 
-        foreach (var item in resultsEl.EnumerateArray())
+        var rowIdx = 0;
+        foreach (var row in matrixRows.EnumerateArray())
         {
-            // Defensive checks
-            if (!item.TryGetProperty("originIndex", out var oi) ||
-                !item.TryGetProperty("destinationIndex", out var di))
-                continue;
+            if (rowIdx >= originIds.Count)
+                break;
 
-            var oIdx = oi.GetInt32();
-            var dIdx = di.GetInt32();
-
-            if (oIdx < 0 || oIdx >= originIds.Count || dIdx < 0 || dIdx >= destIds.Count)
-                continue;
-
-            var originId = originIds[oIdx];
-            var destId = destIds[dIdx];
-
-            var statusCode = item.TryGetProperty("statusCode", out var sc) ? sc.GetInt32() : 0;
-
-            if (statusCode != 200)
+            if (row.ValueKind != JsonValueKind.Array)
             {
-                map[(originId, destId)] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
+                rowIdx++;
                 continue;
             }
 
-            // Azure can return summary under response.routeSummary or response.summary (depending on endpoint/version)
-            if (!item.TryGetProperty("response", out var resp) || resp.ValueKind != JsonValueKind.Object)
+            var originId = originIds[rowIdx];
+            var colIdx = 0;
+
+            foreach (var cell in row.EnumerateArray())
             {
-                map[(originId, destId)] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
-                continue;
+                if (colIdx >= destIds.Count)
+                    break;
+
+                var destId = destIds[colIdx];
+
+                var statusCode = cell.TryGetProperty("statusCode", out var sc) ? sc.GetInt32() : 0;
+
+                if (statusCode != 200 ||
+                    !cell.TryGetProperty("response", out var resp) ||
+                    resp.ValueKind != JsonValueKind.Object)
+                {
+                    // Cell present but not successful — record as low-confidence zero so the
+                    // caller knows the pair was attempted. Not cached (see CachedRouteMatrixService).
+                    map[(originId, destId)] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
+                    colIdx++;
+                    continue;
+                }
+
+                // Azure puts the route summary under either "routeSummary" or "summary".
+                JsonElement summary;
+                if (!resp.TryGetProperty("routeSummary", out summary) &&
+                    !resp.TryGetProperty("summary", out summary))
+                {
+                    map[(originId, destId)] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
+                    colIdx++;
+                    continue;
+                }
+
+                var lengthMeters = summary.TryGetProperty("lengthInMeters", out var lm) ? lm.GetDouble() : 0d;
+                var timeSeconds = summary.TryGetProperty("travelTimeInSeconds", out var ts) ? ts.GetInt32() : 0;
+
+                var miles = Math.Round(lengthMeters / 1609.344d, 2);
+                var minutes = (int)Math.Ceiling(timeSeconds / 60d);
+
+                // Confidence is "High" whenever Azure returned a genuine route,
+                // even if the route happens to be instantaneous (0 s).
+                map[(originId, destId)] = new RouteResult(
+                    minutes,
+                    miles,
+                    "High",
+                    TravelRouteResolutionSource.AzureMaps);
+
+                colIdx++;
             }
 
-            JsonElement summary;
-            if (!(resp.TryGetProperty("routeSummary", out summary) || resp.TryGetProperty("summary", out summary)))
-            {
-                map[(originId, destId)] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
-                continue;
-            }
-
-            var lengthMeters = summary.TryGetProperty("lengthInMeters", out var lm) ? lm.GetDouble() : 0d;
-
-            // travelTimeInSeconds sometimes appears as travelTimeInSeconds or travelTimeInSeconds (same) – keep defensive
-            var timeSeconds =
-                summary.TryGetProperty("travelTimeInSeconds", out var ts) ? ts.GetInt32() :
-                summary.TryGetProperty("travelTimeInSeconds", out ts) ? ts.GetInt32() :
-                0;
-
-            var miles = lengthMeters / 1609.344d;
-            var minutes = (int)Math.Ceiling(timeSeconds / 60d);
-
-            map[(originId, destId)] = new RouteResult(
-                minutes,
-                Math.Round(miles, 2),
-                minutes > 0 ? "High" : "Low",
-                TravelRouteResolutionSource.AzureMaps);
+            rowIdx++;
         }
 
         return map;
