@@ -815,6 +815,84 @@ public sealed class TravelCoverageServiceTests
     }
 
     [Fact]
+    public async Task TravelCoverageService_TimeDependentStableWindow_EvaluatesOnlyAnchorSlots()
+    {
+        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CM1 2FG"] = new(51.73, 0.47),
+            ["CM1 2GG"] = new(51.74, 0.48)
+        });
+        var provider = new StableTimeDependentRouteOutcomeProvider(etaMinutes: 45, distanceMiles: 25.5);
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["TravelCoverage:AdaptiveAnchors:TravelTimeToleranceMinutes"] = "5",
+                ["TravelCoverage:AdaptiveAnchors:DistanceToleranceMiles"] = "2",
+                ["TravelCoverage:AdaptiveAnchors:CoverageThresholdBuffer"] = "5",
+                ["TravelCoverage:AdaptiveAnchors:MaxExpansionDepth"] = "2",
+                ["TravelCoverage:AdaptiveAnchors:MaxEvaluatedSlots"] = "8"
+            })
+            .Build();
+
+        var service = new TravelCoverageService(resolver, provider, NullLogger<TravelCoverageService>.Instance, configuration);
+
+        var request = BuildTimeDependentRequest(
+            DateTimeOffset.Parse("2026-05-22T08:00:00Z"),
+            DateTimeOffset.Parse("2026-05-22T17:00:00Z"),
+            maxTravelTimeMinutes: 90,
+            maxDistanceMiles: 60);
+
+        var result = await service.EvaluateAsync(request, CancellationToken.None);
+
+        var destination = Assert.Single(result.Destinations);
+        Assert.Equal(18, destination.Slots.Count);
+        Assert.Equal(3, provider.CallCount);
+        Assert.Equal(
+            [
+                DateTimeOffset.Parse("2026-05-22T08:00:00Z"),
+                DateTimeOffset.Parse("2026-05-22T12:30:00Z"),
+                DateTimeOffset.Parse("2026-05-22T16:30:00Z")
+            ],
+            provider.Departures);
+    }
+
+    [Fact]
+    public async Task TravelCoverageService_TimeDependentNearCoverageThreshold_ExpandsBeyondAnchorSlots()
+    {
+        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CM1 2FG"] = new(51.73, 0.47),
+            ["CM1 2GG"] = new(51.74, 0.48)
+        });
+        var provider = new StableTimeDependentRouteOutcomeProvider(etaMinutes: 45, distanceMiles: 25.5);
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["TravelCoverage:AdaptiveAnchors:CoverageThresholdBuffer"] = "5",
+                ["TravelCoverage:AdaptiveAnchors:MaxExpansionDepth"] = "2",
+                ["TravelCoverage:AdaptiveAnchors:MaxEvaluatedSlots"] = "5"
+            })
+            .Build();
+
+        var service = new TravelCoverageService(resolver, provider, NullLogger<TravelCoverageService>.Instance, configuration);
+
+        var request = BuildTimeDependentRequest(
+            DateTimeOffset.Parse("2026-05-22T08:00:00Z"),
+            DateTimeOffset.Parse("2026-05-22T17:00:00Z"),
+            maxTravelTimeMinutes: 47,
+            maxDistanceMiles: 60);
+
+        var result = await service.EvaluateAsync(request, CancellationToken.None);
+
+        var destination = Assert.Single(result.Destinations);
+        Assert.Equal(18, destination.Slots.Count);
+        Assert.True(provider.CallCount > 3);
+        Assert.True(provider.CallCount <= 5);
+    }
+
+    [Fact]
     public async Task CachedRouteMatrixService_UsesRequestScopedInMemoryCache_ToAvoidRepeatedPersistentCacheHits()
     {
         // Arrange
@@ -877,6 +955,55 @@ public sealed class TravelCoverageServiceTests
             var results = new Dictionary<string, TravelRouteOutcome>(StringComparer.OrdinalIgnoreCase);
             results["dest-1"] = new TravelRouteOutcome(10, 5.0, "High", TravelRouteResolutionSource.AzureMaps);
             return results;
+        }
+    }
+
+    private static TravelCoverageRequest BuildTimeDependentRequest(
+        DateTimeOffset start,
+        DateTimeOffset end,
+        int maxTravelTimeMinutes,
+        double maxDistanceMiles)
+        => new()
+        {
+            SourcePostcode = "CM1 2FG",
+            TimeContext = new TravelCoverageTimeContext
+            {
+                StartTime = start,
+                EndTime = end,
+                SearchIntervalMinutes = 30,
+                TimingMode = TravelCoverageTimingMode.DepartureTime,
+                SlotResponseMode = TravelCoverageSlotResponseMode.Expanded
+            },
+            Destinations =
+            [
+                new TravelCoverageDestinationRequest
+                {
+                    CorrelationId = "dest-1",
+                    Postcode = "CM1 2GG",
+                    MaxTravelTimeMinutes = maxTravelTimeMinutes,
+                    MaxDistanceMiles = maxDistanceMiles
+                }
+            ],
+            RequestContext = new LocationRequestContext { CorrelationId = "req-1" }
+        };
+
+    private sealed class StableTimeDependentRouteOutcomeProvider(int etaMinutes, double distanceMiles) : ITravelRouteOutcomeProvider
+    {
+        public int CallCount { get; private set; }
+        public List<DateTimeOffset?> Departures { get; } = [];
+
+        public Task<IReadOnlyDictionary<string, TravelRouteOutcome>> GetOutcomesAsync(
+            TravelRouteOutcomeRequest request,
+            CancellationToken ct)
+        {
+            CallCount++;
+            Departures.Add(request.TimeContext.RequestedDepartureTime);
+
+            return Task.FromResult<IReadOnlyDictionary<string, TravelRouteOutcome>>(
+                new Dictionary<string, TravelRouteOutcome>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["dest-1"] = new(etaMinutes, distanceMiles, "High", TravelRouteResolutionSource.AzureMaps)
+                });
         }
     }
 
