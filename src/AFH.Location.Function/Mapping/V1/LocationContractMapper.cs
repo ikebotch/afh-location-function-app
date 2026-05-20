@@ -2,13 +2,103 @@ using AFH.Location.Application.Models.V1;
 using AFH.Location.Application.Models.V1.Batch;
 using AFH.Location.Application.Models.V1.Requests;
 using AFH.Location.Application.Models.V1.Results;
+using AFH.Location.Application.Models.V1.Travel;
 using AFH.Location.Contract.V1.Requests;
+using AFH.Location.Contract.V1.Requests.Travel;
 using AFH.Location.Contract.V1.Responses;
+using AFH.Location.Contract.V1.Responses.Travel;
+using AFH.Location.Domain.Travel;
+using ContractTravelCoverageStatus = AFH.Location.Contract.V1.Responses.Travel.TravelCoverageStatusV1;
+using ContractTravelRouteResolutionSource = AFH.Location.Contract.V1.Responses.Travel.TravelRouteResolutionSourceV1;
+using ContractTravelCoverageTimingMode = AFH.Location.Contract.V1.Requests.Travel.TravelCoverageTimingModeV1;
+using ApplicationTravelCoverageStatus = AFH.Location.Application.Models.V1.Travel.TravelCoverageStatus;
 
 namespace AFH.Location.Function.Mapping.V1;
 
 public static class LocationContractMapper
 {
+    public static TravelCoverageRequest ToApplicationRequest(TravelCoverageRequestV1 contract)
+    {
+        return new TravelCoverageRequest
+        {
+            SourcePostcode = contract.SourcePostcode,
+            TimeContext = new TravelCoverageTimeContext
+            {
+                RequestedDepartureTime = contract.TimeContext.RequestedDepartureTime,
+                TimingMode = contract.TimeContext.TimingMode == ContractTravelCoverageTimingMode.DepartureTime
+                    ? TravelCoverageTimingMode.DepartureTime
+                    : TravelCoverageTimingMode.TimeIndependent
+            },
+            Destinations = contract.Destinations.Select(destination => new TravelCoverageDestinationRequest
+            {
+                CorrelationId = destination.CorrelationId,
+                Postcode = destination.Postcode,
+                MaxTravelTimeMinutes = destination.MaxTravelTimeMinutes,
+                MaxDistanceMiles = destination.MaxDistanceMiles
+            }).ToList(),
+            Metadata = new TravelCoverageRequestMetadata
+            {
+                AppointmentType = contract.Metadata.AppointmentType,
+                Channel = contract.Metadata.Channel
+            },
+            RequestContext = new LocationRequestContext
+            {
+                CorrelationId = contract.RequestContext.CorrelationId,
+                RequestedBy = contract.RequestContext.RequestedBy
+            }
+        };
+    }
+
+    public static TravelCoverageResponseV1 ToContractResponse(TravelCoverageResult result)
+    {
+        return new TravelCoverageResponseV1
+        {
+            SourcePostcode = result.SourcePostcode,
+            SourceCoordinates = ToContractCoordinates(result.SourceCoordinates),
+            TimeContext = new TravelCoverageTimeContextV1
+            {
+                RequestedDepartureTime = result.TimeContext.RequestedDepartureTime,
+                TimingMode = result.TimeContext.TimingMode == TravelCoverageTimingMode.DepartureTime
+                    ? ContractTravelCoverageTimingMode.DepartureTime
+                    : ContractTravelCoverageTimingMode.TimeIndependent
+            },
+            Destinations = result.Destinations.Select(destination => new TravelCoverageDestinationOutcomeV1
+            {
+                CorrelationId = destination.CorrelationId,
+                Postcode = destination.Postcode,
+                Status = ToContractStatus(destination.Status),
+                Coordinates = ToContractCoordinates(destination.Coordinates),
+                Route = destination.Route is null
+                    ? null
+                    : new TravelRouteOutcomeV1
+                    {
+                        TravelTimeMinutes = destination.Route.TravelTimeMinutes ?? 0,
+                        TravelDistanceMiles = destination.Route.DistanceMiles ?? 0,
+                        Confidence = destination.Route.Confidence ?? string.Empty,
+                        ResolutionSource = ToContractResolutionSource(destination.Route.ResolutionSource)
+                    },
+                Coverage = destination.Coverage is null
+                    ? null
+                    : new CoverageOutcomeV1
+                    {
+                        IsWithinCoverage = destination.Coverage.IsWithinCoverage,
+                        MaxTravelTimeMinutes = destination.Coverage.MaxTravelTimeMinutes,
+                        MaxDistanceMiles = destination.Coverage.MaxDistanceMiles
+                    },
+                Warnings = destination.Warnings.Select(warning => new ApiWarning
+                {
+                    Code = warning.Code,
+                    Message = warning.Message
+                }).ToList()
+            }).ToList(),
+            RequestContext = new LocationRequestContextV1
+            {
+                CorrelationId = result.RequestContext.CorrelationId,
+                RequestedBy = result.RequestContext.RequestedBy
+            }
+        };
+    }
+
     public static LocationSearchRequest ToApplicationRequest(LocationSearchRequestV1 contract)
     {
         return new LocationSearchRequest
@@ -190,6 +280,40 @@ public static class LocationContractMapper
             Reasons = candidate.Reasons.ToList(),
             Rank = candidate.Rank,
             Score = candidate.Score
+        };
+    }
+
+    private static LocationCoordinatesV1? ToContractCoordinates(LocationCoordinates? coordinates)
+    {
+        return coordinates is null
+            ? null
+            : new LocationCoordinatesV1
+            {
+                Latitude = coordinates.Latitude,
+                Longitude = coordinates.Longitude
+            };
+    }
+
+    private static ContractTravelCoverageStatus ToContractStatus(ApplicationTravelCoverageStatus status)
+    {
+        return status switch
+        {
+            ApplicationTravelCoverageStatus.Succeeded => ContractTravelCoverageStatus.Succeeded,
+            ApplicationTravelCoverageStatus.SourcePostcodeUnresolved => ContractTravelCoverageStatus.SourcePostcodeUnresolved,
+            ApplicationTravelCoverageStatus.DestinationPostcodeUnresolved => ContractTravelCoverageStatus.DestinationPostcodeUnresolved,
+            ApplicationTravelCoverageStatus.RouteUnavailable => ContractTravelCoverageStatus.RouteUnavailable,
+            _ => ContractTravelCoverageStatus.Failed
+        };
+    }
+
+    private static ContractTravelRouteResolutionSource ToContractResolutionSource(TravelRouteResolutionSource source)
+    {
+        return source switch
+        {
+            TravelRouteResolutionSource.Cache => ContractTravelRouteResolutionSource.Cache,
+            TravelRouteResolutionSource.Database => ContractTravelRouteResolutionSource.Database,
+            TravelRouteResolutionSource.AzureMaps => ContractTravelRouteResolutionSource.AzureMaps,
+            _ => ContractTravelRouteResolutionSource.Unknown
         };
     }
 }

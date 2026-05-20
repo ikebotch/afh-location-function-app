@@ -8,6 +8,7 @@ public sealed class InMemoryRouteMatrixPolicyProvider : IRouteMatrixPolicyProvid
     private static readonly RouteMatrixPolicy Policy = new()
     {
         MaxOriginsPerCall = 50,
+        MaxDestinationsPerCall = 50,
         SuccessConfidence = "High",
         FailureConfidence = "Low"
     };

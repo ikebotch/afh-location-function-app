@@ -1,4 +1,6 @@
-﻿namespace AFH.Location.Application.Abstractions.Geo;
+﻿using AFH.Location.Domain.Travel;
+
+namespace AFH.Location.Application.Abstractions.Geo;
 
 public interface IRoutingService
 {
@@ -9,4 +11,8 @@ public interface IRoutingService
         CancellationToken ct);
 }
 
-public sealed record RouteResult(int EtaMinutes, double DistanceMiles, string Confidence);
+public sealed record RouteResult(
+    int EtaMinutes,
+    double DistanceMiles,
+    string Confidence,
+    TravelRouteResolutionSource ResolutionSource = TravelRouteResolutionSource.Unknown);

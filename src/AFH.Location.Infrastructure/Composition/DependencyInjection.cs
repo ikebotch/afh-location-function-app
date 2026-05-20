@@ -1,5 +1,7 @@
-﻿using AFH.Location.Application.Services.Common;
+﻿using AFH.Location.Application.Abstractions.Travel;
+using AFH.Location.Application.Services.Common;
 using AFH.Location.Application.Services.V1;
+using AFH.Location.Application.Services.V1.Travel;
 using AFH.Location.Infrastructure.Caching;
 using AFH.Location.Infrastructure.External.Calendar;
 using AFH.Location.Infrastructure.External.Graph;
@@ -75,6 +77,9 @@ public static class DependencyInjection
             sp.GetRequiredService<IRouteCache>(),
             sp.GetRequiredService<ILogger<CachedRouteMatrixService>>()));
         services.AddScoped<RouteMatrixCoordinator>();
+        services.AddScoped<IPostcodeCoordinateResolver, PostcodeCoordinateResolver>();
+        services.AddScoped<ITravelRouteOutcomeProvider, TravelRouteOutcomeProvider>();
+        services.AddScoped<ITravelCoverageService, TravelCoverageService>();
         services.AddSingleton<IBusinessTimeZoneProvider, BusinessTimeZoneProvider>();
         services.AddSingleton<ICoveragePresentationSettings, CoveragePresentationSettings>();
         services.AddScoped<AvailabilityEvaluator>();

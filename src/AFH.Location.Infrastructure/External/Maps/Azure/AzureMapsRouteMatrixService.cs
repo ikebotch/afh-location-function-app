@@ -1,4 +1,5 @@
 ﻿using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http.Json;
 using System.Text;
@@ -47,7 +48,7 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
             if (matrix.TryGetValue((adviserId, "DEST"), out var rr))
                 results[adviserId] = rr;
             else
-                results[adviserId] = new RouteResult(0, 0, "Low");
+                results[adviserId] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
         }
 
         return results;
@@ -78,7 +79,7 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
             if (matrix.TryGetValue(("ORIGIN", destId), out var rr))
                 results[destId] = rr;
             else
-                results[destId] = new RouteResult(0, 0, "Low");
+                results[destId] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
         }
 
         return results;
@@ -289,21 +290,21 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
 
             if (statusCode != 200)
             {
-                map[(originId, destId)] = new RouteResult(0, 0, "Low");
+                map[(originId, destId)] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
                 continue;
             }
 
             // Azure can return summary under response.routeSummary or response.summary (depending on endpoint/version)
             if (!item.TryGetProperty("response", out var resp) || resp.ValueKind != JsonValueKind.Object)
             {
-                map[(originId, destId)] = new RouteResult(0, 0, "Low");
+                map[(originId, destId)] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
                 continue;
             }
 
             JsonElement summary;
             if (!(resp.TryGetProperty("routeSummary", out summary) || resp.TryGetProperty("summary", out summary)))
             {
-                map[(originId, destId)] = new RouteResult(0, 0, "Low");
+                map[(originId, destId)] = new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps);
                 continue;
             }
 
@@ -321,7 +322,8 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
             map[(originId, destId)] = new RouteResult(
                 minutes,
                 Math.Round(miles, 2),
-                minutes > 0 ? "High" : "Low");
+                minutes > 0 ? "High" : "Low",
+                TravelRouteResolutionSource.AzureMaps);
         }
 
         return map;

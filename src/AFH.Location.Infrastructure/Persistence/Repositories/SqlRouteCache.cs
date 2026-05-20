@@ -1,4 +1,5 @@
 using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Domain.Travel;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +25,11 @@ public sealed class SqlRouteCache : IRouteCache
             return false;
         }
 
-        result = new RouteResult(entry.EtaMinutes, entry.DistanceMiles, entry.Confidence);
+        result = new RouteResult(
+            entry.EtaMinutes,
+            entry.DistanceMiles,
+            entry.Confidence,
+            TravelRouteResolutionSource.Database);
         return true;
     }
 

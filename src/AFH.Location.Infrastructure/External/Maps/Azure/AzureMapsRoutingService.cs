@@ -1,4 +1,5 @@
 ﻿using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Configuration;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -56,7 +57,7 @@ public sealed class AzureMapsRoutingService : IRoutingService
         var miles = summary.LengthInMeters / 1609.344d;
         var minutes = (int)Math.Ceiling(summary.TravelTimeInSeconds / 60d);
 
-        return new RouteResult(minutes, Math.Round(miles, 2), "High");
+        return new RouteResult(minutes, Math.Round(miles, 2), "High", TravelRouteResolutionSource.AzureMaps);
     }
 
     private sealed class RouteDirectionsResponse
