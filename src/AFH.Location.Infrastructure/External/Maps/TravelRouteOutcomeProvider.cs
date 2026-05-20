@@ -32,13 +32,17 @@ public sealed class TravelRouteOutcomeProvider : ITravelRouteOutcomeProvider
 
         foreach (var batch in Batch(request.Destinations, maxDestinations))
         {
+            var departAt = request.TimeContext?.TimingMode == TravelCoverageTimingMode.DepartureTime
+                ? request.TimeContext.RequestedDepartureTime
+                : null;
+
             var routes = await _routeMatrixService.GetOneToManyAsync(
                 (request.Source.Latitude, request.Source.Longitude),
                 batch.ToDictionary(
                     item => item.Key,
                     item => (item.Value.Latitude, item.Value.Longitude),
                     StringComparer.OrdinalIgnoreCase),
-                departAt: request.TimeContext?.RequestedDepartureTime,
+                departAt: departAt,
                 ct: ct);
 
             foreach (var route in routes)

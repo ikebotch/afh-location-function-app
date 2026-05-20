@@ -3,6 +3,7 @@ using AFH.Location.Application.Models.V1.Travel;
 using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using System.Diagnostics;
 
 namespace AFH.Location.Application.Services.V1.Travel;
 
@@ -27,11 +28,19 @@ public sealed class TravelCoverageService : ITravelCoverageService
 
     public async Task<TravelCoverageResult> EvaluateAsync(TravelCoverageRequest request, CancellationToken ct)
     {
+        var totalStopwatch = Stopwatch.StartNew();
         var sourcePostcode = NormalisePostcode(request.SourcePostcode);
         var source = await _coordinateResolver.ResolveAsync(sourcePostcode, ct);
 
         if (!source.Succeeded)
         {
+            totalStopwatch.Stop();
+            _logger.LogInformation(
+                "Location travel coverage phase timing. Phase={Phase} DurationMs={DurationMs} DestinationCount={DestinationCount}",
+                "TotalRequest",
+                totalStopwatch.ElapsedMilliseconds,
+                request.Destinations.Count);
+
             return new TravelCoverageResult
             {
                 SourcePostcode = sourcePostcode,
@@ -356,6 +365,12 @@ public sealed class TravelCoverageService : ITravelCoverageService
             request.RequestContext.CorrelationId,
             outcomes.Count,
             routeDestinations.Count);
+        totalStopwatch.Stop();
+        _logger.LogInformation(
+            "Location travel coverage phase timing. Phase={Phase} DurationMs={DurationMs} DestinationCount={DestinationCount}",
+            "TotalRequest",
+            totalStopwatch.ElapsedMilliseconds,
+            outcomes.Count);
 
         return new TravelCoverageResult
         {
@@ -372,39 +387,17 @@ public sealed class TravelCoverageService : ITravelCoverageService
         CancellationToken ct)
     {
         var distinctDestinations = destinations
-            .Select(destination => (Key: BuildDestinationKey(destination), destination.Postcode))
-            .DistinctBy(destination => destination.Key, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .GroupBy(destination => BuildDestinationKey(destination), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Postcode,
+                StringComparer.OrdinalIgnoreCase);
 
-        var maxParallelism = 8;
-        if (_configuration != null)
-        {
-            var configValStr = _configuration.GetSection("TravelCoverage:PostcodeResolutionMaxDegreeOfParallelism")?.Value;
-            if (int.TryParse(configValStr, out var configVal) && configVal > 0)
-            {
-                maxParallelism = configVal;
-            }
-        }
-
-        using var semaphore = new SemaphoreSlim(maxParallelism);
-        var tasks = distinctDestinations.Select(async destination =>
-        {
-            await semaphore.WaitAsync(ct);
-            try
-            {
-                return (destination.Key, Resolution: await _coordinateResolver.ResolveAsync(destination.Postcode, ct));
-            }
-            finally
-            {
-                semaphore.Release();
-            }
-        });
-
-        var resolved = await Task.WhenAll(tasks);
+        var resolved = await _coordinateResolver.ResolveManyAsync(distinctDestinations, ct);
 
         return resolved.ToDictionary(
             item => item.Key,
-            item => item.Resolution,
+            item => item.Value,
             StringComparer.OrdinalIgnoreCase);
     }
 

@@ -2,6 +2,7 @@ using AFH.Location.Application.Abstractions;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace AFH.Location.Infrastructure.External.Maps;
 
@@ -66,19 +67,65 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
     {
         var cached = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
         var misses = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
+        var lookupKeys = new Dictionary<string, RouteCacheLookupKeys>(StringComparer.OrdinalIgnoreCase);
+        var bulkCacheKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var cacheWrites = new Dictionary<string, RouteCacheEntry>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var destination in destinations)
         {
-            if (TryGetCachedRoute(origin, destination.Value, destination.Key, departAt, out var route))
+            var keys = new RouteCacheLookupKeys(
+                BuildKey(origin, destination.Value, destination.Key, departAt),
+                BuildSingleKey(origin, destination.Value, departAt));
+            lookupKeys[destination.Key] = keys;
+
+            if (_requestCache.TryGetValue(keys.SpecificKey, out var route) ||
+                _requestCache.TryGetValue(keys.SingleKey, out route!))
+            {
                 cached[destination.Key] = route;
-            else
-                misses[destination.Key] = destination.Value;
+                _requestCache[keys.SpecificKey] = route;
+                continue;
+            }
+
+            bulkCacheKeys.Add(keys.SpecificKey);
+            bulkCacheKeys.Add(keys.SingleKey);
+            misses[destination.Key] = destination.Value;
+        }
+
+        if (bulkCacheKeys.Count > 0)
+        {
+            var cacheReadStopwatch = Stopwatch.StartNew();
+            var cacheHits = await _cache.TryGetManyAsync(bulkCacheKeys.ToArray(), ct);
+            cacheReadStopwatch.Stop();
+            LogPhaseTiming("RouteCacheRead", cacheReadStopwatch.ElapsedMilliseconds, bulkCacheKeys.Count, cacheHits.Count);
+
+            foreach (var miss in misses.ToList())
+            {
+                var keys = lookupKeys[miss.Key];
+                if (cacheHits.TryGetValue(keys.SpecificKey, out var route) ||
+                    cacheHits.TryGetValue(keys.SingleKey, out route!))
+                {
+                    cached[miss.Key] = route;
+                    _requestCache[keys.SpecificKey] = route;
+                    _requestCache[keys.SingleKey] = route;
+                    misses.Remove(miss.Key);
+
+                    if (cacheHits.ContainsKey(keys.SingleKey) && !cacheHits.ContainsKey(keys.SpecificKey))
+                        cacheWrites[keys.SpecificKey] = new RouteCacheEntry(route, GetTtl(route));
+                }
+            }
+        }
+        else
+        {
+            LogPhaseTiming("RouteCacheRead", 0, 0, 0);
         }
 
         if (misses.Count > 0)
         {
             LogCacheSummary("OneToMany", cached.Count, misses.Count, 1);
+            var azureStopwatch = Stopwatch.StartNew();
             var live = await _inner.GetOneToManyAsync(origin, misses, departAt, ct);
+            azureStopwatch.Stop();
+            LogPhaseTiming("AzureMatrix", azureStopwatch.ElapsedMilliseconds, misses.Count, live.Count);
 
             foreach (var item in live)
             {
@@ -89,7 +136,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
                 // provider had no route data for this pair — do not cache it, otherwise
                 // a transient provider failure poisons the cache for the failure TTL window.
                 if (!IsSyntheticFallback(item.Value) && misses.TryGetValue(item.Key, out var destCoords))
-                    CacheRoute(origin, destCoords, item.Key, item.Value, departAt);
+                    AddCacheRouteWrite(origin, destCoords, item.Key, item.Value, departAt, cacheWrites);
             }
 
             // Destinations not returned by the provider at all get the fallback.
@@ -103,6 +150,19 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         else
         {
             LogCacheSummary("OneToMany", cached.Count, 0, 0);
+            LogPhaseTiming("AzureMatrix", 0, 0, 0);
+        }
+
+        if (cacheWrites.Count > 0)
+        {
+            var cacheWriteStopwatch = Stopwatch.StartNew();
+            await _cache.SetManyAsync(cacheWrites, ct);
+            cacheWriteStopwatch.Stop();
+            LogPhaseTiming("RouteCacheWrite", cacheWriteStopwatch.ElapsedMilliseconds, cacheWrites.Count, cacheWrites.Count);
+        }
+        else
+        {
+            LogPhaseTiming("RouteCacheWrite", 0, 0, 0);
         }
 
         return cached;
@@ -160,6 +220,21 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         RouteResult route,
         DateTimeOffset? departAt = null)
     {
+        var cacheWrites = new Dictionary<string, RouteCacheEntry>(StringComparer.OrdinalIgnoreCase);
+        AddCacheRouteWrite(origin, destination, id, route, departAt, cacheWrites);
+
+        foreach (var item in cacheWrites)
+            _cache.Set(item.Key, item.Value.Result, item.Value.Ttl);
+    }
+
+    private void AddCacheRouteWrite(
+        (double Lat, double Lng) origin,
+        (double Lat, double Lng) destination,
+        string id,
+        RouteResult route,
+        DateTimeOffset? departAt,
+        IDictionary<string, RouteCacheEntry> cacheWrites)
+    {
         var ttl = GetTtl(route);
         var specificKey = BuildKey(origin, destination, id, departAt);
         var singleKey = BuildSingleKey(origin, destination, departAt);
@@ -167,8 +242,8 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         _requestCache[specificKey] = route;
         _requestCache[singleKey] = route;
 
-        _cache.Set(specificKey, route, ttl);
-        _cache.Set(singleKey, route, ttl);
+        cacheWrites[specificKey] = new RouteCacheEntry(route, ttl);
+        cacheWrites[singleKey] = new RouteCacheEntry(route, ttl);
     }
 
     private static TimeSpan GetTtl(RouteResult route)
@@ -213,4 +288,16 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
             missCount,
             providerCallCount);
     }
+
+    private void LogPhaseTiming(string phase, long durationMs, int itemCount, int resultCount)
+    {
+        _logger?.LogInformation(
+            "Location travel coverage phase timing. Phase={Phase} DurationMs={DurationMs} ItemCount={ItemCount} ResultCount={ResultCount}",
+            phase,
+            durationMs,
+            itemCount,
+            resultCount);
+    }
+
+    private sealed record RouteCacheLookupKeys(string SpecificKey, string SingleKey);
 }

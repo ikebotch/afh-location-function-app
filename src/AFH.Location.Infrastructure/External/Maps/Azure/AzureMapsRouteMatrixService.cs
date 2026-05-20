@@ -1,6 +1,7 @@
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -12,11 +13,16 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
 {
     private readonly HttpClient _http;
     private readonly IConfiguration _cfg;
+    private readonly ILogger<AzureMapsRouteMatrixService>? _logger;
 
-    public AzureMapsRouteMatrixService(IHttpClientFactory httpFactory, IConfiguration cfg)
+    public AzureMapsRouteMatrixService(
+        IHttpClientFactory httpFactory,
+        IConfiguration cfg,
+        ILogger<AzureMapsRouteMatrixService>? logger = null)
     {
         _http = httpFactory.CreateClient(nameof(AzureMapsRouteMatrixService));
         _cfg = cfg;
+        _logger = logger;
     }
 
     /// <summary>
@@ -38,8 +44,20 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
             ["DEST"] = destination
         };
 
-        // Call matrix
-        var matrix = await ExecuteMatrixAsync(origins, destinations, null, ct);
+        Dictionary<(string OriginId, string DestId), RouteResult> matrix;
+        try
+        {
+            matrix = await ExecuteMatrixAsync(origins, destinations, null, ct);
+        }
+        catch (TimeoutException ex)
+        {
+            _logger?.LogWarning(
+                ex,
+                "Azure Maps route matrix timed out. OriginCount={OriginCount} DestinationCount={DestinationCount}",
+                origins.Count,
+                destinations.Count);
+            matrix = [];
+        }
 
         // Extract each adviser -> DEST cell
         var results = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
@@ -71,7 +89,20 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
             ["ORIGIN"] = origin
         };
 
-        var matrix = await ExecuteMatrixAsync(origins, destinations, departAt, ct);
+        Dictionary<(string OriginId, string DestId), RouteResult> matrix;
+        try
+        {
+            matrix = await ExecuteMatrixAsync(origins, destinations, departAt, ct);
+        }
+        catch (TimeoutException ex)
+        {
+            _logger?.LogWarning(
+                ex,
+                "Azure Maps route matrix timed out. OriginCount={OriginCount} DestinationCount={DestinationCount}",
+                origins.Count,
+                destinations.Count);
+            matrix = [];
+        }
 
         // Extract ORIGIN -> each destination id
         var results = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
@@ -186,9 +217,8 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
 
     private async Task<string> PollForMatrixResultAsync(string pollUrl, CancellationToken ct)
     {
-        // Simple polling with max attempts. You can wire this to your policy provider later.
-        const int maxAttempts = 10;
-        const int delayMs = 400;
+        var maxAttempts = GetConfiguredPositiveInt("Maps:Azure:MatrixMaxPollAttempts", 10);
+        var delayMs = GetConfiguredPositiveInt("Maps:Azure:MatrixPollDelayMs", 400);
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -196,7 +226,7 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
 
             if (pollResp.StatusCode == System.Net.HttpStatusCode.Accepted)
             {
-                await Task.Delay(delayMs, ct);
+                await Task.Delay(TimeSpan.FromMilliseconds(delayMs), ct);
                 continue;
             }
 
@@ -211,6 +241,14 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
         }
 
         throw new TimeoutException("AzureMaps matrix polling exceeded max attempts.");
+    }
+
+    private int GetConfiguredPositiveInt(string key, int defaultValue)
+    {
+        var value = _cfg.GetSection(key)?.Value;
+        return int.TryParse(value, out var parsed) && parsed > 0
+            ? parsed
+            : defaultValue;
     }
 
     private static Dictionary<(string OriginId, string DestId), RouteResult> ParseMatrix(
