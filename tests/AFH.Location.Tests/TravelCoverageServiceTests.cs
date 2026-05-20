@@ -318,6 +318,87 @@ public sealed class TravelCoverageServiceTests
         Assert.Equal(1, provider.CallCount);
     }
 
+    [Fact]
+    public async Task EvaluateAsync_SamePostcode_ShortCircuitsToZeroWithoutCallingProvider()
+    {
+        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CM1 2FG"] = new(51.73, 0.47)
+        });
+
+        var provider = new RecordingRouteOutcomeProvider();
+        var sut = new TravelCoverageService(resolver, provider, NullLogger<TravelCoverageService>.Instance);
+
+        var request = new TravelCoverageRequest
+        {
+            SourcePostcode = "CM1 2FG",
+            Destinations =
+            [
+                new TravelCoverageDestinationRequest
+                {
+                    CorrelationId = "dest-1",
+                    Postcode = "CM1 2FG",
+                    MaxTravelTimeMinutes = 30,
+                    MaxDistanceMiles = 10.0
+                }
+            ]
+        };
+
+        var result = await sut.EvaluateAsync(request, CancellationToken.None);
+
+        Assert.Single(result.Destinations);
+        var outcome = result.Destinations[0];
+
+        Assert.Equal(TravelCoverageStatus.Succeeded, outcome.Status);
+        Assert.NotNull(outcome.Route);
+        Assert.Equal(0, outcome.Route!.TravelTimeMinutes);
+        Assert.Equal(0d, outcome.Route.DistanceMiles);
+        Assert.NotNull(outcome.Coverage);
+        Assert.True(outcome.Coverage!.IsWithinCoverage);
+        Assert.Equal(0, provider.CallCount);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_SameCoordinates_ShortCircuitsToZeroWithoutCallingProvider()
+    {
+        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CM1 2FG"] = new(51.73, 0.47),
+            ["CM1 2GG"] = new(51.73, 0.47) // Same coordinates
+        });
+
+        var provider = new RecordingRouteOutcomeProvider();
+        var sut = new TravelCoverageService(resolver, provider, NullLogger<TravelCoverageService>.Instance);
+
+        var request = new TravelCoverageRequest
+        {
+            SourcePostcode = "CM1 2FG",
+            Destinations =
+            [
+                new TravelCoverageDestinationRequest
+                {
+                    CorrelationId = "dest-1",
+                    Postcode = "CM1 2GG",
+                    MaxTravelTimeMinutes = 30,
+                    MaxDistanceMiles = 10.0
+                }
+            ]
+        };
+
+        var result = await sut.EvaluateAsync(request, CancellationToken.None);
+
+        Assert.Single(result.Destinations);
+        var outcome = result.Destinations[0];
+
+        Assert.Equal(TravelCoverageStatus.Succeeded, outcome.Status);
+        Assert.NotNull(outcome.Route);
+        Assert.Equal(0, outcome.Route!.TravelTimeMinutes);
+        Assert.Equal(0d, outcome.Route.DistanceMiles);
+        Assert.NotNull(outcome.Coverage);
+        Assert.True(outcome.Coverage!.IsWithinCoverage);
+        Assert.Equal(0, provider.CallCount);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // 6. Lean API Response Mapping & Slot Generation Tests
     // ─────────────────────────────────────────────────────────────────────────
@@ -367,6 +448,8 @@ public sealed class TravelCoverageServiceTests
         Assert.NotNull(contractResponse);
         Assert.Equal("CM1 2FG", contractResponse.SourcePostcode);
         Assert.Equal("c-123", contractResponse.RequestContext.CorrelationId);
+        Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.TravelEvaluationModeV1.TimeIndependent, contractResponse.TimeContext.TravelEvaluationMode);
+        Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.SlotResponseModeV1.Grouped, contractResponse.TimeContext.SlotResponseMode);
         
         Assert.Single(contractResponse.Destinations);
         var destOutcome = contractResponse.Destinations[0];
@@ -375,20 +458,12 @@ public sealed class TravelCoverageServiceTests
         Assert.Equal(AFH.Location.Contract.V1.Responses.Travel.TravelCoverageStatusV1.Succeeded, destOutcome.Status);
         
         Assert.NotNull(destOutcome.Slots);
-        Assert.Equal(4, destOutcome.Slots.Count); // (10:00 - 08:00) = 2 hours / 30 mins = 4 slots
-        
-        Assert.All(destOutcome.Slots, slot =>
-        {
-            Assert.Equal(12, slot.TravelTimeMinutes);
-            Assert.Equal(3.5, slot.TravelDistanceMiles);
-            Assert.True(slot.IsWithinCoverage);
-        });
-
-        Assert.Equal(startTime, destOutcome.Slots[0].StartTime);
-        Assert.Equal(startTime.AddMinutes(30), destOutcome.Slots[0].EndTime);
-
-        Assert.Equal(endTime.AddMinutes(-30), destOutcome.Slots[3].StartTime);
-        Assert.Equal(endTime, destOutcome.Slots[3].EndTime);
+        var singleSlot = Assert.Single(destOutcome.Slots);
+        Assert.Equal(startTime, singleSlot.StartTime);
+        Assert.Equal(endTime, singleSlot.EndTime);
+        Assert.Equal(12, singleSlot.TravelTimeMinutes);
+        Assert.Equal(3.5, singleSlot.TravelDistanceMiles);
+        Assert.True(singleSlot.IsWithinCoverage);
     }
 
     [Fact]

@@ -12,11 +12,19 @@ public static class TravelCoverageRequestValidatorV1
         if (string.IsNullOrWhiteSpace(request.SourcePostcode))
             errors.Add("sourcePostcode is required.");
 
-        if (request.TimeContext.TimingMode == TravelCoverageTimingMode.DepartureTime
-            && request.TimeContext.RequestedDepartureTime is null)
-        {
-            errors.Add("timeContext.requestedDepartureTime is required when timingMode is DepartureTime.");
-        }
+        if (request.TimeContext.StartTime is null)
+            errors.Add("timeContext.startTime is required.");
+
+        if (request.TimeContext.EndTime is null)
+            errors.Add("timeContext.endTime is required.");
+
+        if (request.TimeContext.StartTime.HasValue && request.TimeContext.EndTime.HasValue && request.TimeContext.EndTime.Value <= request.TimeContext.StartTime.Value)
+            errors.Add("timeContext.endTime must be after timeContext.startTime.");
+
+        if (request.TimeContext.SearchIntervalMinutes is null)
+            errors.Add("timeContext.searchIntervalMinutes is required.");
+        else if (request.TimeContext.SearchIntervalMinutes <= 0)
+            errors.Add("timeContext.searchIntervalMinutes must be greater than zero.");
 
         if (request.Destinations.Count == 0)
             errors.Add("destinations is required and cannot be empty.");

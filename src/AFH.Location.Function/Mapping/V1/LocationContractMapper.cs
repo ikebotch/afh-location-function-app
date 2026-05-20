@@ -9,7 +9,8 @@ using AFH.Location.Contract.V1.Responses;
 using AFH.Location.Contract.V1.Responses.Travel;
 using AFH.Location.Domain.Travel;
 using ContractTravelCoverageStatus = AFH.Location.Contract.V1.Responses.Travel.TravelCoverageStatusV1;
-using ContractTravelCoverageTimingMode = AFH.Location.Contract.V1.Requests.Travel.TravelCoverageTimingModeV1;
+using ContractTravelEvaluationMode = AFH.Location.Contract.V1.Requests.Travel.TravelEvaluationModeV1;
+using ContractSlotResponseMode = AFH.Location.Contract.V1.Requests.Travel.SlotResponseModeV1;
 using ApplicationTravelCoverageStatus = AFH.Location.Application.Models.V1.Travel.TravelCoverageStatus;
 
 namespace AFH.Location.Function.Mapping.V1;
@@ -23,8 +24,8 @@ public static class LocationContractMapper
             SourcePostcode = contract.SourcePostcode,
             TimeContext = new TravelCoverageTimeContext
             {
-                RequestedDepartureTime = contract.TimeContext.RequestedDepartureTime,
-                TimingMode = contract.TimeContext.TimingMode == ContractTravelCoverageTimingMode.DepartureTime
+                RequestedDepartureTime = contract.TimeContext.StartTime,
+                TimingMode = contract.TimeContext.TravelEvaluationMode == ContractTravelEvaluationMode.DepartureTime
                     ? TravelCoverageTimingMode.DepartureTime
                     : TravelCoverageTimingMode.TimeIndependent,
                 StartTime = contract.TimeContext.StartTime,
@@ -38,15 +39,11 @@ public static class LocationContractMapper
                 MaxTravelTimeMinutes = destination.MaxTravelTimeMinutes,
                 MaxDistanceMiles = destination.MaxDistanceMiles
             }).ToList(),
-            Metadata = new TravelCoverageRequestMetadata
-            {
-                AppointmentType = contract.Metadata.AppointmentType,
-                Channel = contract.Metadata.Channel
-            },
+            Metadata = new TravelCoverageRequestMetadata(),
             RequestContext = new LocationRequestContext
             {
                 CorrelationId = contract.RequestContext.CorrelationId,
-                RequestedBy = contract.RequestContext.RequestedBy
+                RequestedBy = null
             }
         };
     }
@@ -58,10 +55,10 @@ public static class LocationContractMapper
             SourcePostcode = result.SourcePostcode,
             TimeContext = new TravelCoverageTimeContextV1
             {
-                RequestedDepartureTime = result.TimeContext.RequestedDepartureTime,
-                TimingMode = result.TimeContext.TimingMode == TravelCoverageTimingMode.DepartureTime
-                    ? ContractTravelCoverageTimingMode.DepartureTime
-                    : ContractTravelCoverageTimingMode.TimeIndependent,
+                TravelEvaluationMode = result.TimeContext.TimingMode == TravelCoverageTimingMode.DepartureTime
+                    ? ContractTravelEvaluationMode.DepartureTime
+                    : ContractTravelEvaluationMode.TimeIndependent,
+                SlotResponseMode = ContractSlotResponseMode.Grouped,
                 StartTime = result.TimeContext.StartTime,
                 EndTime = result.TimeContext.EndTime,
                 SearchIntervalMinutes = result.TimeContext.SearchIntervalMinutes
@@ -84,8 +81,7 @@ public static class LocationContractMapper
             }).ToList(),
             RequestContext = new LocationRequestContextV1
             {
-                CorrelationId = result.RequestContext.CorrelationId,
-                RequestedBy = result.RequestContext.RequestedBy
+                CorrelationId = result.RequestContext.CorrelationId
             }
         };
     }
@@ -299,62 +295,79 @@ public static class LocationContractMapper
         var travelDistanceMiles = destination.Route?.DistanceMiles ?? 0d;
         var isWithinCoverage = destination.Coverage?.IsWithinCoverage ?? false;
 
-        if (timeContext.StartTime.HasValue && timeContext.EndTime.HasValue)
+        if (!timeContext.StartTime.HasValue || !timeContext.EndTime.HasValue)
         {
-            var slots = new List<TravelCoverageSlotV1>();
-            var start = timeContext.StartTime.Value;
-            var end = timeContext.EndTime.Value;
-            var interval = timeContext.SearchIntervalMinutes;
-
-            if (interval.HasValue && interval.Value > 0)
+            return new List<TravelCoverageSlotV1>
             {
-                var current = start;
-                while (current < end)
+                new()
                 {
-                    var next = current.AddMinutes(interval.Value);
-                    if (next > end)
-                    {
-                        next = end;
-                    }
-
-                    slots.Add(new TravelCoverageSlotV1
-                    {
-                        StartTime = current,
-                        EndTime = next,
-                        TravelTimeMinutes = travelTimeMinutes,
-                        TravelDistanceMiles = travelDistanceMiles,
-                        IsWithinCoverage = isWithinCoverage
-                    });
-
-                    current = next;
-                }
-            }
-            else
-            {
-                slots.Add(new TravelCoverageSlotV1
-                {
-                    StartTime = start,
-                    EndTime = end,
+                    StartTime = timeContext.RequestedDepartureTime ?? timeContext.StartTime,
+                    EndTime = timeContext.EndTime,
                     TravelTimeMinutes = travelTimeMinutes,
                     TravelDistanceMiles = travelDistanceMiles,
                     IsWithinCoverage = isWithinCoverage
-                });
-            }
-
-            return slots;
+                }
+            };
         }
 
-        // Fallback/Departure Time/Missing window
-        return new List<TravelCoverageSlotV1>
+        var start = timeContext.StartTime.Value;
+        var end = timeContext.EndTime.Value;
+        var interval = timeContext.SearchIntervalMinutes ?? 30;
+        if (interval <= 0)
         {
-            new()
+            interval = 30;
+        }
+
+        // 1. Generate individual intervals
+        var intervals = new List<(DateTimeOffset Start, DateTimeOffset End)>();
+        var current = start;
+        while (current < end)
+        {
+            var next = current.AddMinutes(interval);
+            if (next > end)
             {
-                StartTime = timeContext.RequestedDepartureTime,
-                EndTime = null,
-                TravelTimeMinutes = travelTimeMinutes,
-                TravelDistanceMiles = travelDistanceMiles,
-                IsWithinCoverage = isWithinCoverage
+                next = end;
             }
-        };
+            intervals.Add((current, next));
+            current = next;
+        }
+
+        if (intervals.Count == 0)
+        {
+            return [];
+        }
+
+        // 2. Build raw slots (keeping structure ready for interval-sensitive evaluation)
+        var rawSlots = intervals.Select(inv => new TravelCoverageSlotV1
+        {
+            StartTime = inv.Start,
+            EndTime = inv.End,
+            TravelTimeMinutes = travelTimeMinutes,
+            TravelDistanceMiles = travelDistanceMiles,
+            IsWithinCoverage = isWithinCoverage
+        }).ToList();
+
+        // 3. Merge adjacent identical slots (default grouped slot response behavior)
+        var mergedSlots = new List<TravelCoverageSlotV1>();
+        var currentMerged = rawSlots[0];
+        for (int i = 1; i < rawSlots.Count; i++)
+        {
+            var nextSlot = rawSlots[i];
+            if (currentMerged.TravelTimeMinutes == nextSlot.TravelTimeMinutes &&
+                currentMerged.TravelDistanceMiles == nextSlot.TravelDistanceMiles &&
+                currentMerged.IsWithinCoverage == nextSlot.IsWithinCoverage)
+            {
+                // Merge next into current by updating EndTime
+                currentMerged = currentMerged with { EndTime = nextSlot.EndTime };
+            }
+            else
+            {
+                mergedSlots.Add(currentMerged);
+                currentMerged = nextSlot;
+            }
+        }
+        mergedSlots.Add(currentMerged);
+
+        return mergedSlots;
     }
 }

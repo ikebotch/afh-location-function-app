@@ -44,7 +44,8 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
             foreach (var item in live)
             {
                 cached[item.Key] = item.Value;
-                CacheRoute(misses[item.Key], destination, item.Key, item.Value);
+                if (!IsSyntheticFallback(item.Value) && misses.TryGetValue(item.Key, out var adviserCoords))
+                    CacheRoute(adviserCoords, destination, item.Key, item.Value);
             }
         }
         else

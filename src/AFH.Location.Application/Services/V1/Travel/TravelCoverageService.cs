@@ -38,16 +38,34 @@ public sealed class TravelCoverageService : ITravelCoverageService
         }
 
         var destinationResolutions = await ResolveDestinationsAsync(request.Destinations, ct);
-        var routeDestinations = destinationResolutions
-            .Where(item => item.Value.Succeeded)
-            .ToDictionary(
-                item => item.Key,
-                item => item.Value.Coordinates!,
-                StringComparer.OrdinalIgnoreCase);
+        
+        var routeDestinations = new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase);
+        var routes = new Dictionary<string, TravelRouteOutcome>(StringComparer.OrdinalIgnoreCase);
 
-        var routes = routeDestinations.Count == 0
-            ? new Dictionary<string, TravelRouteOutcome>(StringComparer.OrdinalIgnoreCase)
-            : await _routeOutcomeProvider.GetOutcomesAsync(
+        foreach (var item in destinationResolutions)
+        {
+            if (!item.Value.Succeeded)
+                continue;
+
+            var destPostcode = NormalisePostcode(item.Value.Postcode);
+            var destCoords = item.Value.Coordinates!;
+
+            bool isSameOrigin = string.Equals(sourcePostcode, destPostcode, StringComparison.OrdinalIgnoreCase)
+                || (source.Coordinates != null && source.Coordinates.Latitude == destCoords.Latitude && source.Coordinates.Longitude == destCoords.Longitude);
+
+            if (isSameOrigin)
+            {
+                routes[item.Key] = new TravelRouteOutcome(0, 0d, "High", TravelRouteResolutionSource.Unknown);
+            }
+            else
+            {
+                routeDestinations[item.Key] = destCoords;
+            }
+        }
+
+        if (routeDestinations.Count > 0)
+        {
+            var providerRoutes = await _routeOutcomeProvider.GetOutcomesAsync(
                 new TravelRouteOutcomeRequest
                 {
                     Source = source.Coordinates!,
@@ -55,6 +73,12 @@ public sealed class TravelCoverageService : ITravelCoverageService
                     TimeContext = request.TimeContext
                 },
                 ct);
+
+            foreach (var route in providerRoutes)
+            {
+                routes[route.Key] = route.Value;
+            }
+        }
 
         var outcomes = new List<TravelCoverageDestinationOutcome>(request.Destinations.Count);
         foreach (var destination in request.Destinations)
