@@ -3,6 +3,8 @@ using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Application.Models.V1.Travel;
 using AFH.Location.Application.Services.V1.Travel;
+using AFH.Location.Contract.V1.Requests.Travel;
+using AFH.Location.Contract.V1.Responses.Travel;
 using AFH.Location.Domain;
 using AFH.Location.Domain.Travel;
 using AFH.Location.Infrastructure.External.Maps;
@@ -502,6 +504,68 @@ public sealed class TravelCoverageServiceTests
         Assert.NotNull(destOutcome.Warnings);
         Assert.Single(destOutcome.Warnings);
         Assert.Equal("DESTINATION_POSTCODE_UNRESOLVED", destOutcome.Warnings[0].Code);
+    }
+
+    [Fact]
+    public void TravelCoverageRequestV1_DeserializesEnumValuesCaseInsensitively()
+    {
+        // Arrange — mix of all lowercase, camelCase, and PascalCase string representations of enums
+        const string json1 = """
+            {
+              "sourcePostcode": "CM1 2FG",
+              "timeContext": {
+                "travelEvaluationMode": "timeindependent",
+                "slotResponseMode": "grouped"
+              }
+            }
+            """;
+
+        const string json2 = """
+            {
+              "sourcePostcode": "CM1 2FG",
+              "timeContext": {
+                "travelEvaluationMode": "timeDependent",
+                "slotResponseMode": "expanded"
+              }
+            }
+            """;
+
+        const string json3 = """
+            {
+              "sourcePostcode": "CM1 2FG",
+              "timeContext": {
+                "travelEvaluationMode": "TIMEDEPENDENT",
+                "slotResponseMode": "summary"
+              }
+            }
+            """;
+
+        // Act
+        var req1 = System.Text.Json.JsonSerializer.Deserialize<TravelCoverageRequestV1>(json1, new System.Text.Json.JsonSerializerOptions 
+        { 
+            PropertyNameCaseInsensitive = true 
+        });
+        var req2 = System.Text.Json.JsonSerializer.Deserialize<TravelCoverageRequestV1>(json2, new System.Text.Json.JsonSerializerOptions 
+        { 
+            PropertyNameCaseInsensitive = true 
+        });
+        var req3 = System.Text.Json.JsonSerializer.Deserialize<TravelCoverageRequestV1>(json3, new System.Text.Json.JsonSerializerOptions 
+        { 
+            PropertyNameCaseInsensitive = true 
+        });
+
+        // Assert
+        Assert.NotNull(req1);
+        Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.TravelEvaluationModeV1.TimeIndependent, req1.TimeContext.TravelEvaluationMode);
+        Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.SlotResponseModeV1.Grouped, req1.TimeContext.SlotResponseMode);
+
+        Assert.NotNull(req2);
+        Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.TravelEvaluationModeV1.TimeDependent, req2.TimeContext.TravelEvaluationMode);
+        Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.SlotResponseModeV1.Expanded, req2.TimeContext.SlotResponseMode);
+
+        Assert.NotNull(req3);
+        Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.TravelEvaluationModeV1.TimeDependent, req3.TimeContext.TravelEvaluationMode);
+        Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.SlotResponseModeV1.Summary, req3.TimeContext.SlotResponseMode);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

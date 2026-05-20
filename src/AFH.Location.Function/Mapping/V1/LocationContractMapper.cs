@@ -25,7 +25,7 @@ public static class LocationContractMapper
             TimeContext = new TravelCoverageTimeContext
             {
                 RequestedDepartureTime = contract.TimeContext.StartTime,
-                TimingMode = contract.TimeContext.TravelEvaluationMode == ContractTravelEvaluationMode.DepartureTime
+                TimingMode = contract.TimeContext.TravelEvaluationMode == ContractTravelEvaluationMode.TimeDependent
                     ? TravelCoverageTimingMode.DepartureTime
                     : TravelCoverageTimingMode.TimeIndependent,
                 StartTime = contract.TimeContext.StartTime,
@@ -56,7 +56,7 @@ public static class LocationContractMapper
             TimeContext = new TravelCoverageTimeContextV1
             {
                 TravelEvaluationMode = result.TimeContext.TimingMode == TravelCoverageTimingMode.DepartureTime
-                    ? ContractTravelEvaluationMode.DepartureTime
+                    ? ContractTravelEvaluationMode.TimeDependent
                     : ContractTravelEvaluationMode.TimeIndependent,
                 SlotResponseMode = ContractSlotResponseMode.Grouped,
                 StartTime = result.TimeContext.StartTime,

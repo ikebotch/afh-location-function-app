@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace AFH.Location.Contract.V1.Requests.Travel;
 
 public sealed record TravelCoverageRequestV1
@@ -20,15 +22,19 @@ public sealed record TravelCoverageTimeContextV1
     public int? SearchIntervalMinutes { get; init; }
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum TravelEvaluationModeV1
 {
     TimeIndependent = 0,
-    DepartureTime = 1
+    TimeDependent = 1
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum SlotResponseModeV1
 {
-    Grouped = 0
+    Grouped = 0,
+    Expanded = 1,
+    Summary = 2
 }
 
 public sealed record TravelCoverageDestinationRequestV1
