@@ -371,17 +371,41 @@ public sealed class TravelCoverageService : ITravelCoverageService
         IReadOnlyList<TravelCoverageDestinationRequest> destinations,
         CancellationToken ct)
     {
-        var resolutions = new Dictionary<string, PostcodeCoordinateResolution>(StringComparer.OrdinalIgnoreCase);
-        foreach (var destination in destinations)
-        {
-            var key = BuildDestinationKey(destination);
-            if (resolutions.ContainsKey(key))
-                continue;
+        var distinctDestinations = destinations
+            .Select(destination => (Key: BuildDestinationKey(destination), destination.Postcode))
+            .DistinctBy(destination => destination.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-            resolutions[key] = await _coordinateResolver.ResolveAsync(destination.Postcode, ct);
+        var maxParallelism = 8;
+        if (_configuration != null)
+        {
+            var configValStr = _configuration.GetSection("TravelCoverage:PostcodeResolutionMaxDegreeOfParallelism")?.Value;
+            if (int.TryParse(configValStr, out var configVal) && configVal > 0)
+            {
+                maxParallelism = configVal;
+            }
         }
 
-        return resolutions;
+        using var semaphore = new SemaphoreSlim(maxParallelism);
+        var tasks = distinctDestinations.Select(async destination =>
+        {
+            await semaphore.WaitAsync(ct);
+            try
+            {
+                return (destination.Key, Resolution: await _coordinateResolver.ResolveAsync(destination.Postcode, ct));
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        var resolved = await Task.WhenAll(tasks);
+
+        return resolved.ToDictionary(
+            item => item.Key,
+            item => item.Resolution,
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static TravelCoverageDestinationOutcome BuildSourceUnresolved(TravelCoverageDestinationRequest destination)
