@@ -13,6 +13,12 @@ public sealed record TravelCoverageTimeContextV1
 {
     public DateTimeOffset? RequestedDepartureTime { get; init; }
     public TravelCoverageTimingModeV1 TimingMode { get; init; } = TravelCoverageTimingModeV1.TimeIndependent;
+    /// <summary>Window start for slot generation (inclusive).</summary>
+    public DateTimeOffset? StartTime { get; init; }
+    /// <summary>Window end for slot generation (exclusive).</summary>
+    public DateTimeOffset? EndTime { get; init; }
+    /// <summary>Duration of each slot in minutes. When omitted the full window is treated as a single slot.</summary>
+    public int? SearchIntervalMinutes { get; init; }
 }
 
 public enum TravelCoverageTimingModeV1

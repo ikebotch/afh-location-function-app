@@ -9,7 +9,6 @@ using AFH.Location.Contract.V1.Responses;
 using AFH.Location.Contract.V1.Responses.Travel;
 using AFH.Location.Domain.Travel;
 using ContractTravelCoverageStatus = AFH.Location.Contract.V1.Responses.Travel.TravelCoverageStatusV1;
-using ContractTravelRouteResolutionSource = AFH.Location.Contract.V1.Responses.Travel.TravelRouteResolutionSourceV1;
 using ContractTravelCoverageTimingMode = AFH.Location.Contract.V1.Requests.Travel.TravelCoverageTimingModeV1;
 using ApplicationTravelCoverageStatus = AFH.Location.Application.Models.V1.Travel.TravelCoverageStatus;
 
@@ -27,7 +26,10 @@ public static class LocationContractMapper
                 RequestedDepartureTime = contract.TimeContext.RequestedDepartureTime,
                 TimingMode = contract.TimeContext.TimingMode == ContractTravelCoverageTimingMode.DepartureTime
                     ? TravelCoverageTimingMode.DepartureTime
-                    : TravelCoverageTimingMode.TimeIndependent
+                    : TravelCoverageTimingMode.TimeIndependent,
+                StartTime = contract.TimeContext.StartTime,
+                EndTime = contract.TimeContext.EndTime,
+                SearchIntervalMinutes = contract.TimeContext.SearchIntervalMinutes
             },
             Destinations = contract.Destinations.Select(destination => new TravelCoverageDestinationRequest
             {
@@ -54,42 +56,31 @@ public static class LocationContractMapper
         return new TravelCoverageResponseV1
         {
             SourcePostcode = result.SourcePostcode,
-            SourceCoordinates = ToContractCoordinates(result.SourceCoordinates),
             TimeContext = new TravelCoverageTimeContextV1
             {
                 RequestedDepartureTime = result.TimeContext.RequestedDepartureTime,
                 TimingMode = result.TimeContext.TimingMode == TravelCoverageTimingMode.DepartureTime
                     ? ContractTravelCoverageTimingMode.DepartureTime
-                    : ContractTravelCoverageTimingMode.TimeIndependent
+                    : ContractTravelCoverageTimingMode.TimeIndependent,
+                StartTime = result.TimeContext.StartTime,
+                EndTime = result.TimeContext.EndTime,
+                SearchIntervalMinutes = result.TimeContext.SearchIntervalMinutes
             },
             Destinations = result.Destinations.Select(destination => new TravelCoverageDestinationOutcomeV1
             {
                 CorrelationId = destination.CorrelationId,
                 Postcode = destination.Postcode,
                 Status = ToContractStatus(destination.Status),
-                Coordinates = ToContractCoordinates(destination.Coordinates),
-                Route = destination.Route is null
+                Slots = GenerateSlots(result.TimeContext, destination),
+                Warnings = destination.Status == ApplicationTravelCoverageStatus.Succeeded
                     ? null
-                    : new TravelRouteOutcomeV1
-                    {
-                        TravelTimeMinutes = destination.Route.TravelTimeMinutes ?? 0,
-                        TravelDistanceMiles = destination.Route.DistanceMiles ?? 0,
-                        Confidence = destination.Route.Confidence ?? string.Empty,
-                        ResolutionSource = ToContractResolutionSource(destination.Route.ResolutionSource)
-                    },
-                Coverage = destination.Coverage is null
-                    ? null
-                    : new CoverageOutcomeV1
-                    {
-                        IsWithinCoverage = destination.Coverage.IsWithinCoverage,
-                        MaxTravelTimeMinutes = destination.Coverage.MaxTravelTimeMinutes,
-                        MaxDistanceMiles = destination.Coverage.MaxDistanceMiles
-                    },
-                Warnings = destination.Warnings.Select(warning => new ApiWarning
-                {
-                    Code = warning.Code,
-                    Message = warning.Message
-                }).ToList()
+                    : destination.Warnings.Any()
+                        ? destination.Warnings.Select(warning => new ApiWarning
+                          {
+                              Code = warning.Code,
+                              Message = warning.Message
+                          }).ToList()
+                        : null
             }).ToList(),
             RequestContext = new LocationRequestContextV1
             {
@@ -283,17 +274,6 @@ public static class LocationContractMapper
         };
     }
 
-    private static LocationCoordinatesV1? ToContractCoordinates(LocationCoordinates? coordinates)
-    {
-        return coordinates is null
-            ? null
-            : new LocationCoordinatesV1
-            {
-                Latitude = coordinates.Latitude,
-                Longitude = coordinates.Longitude
-            };
-    }
-
     private static ContractTravelCoverageStatus ToContractStatus(ApplicationTravelCoverageStatus status)
     {
         return status switch
@@ -306,14 +286,75 @@ public static class LocationContractMapper
         };
     }
 
-    private static ContractTravelRouteResolutionSource ToContractResolutionSource(TravelRouteResolutionSource source)
+    private static IReadOnlyList<TravelCoverageSlotV1>? GenerateSlots(
+        TravelCoverageTimeContext timeContext,
+        TravelCoverageDestinationOutcome destination)
     {
-        return source switch
+        if (destination.Status != ApplicationTravelCoverageStatus.Succeeded)
         {
-            TravelRouteResolutionSource.Cache => ContractTravelRouteResolutionSource.Cache,
-            TravelRouteResolutionSource.Database => ContractTravelRouteResolutionSource.Database,
-            TravelRouteResolutionSource.AzureMaps => ContractTravelRouteResolutionSource.AzureMaps,
-            _ => ContractTravelRouteResolutionSource.Unknown
+            return null;
+        }
+
+        var travelTimeMinutes = destination.Route?.TravelTimeMinutes ?? 0;
+        var travelDistanceMiles = destination.Route?.DistanceMiles ?? 0d;
+        var isWithinCoverage = destination.Coverage?.IsWithinCoverage ?? false;
+
+        if (timeContext.StartTime.HasValue && timeContext.EndTime.HasValue)
+        {
+            var slots = new List<TravelCoverageSlotV1>();
+            var start = timeContext.StartTime.Value;
+            var end = timeContext.EndTime.Value;
+            var interval = timeContext.SearchIntervalMinutes;
+
+            if (interval.HasValue && interval.Value > 0)
+            {
+                var current = start;
+                while (current < end)
+                {
+                    var next = current.AddMinutes(interval.Value);
+                    if (next > end)
+                    {
+                        next = end;
+                    }
+
+                    slots.Add(new TravelCoverageSlotV1
+                    {
+                        StartTime = current,
+                        EndTime = next,
+                        TravelTimeMinutes = travelTimeMinutes,
+                        TravelDistanceMiles = travelDistanceMiles,
+                        IsWithinCoverage = isWithinCoverage
+                    });
+
+                    current = next;
+                }
+            }
+            else
+            {
+                slots.Add(new TravelCoverageSlotV1
+                {
+                    StartTime = start,
+                    EndTime = end,
+                    TravelTimeMinutes = travelTimeMinutes,
+                    TravelDistanceMiles = travelDistanceMiles,
+                    IsWithinCoverage = isWithinCoverage
+                });
+            }
+
+            return slots;
+        }
+
+        // Fallback/Departure Time/Missing window
+        return new List<TravelCoverageSlotV1>
+        {
+            new()
+            {
+                StartTime = timeContext.RequestedDepartureTime,
+                EndTime = null,
+                TravelTimeMinutes = travelTimeMinutes,
+                TravelDistanceMiles = travelDistanceMiles,
+                IsWithinCoverage = isWithinCoverage
+            }
         };
     }
 }

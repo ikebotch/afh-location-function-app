@@ -319,6 +319,117 @@ public sealed class TravelCoverageServiceTests
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // 6. Lean API Response Mapping & Slot Generation Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void LocationContractMapper_ToContractResponse_WithTimeIndependentWindow_GeneratesCorrectSlots()
+    {
+        // Arrange
+        var startTime = DateTimeOffset.Parse("2026-05-20T08:00:00Z");
+        var endTime = DateTimeOffset.Parse("2026-05-20T10:00:00Z");
+
+        var result = new TravelCoverageResult
+        {
+            SourcePostcode = "CM1 2FG",
+            SourceCoordinates = new LocationCoordinates(51.73, 0.47),
+            TimeContext = new TravelCoverageTimeContext
+            {
+                TimingMode = TravelCoverageTimingMode.TimeIndependent,
+                StartTime = startTime,
+                EndTime = endTime,
+                SearchIntervalMinutes = 30
+            },
+            RequestContext = new LocationRequestContext { CorrelationId = "c-123", RequestedBy = "test-user" },
+            Destinations =
+            [
+                new TravelCoverageDestinationOutcome
+                {
+                    CorrelationId = "dest-1",
+                    Postcode = "CM1 2GG",
+                    Status = TravelCoverageStatus.Succeeded,
+                    Coordinates = new LocationCoordinates(51.74, 0.48),
+                    Route = new TravelRouteOutcome(12, 3.5, "High", TravelRouteResolutionSource.AzureMaps),
+                    Coverage = new TravelCoverageOutcome
+                    {
+                        IsWithinCoverage = true,
+                        MaxTravelTimeMinutes = 30,
+                        MaxDistanceMiles = 10.0
+                    }
+                }
+            ]
+        };
+
+        // Act
+        var contractResponse = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(result);
+
+        // Assert
+        Assert.NotNull(contractResponse);
+        Assert.Equal("CM1 2FG", contractResponse.SourcePostcode);
+        Assert.Equal("c-123", contractResponse.RequestContext.CorrelationId);
+        
+        Assert.Single(contractResponse.Destinations);
+        var destOutcome = contractResponse.Destinations[0];
+        Assert.Equal("dest-1", destOutcome.CorrelationId);
+        Assert.Equal("CM1 2GG", destOutcome.Postcode);
+        Assert.Equal(AFH.Location.Contract.V1.Responses.Travel.TravelCoverageStatusV1.Succeeded, destOutcome.Status);
+        
+        Assert.NotNull(destOutcome.Slots);
+        Assert.Equal(4, destOutcome.Slots.Count); // (10:00 - 08:00) = 2 hours / 30 mins = 4 slots
+        
+        Assert.All(destOutcome.Slots, slot =>
+        {
+            Assert.Equal(12, slot.TravelTimeMinutes);
+            Assert.Equal(3.5, slot.TravelDistanceMiles);
+            Assert.True(slot.IsWithinCoverage);
+        });
+
+        Assert.Equal(startTime, destOutcome.Slots[0].StartTime);
+        Assert.Equal(startTime.AddMinutes(30), destOutcome.Slots[0].EndTime);
+
+        Assert.Equal(endTime.AddMinutes(-30), destOutcome.Slots[3].StartTime);
+        Assert.Equal(endTime, destOutcome.Slots[3].EndTime);
+    }
+
+    [Fact]
+    public void LocationContractMapper_ToContractResponse_OnFailure_HasNullSlotsAndPopulatedWarnings()
+    {
+        // Arrange
+        var result = new TravelCoverageResult
+        {
+            SourcePostcode = "CM1 2FG",
+            TimeContext = new TravelCoverageTimeContext
+            {
+                TimingMode = TravelCoverageTimingMode.TimeIndependent
+            },
+            RequestContext = new LocationRequestContext { CorrelationId = "c-123" },
+            Destinations =
+            [
+                new TravelCoverageDestinationOutcome
+                {
+                    CorrelationId = "dest-1",
+                    Postcode = "CM1 2GG",
+                    Status = TravelCoverageStatus.DestinationPostcodeUnresolved,
+                    Warnings = [new TravelCoverageWarning("DESTINATION_POSTCODE_UNRESOLVED", "Unresolved")]
+                }
+            ]
+        };
+
+        // Act
+        var contractResponse = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(result);
+
+        // Assert
+        Assert.NotNull(contractResponse);
+        Assert.Single(contractResponse.Destinations);
+        var destOutcome = contractResponse.Destinations[0];
+        Assert.Equal(AFH.Location.Contract.V1.Responses.Travel.TravelCoverageStatusV1.DestinationPostcodeUnresolved, destOutcome.Status);
+        Assert.Null(destOutcome.Slots);
+        Assert.NotNull(destOutcome.Warnings);
+        Assert.Single(destOutcome.Warnings);
+        Assert.Equal("DESTINATION_POSTCODE_UNRESOLVED", destOutcome.Warnings[0].Code);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Test doubles
     // ─────────────────────────────────────────────────────────────────────────
 
