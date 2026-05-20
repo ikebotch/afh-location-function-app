@@ -819,7 +819,8 @@ public sealed class LocationPerformanceGuardTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
             => throw new NotSupportedException();
     }
 
@@ -892,7 +893,8 @@ public sealed class LocationPerformanceGuardTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
             => Task.FromResult<IReadOnlyDictionary<string, RouteResult>>(
                 new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
     }
@@ -918,7 +920,8 @@ public sealed class LocationPerformanceGuardTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
         {
             OneToManyCalls++;
             IReadOnlyDictionary<string, RouteResult> result = destinations.ToDictionary(
@@ -951,7 +954,8 @@ public sealed class LocationPerformanceGuardTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
             => Task.FromResult<IReadOnlyDictionary<string, RouteResult>>(
                 new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
     }
@@ -978,7 +982,8 @@ public sealed class LocationPerformanceGuardTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
         {
             OneToManyCalls++;
             OneToManyDestinationCounts.Add(destinations.Count);
@@ -1013,7 +1018,8 @@ public sealed class LocationPerformanceGuardTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
             => Task.FromResult<IReadOnlyDictionary<string, RouteResult>>(
                 new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
     }

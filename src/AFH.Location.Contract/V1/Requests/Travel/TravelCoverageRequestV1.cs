@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace AFH.Location.Contract.V1.Requests.Travel;
 
@@ -22,19 +23,49 @@ public sealed record TravelCoverageTimeContextV1
     public int? SearchIntervalMinutes { get; init; }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(CaseInsensitiveEnumConverter<TravelEvaluationModeV1>))]
 public enum TravelEvaluationModeV1
 {
     TimeIndependent = 0,
     TimeDependent = 1
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(CaseInsensitiveEnumConverter<SlotResponseModeV1>))]
 public enum SlotResponseModeV1
 {
     Grouped = 0,
     Expanded = 1,
     Summary = 2
+}
+
+public class CaseInsensitiveEnumConverter<T> : JsonConverter<T> where T : struct, Enum
+{
+    public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            var str = reader.GetString();
+            if (Enum.TryParse<T>(str, ignoreCase: true, out var result))
+            {
+                return result;
+            }
+        }
+        else if (reader.TokenType == JsonTokenType.Number)
+        {
+            var val = reader.GetInt32();
+            if (Enum.IsDefined(typeof(T), val))
+            {
+                return (T)(object)val;
+            }
+        }
+        
+        throw new JsonException($"Unable to parse enum value to {typeof(T).Name}");
+    }
+
+    public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString());
+    }
 }
 
 public sealed record TravelCoverageDestinationRequestV1

@@ -11,16 +11,32 @@ public sealed record TravelCoverageRequest
     public LocationRequestContext RequestContext { get; init; } = new();
 }
 
+public enum TravelCoverageSlotResponseMode
+{
+    Grouped = 0,
+    Expanded = 1,
+    Summary = 2
+}
+
 public sealed record TravelCoverageTimeContext
 {
     public DateTimeOffset? RequestedDepartureTime { get; init; }
     public TravelCoverageTimingMode TimingMode { get; init; } = TravelCoverageTimingMode.TimeIndependent;
+    public TravelCoverageSlotResponseMode SlotResponseMode { get; init; } = TravelCoverageSlotResponseMode.Grouped;
     /// <summary>Window start for slot generation (inclusive).</summary>
     public DateTimeOffset? StartTime { get; init; }
     /// <summary>Window end for slot generation (exclusive).</summary>
     public DateTimeOffset? EndTime { get; init; }
     /// <summary>Duration of each slot in minutes. When omitted the full window is treated as a single slot.</summary>
     public int? SearchIntervalMinutes { get; init; }
+}
+
+public sealed record TravelCoverageSlotOutcome
+{
+    public DateTimeOffset? StartTime { get; init; }
+    public DateTimeOffset? EndTime { get; init; }
+    public TravelRouteOutcome? Route { get; init; }
+    public TravelCoverageOutcome? Coverage { get; init; }
 }
 
 public sealed record TravelCoverageDestinationRequest
@@ -60,6 +76,7 @@ public sealed record TravelCoverageDestinationOutcome
     public LocationCoordinates? Coordinates { get; init; }
     public TravelRouteOutcome? Route { get; init; }
     public TravelCoverageOutcome? Coverage { get; init; }
+    public IReadOnlyList<TravelCoverageSlotOutcome> Slots { get; init; } = [];
     public IReadOnlyList<TravelCoverageWarning> Warnings { get; init; } = [];
 }
 

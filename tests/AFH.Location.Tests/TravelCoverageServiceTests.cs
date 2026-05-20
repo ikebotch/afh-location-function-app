@@ -64,7 +64,7 @@ public sealed class TravelCoverageServiceTests
         var results = await sut.GetOneToManyAsync(
             (51.73, 0.47),
             new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase) { ["dest-1"] = (51.74, 0.48) },
-            CancellationToken.None);
+            ct: CancellationToken.None);
 
         // Assert — the route must be populated, not the synthetic fallback (0, 0, "Low")
         Assert.True(results.TryGetValue("dest-1", out var route));
@@ -154,7 +154,7 @@ public sealed class TravelCoverageServiceTests
         var results = await sut.GetOneToManyAsync(
             (51.73, 0.47),
             new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase) { ["dest-1"] = (51.74, 0.48) },
-            CancellationToken.None);
+            ct: CancellationToken.None);
 
         Assert.True(results.TryGetValue("dest-1", out var route));
         Assert.Equal("Low", route.Confidence);
@@ -177,7 +177,7 @@ public sealed class TravelCoverageServiceTests
         await sut.GetOneToManyAsync(
             (51.73, 0.47),
             new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase) { ["dest-1"] = (51.74, 0.48) },
-            CancellationToken.None);
+            ct: CancellationToken.None);
 
         // Assert — nothing must have been written to the cache
         Assert.Empty(cache.Written);
@@ -193,7 +193,7 @@ public sealed class TravelCoverageServiceTests
         await sut.GetOneToManyAsync(
             (51.73, 0.47),
             new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase) { ["dest-1"] = (51.74, 0.48) },
-            CancellationToken.None);
+            ct: CancellationToken.None);
 
         // Two entries are written: the id-specific key and the single-route key
         Assert.Equal(2, cache.Written.Count);
@@ -568,6 +568,142 @@ public sealed class TravelCoverageServiceTests
         Assert.Equal(AFH.Location.Contract.V1.Requests.Travel.SlotResponseModeV1.Summary, req3.TimeContext.SlotResponseMode);
     }
 
+    [Fact]
+    public async Task EvaluateAsync_TimeDependent_HonoursSlotResponseModesAndReturnsEmptyWarningsOnSuccess()
+    {
+        // Arrange
+        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CM1 2FG"] = new(51.73, 0.47),
+            ["CM1 2GG"] = new(51.74, 0.48)
+        });
+
+        // Set up provider that returns varying ETA based on departure time:
+        // 08:00 -> ETA 45 mins
+        // 08:30 -> ETA 45 mins
+        // 09:00 -> ETA 65 mins (rush hour)
+        var provider = new TimeDependentRecordingRouteOutcomeProvider();
+        var service = new TravelCoverageService(resolver, provider, NullLogger<TravelCoverageService>.Instance);
+
+        var request = new TravelCoverageRequest
+        {
+            SourcePostcode = "CM1 2FG",
+            TimeContext = new TravelCoverageTimeContext
+            {
+                TimingMode = TravelCoverageTimingMode.DepartureTime,
+                StartTime = DateTimeOffset.Parse("2026-05-22T08:00:00Z"),
+                EndTime = DateTimeOffset.Parse("2026-05-22T09:30:00Z"),
+                SearchIntervalMinutes = 30
+            },
+            Destinations =
+            [
+                new TravelCoverageDestinationRequest
+                {
+                    CorrelationId = "dest-1",
+                    Postcode = "CM1 2GG",
+                    MaxTravelTimeMinutes = 60,
+                    MaxDistanceMiles = 30.0
+                }
+            ]
+        };
+
+        // Act & Assert 1: Expanded Mode
+        var requestExpanded = request with { TimeContext = request.TimeContext with { SlotResponseMode = TravelCoverageSlotResponseMode.Expanded } };
+        var resultExpanded = await service.EvaluateAsync(requestExpanded, CancellationToken.None);
+        var responseExpanded = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(resultExpanded);
+
+        Assert.NotNull(responseExpanded);
+        Assert.Single(responseExpanded.Destinations);
+        var destExpanded = responseExpanded.Destinations[0];
+        Assert.Equal(AFH.Location.Contract.V1.Responses.Travel.TravelCoverageStatusV1.Succeeded, destExpanded.Status);
+        Assert.NotNull(destExpanded.Warnings);
+        Assert.Empty(destExpanded.Warnings); // Verify Warnings is [] instead of null
+
+        Assert.NotNull(destExpanded.Slots);
+        Assert.Equal(3, destExpanded.Slots.Count);
+
+        // Slot 1: 08:00 - 08:30, ETA 45, within coverage
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T08:00:00Z"), destExpanded.Slots[0].StartTime);
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T08:30:00Z"), destExpanded.Slots[0].EndTime);
+        Assert.Equal(45, destExpanded.Slots[0].TravelTimeMinutes);
+        Assert.True(destExpanded.Slots[0].IsWithinCoverage);
+
+        // Slot 2: 08:30 - 09:00, ETA 45, within coverage
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T08:30:00Z"), destExpanded.Slots[1].StartTime);
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T09:00:00Z"), destExpanded.Slots[1].EndTime);
+        Assert.Equal(45, destExpanded.Slots[1].TravelTimeMinutes);
+        Assert.True(destExpanded.Slots[1].IsWithinCoverage);
+
+        // Slot 3: 09:00 - 09:30, ETA 65, NOT within coverage (exceeds 60 mins limit)
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T09:00:00Z"), destExpanded.Slots[2].StartTime);
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T09:30:00Z"), destExpanded.Slots[2].EndTime);
+        Assert.Equal(65, destExpanded.Slots[2].TravelTimeMinutes);
+        Assert.False(destExpanded.Slots[2].IsWithinCoverage);
+
+
+        // Act & Assert 2: Grouped Mode (default / requested)
+        var requestGrouped = request with { TimeContext = request.TimeContext with { SlotResponseMode = TravelCoverageSlotResponseMode.Grouped } };
+        var resultGrouped = await service.EvaluateAsync(requestGrouped, CancellationToken.None);
+        var responseGrouped = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(resultGrouped);
+
+        Assert.NotNull(responseGrouped);
+        var destGrouped = responseGrouped.Destinations[0];
+        Assert.NotNull(destGrouped.Slots);
+        
+        // Slot 1 and Slot 2 are adjacent and identical, so they merge!
+        // Slot 3 has different travel time/coverage, so it remains separate.
+        Assert.Equal(2, destGrouped.Slots.Count);
+
+        // Merged Slot 1: 08:00 - 09:00, ETA 45, within coverage
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T08:00:00Z"), destGrouped.Slots[0].StartTime);
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T09:00:00Z"), destGrouped.Slots[0].EndTime);
+        Assert.Equal(45, destGrouped.Slots[0].TravelTimeMinutes);
+        Assert.True(destGrouped.Slots[0].IsWithinCoverage);
+
+        // Separate Slot 2: 09:00 - 09:30, ETA 65, NOT within coverage
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T09:00:00Z"), destGrouped.Slots[1].StartTime);
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T09:30:00Z"), destGrouped.Slots[1].EndTime);
+        Assert.Equal(65, destGrouped.Slots[1].TravelTimeMinutes);
+        Assert.False(destGrouped.Slots[1].IsWithinCoverage);
+
+
+        // Act & Assert 3: Summary Mode
+        var requestSummary = request with { TimeContext = request.TimeContext with { SlotResponseMode = TravelCoverageSlotResponseMode.Summary } };
+        var resultSummary = await service.EvaluateAsync(requestSummary, CancellationToken.None);
+        var responseSummary = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(resultSummary);
+
+        Assert.NotNull(responseSummary);
+        var destSummary = responseSummary.Destinations[0];
+        Assert.NotNull(destSummary.Slots);
+        
+        // Single rolled up slot
+        var slotSummary = Assert.Single(destSummary.Slots);
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T08:00:00Z"), slotSummary.StartTime);
+        Assert.Equal(DateTimeOffset.Parse("2026-05-22T09:30:00Z"), slotSummary.EndTime);
+        Assert.Equal(65, slotSummary.TravelTimeMinutes); // worst-case ETA
+        Assert.Equal(25.5, slotSummary.TravelDistanceMiles);
+        Assert.False(slotSummary.IsWithinCoverage); // not all intervals are within coverage
+    }
+
+    private sealed class TimeDependentRecordingRouteOutcomeProvider : ITravelRouteOutcomeProvider
+    {
+        public Task<IReadOnlyDictionary<string, TravelRouteOutcome>> GetOutcomesAsync(
+            TravelRouteOutcomeRequest request, CancellationToken ct)
+        {
+            var results = new Dictionary<string, TravelRouteOutcome>(StringComparer.OrdinalIgnoreCase);
+            var depart = request.TimeContext?.RequestedDepartureTime;
+            
+            int eta = 45;
+            if (depart.HasValue && depart.Value.Hour == 9)
+            {
+                eta = 65; // rush hour!
+            }
+
+            results["dest-1"] = new TravelRouteOutcome(eta, 25.5, "High", TravelRouteResolutionSource.AzureMaps);
+            return Task.FromResult<IReadOnlyDictionary<string, TravelRouteOutcome>>(results);
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Test doubles
     // ─────────────────────────────────────────────────────────────────────────
@@ -631,7 +767,8 @@ public sealed class TravelCoverageServiceTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
             => Task.FromResult(_results);
     }
 
@@ -648,7 +785,8 @@ public sealed class TravelCoverageServiceTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
             => Task.FromResult<IReadOnlyDictionary<string, RouteResult>>(
                 new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
     }
@@ -667,7 +805,8 @@ public sealed class TravelCoverageServiceTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
         {
             IReadOnlyDictionary<string, RouteResult> result = destinations.ToDictionary(
                 kv => kv.Key, _ => _result, StringComparer.OrdinalIgnoreCase);

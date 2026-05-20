@@ -1,4 +1,4 @@
-﻿using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Infrastructure.External.Maps;
 
@@ -22,7 +22,7 @@ public sealed class CachedRouteMatrixServiceTests
                 ["home-1"] = (51.6, -0.2),
                 ["home-2"] = (51.7, -0.3)
             },
-            CancellationToken.None);
+            ct: CancellationToken.None);
 
         Assert.Equal(1, inner.OneToManyCallCount);
         Assert.Equal([1], inner.OneToManyBatchSizes);
@@ -46,7 +46,7 @@ public sealed class CachedRouteMatrixServiceTests
             {
                 ["home-1"] = (51.6, -0.2)
             },
-            CancellationToken.None);
+            ct: CancellationToken.None);
 
         var route = await routing.GetRouteAsync((51.5, -0.1), (51.6, -0.2), CancellationToken.None);
 
@@ -69,7 +69,8 @@ public sealed class CachedRouteMatrixServiceTests
         public Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
             (double Lat, double Lng) origin,
             IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-            CancellationToken ct)
+            DateTimeOffset? departAt = null,
+            CancellationToken ct = default)
         {
             OneToManyCallCount++;
             OneToManyBatchSizes.Add(destinations.Count);

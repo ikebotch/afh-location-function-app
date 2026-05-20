@@ -38,7 +38,8 @@ public sealed class TravelRouteOutcomeProvider : ITravelRouteOutcomeProvider
                     item => item.Key,
                     item => (item.Value.Latitude, item.Value.Longitude),
                     StringComparer.OrdinalIgnoreCase),
-                ct);
+                departAt: request.TimeContext?.RequestedDepartureTime,
+                ct: ct);
 
             foreach (var route in routes)
             {

@@ -39,7 +39,7 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
         };
 
         // Call matrix
-        var matrix = await ExecuteMatrixAsync(origins, destinations, ct);
+        var matrix = await ExecuteMatrixAsync(origins, destinations, null, ct);
 
         // Extract each adviser -> DEST cell
         var results = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
@@ -60,7 +60,8 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
     public async Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
         (double Lat, double Lng) origin,
         IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-        CancellationToken ct)
+        DateTimeOffset? departAt = null,
+        CancellationToken ct = default)
     {
         if (destinations.Count == 0)
             return new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
@@ -70,7 +71,7 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
             ["ORIGIN"] = origin
         };
 
-        var matrix = await ExecuteMatrixAsync(origins, destinations, ct);
+        var matrix = await ExecuteMatrixAsync(origins, destinations, departAt, ct);
 
         // Extract ORIGIN -> each destination id
         var results = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
@@ -92,6 +93,7 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
     private async Task<Dictionary<(string OriginId, string DestId), RouteResult>> ExecuteMatrixAsync(
         IReadOnlyDictionary<string, (double Lat, double Lng)> origins,
         IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
+        DateTimeOffset? departAt,
         CancellationToken ct)
     {
         var key = _cfg["Maps:Azure:Key"] ?? _cfg["Maps:Azure:ApiKey"]; // support either name
@@ -127,6 +129,11 @@ public sealed class AzureMapsRouteMatrixService : IRouteMatrixService
             $"&travelMode=car" +
             $"&routeType=fastest" +
             $"&subscription-key={UrlEncoder.Default.Encode(key)}";
+
+        if (departAt.HasValue)
+        {
+            url += $"&departAt={UrlEncoder.Default.Encode(departAt.Value.ToString("o"))}";
+        }
 
         using var msg = new HttpRequestMessage(HttpMethod.Post, url)
         {

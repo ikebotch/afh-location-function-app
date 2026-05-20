@@ -59,14 +59,15 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
     public async Task<IReadOnlyDictionary<string, RouteResult>> GetOneToManyAsync(
         (double Lat, double Lng) origin,
         IReadOnlyDictionary<string, (double Lat, double Lng)> destinations,
-        CancellationToken ct)
+        DateTimeOffset? departAt = null,
+        CancellationToken ct = default)
     {
         var cached = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
         var misses = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var destination in destinations)
         {
-            if (TryGetCachedRoute(origin, destination.Value, destination.Key, out var route))
+            if (TryGetCachedRoute(origin, destination.Value, destination.Key, departAt, out var route))
                 cached[destination.Key] = route;
             else
                 misses[destination.Key] = destination.Value;
@@ -75,7 +76,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         if (misses.Count > 0)
         {
             LogCacheSummary("OneToMany", cached.Count, misses.Count, 1);
-            var live = await _inner.GetOneToManyAsync(origin, misses, ct);
+            var live = await _inner.GetOneToManyAsync(origin, misses, departAt, ct);
 
             foreach (var item in live)
             {
@@ -86,7 +87,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
                 // provider had no route data for this pair — do not cache it, otherwise
                 // a transient provider failure poisons the cache for the failure TTL window.
                 if (!IsSyntheticFallback(item.Value) && misses.TryGetValue(item.Key, out var destCoords))
-                    CacheRoute(origin, destCoords, item.Key, item.Value);
+                    CacheRoute(origin, destCoords, item.Key, item.Value, departAt);
             }
 
             // Destinations not returned by the provider at all get the fallback.
@@ -111,11 +112,21 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         string id,
         out RouteResult route)
     {
-        var specificKey = BuildKey(origin, destination, id);
+        return TryGetCachedRoute(origin, destination, id, null, out route);
+    }
+
+    private bool TryGetCachedRoute(
+        (double Lat, double Lng) origin,
+        (double Lat, double Lng) destination,
+        string id,
+        DateTimeOffset? departAt,
+        out RouteResult route)
+    {
+        var specificKey = BuildKey(origin, destination, id, departAt);
         if (_cache.TryGet(specificKey, out route))
             return true;
 
-        var singleKey = BuildSingleKey(origin, destination);
+        var singleKey = BuildSingleKey(origin, destination, departAt);
         if (_cache.TryGet(singleKey, out route))
         {
             _cache.Set(specificKey, route, GetTtl(route));
@@ -130,11 +141,12 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         (double Lat, double Lng) origin,
         (double Lat, double Lng) destination,
         string id,
-        RouteResult route)
+        RouteResult route,
+        DateTimeOffset? departAt = null)
     {
         var ttl = GetTtl(route);
-        _cache.Set(BuildKey(origin, destination, id), route, ttl);
-        _cache.Set(BuildSingleKey(origin, destination), route, ttl);
+        _cache.Set(BuildKey(origin, destination, id, departAt), route, ttl);
+        _cache.Set(BuildSingleKey(origin, destination, departAt), route, ttl);
     }
 
     private static TimeSpan GetTtl(RouteResult route)
@@ -150,11 +162,25 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
            && result.DistanceMiles == 0d
            && string.Equals(result.Confidence, "Low", StringComparison.OrdinalIgnoreCase);
 
-    private static string BuildKey((double Lat, double Lng) origin, (double Lat, double Lng) destination, string id)
-        => $"{id}:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}".ToLowerInvariant();
+    private static string BuildKey((double Lat, double Lng) origin, (double Lat, double Lng) destination, string id, DateTimeOffset? departAt)
+    {
+        var baseKey = $"{id}:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}";
+        if (departAt.HasValue)
+        {
+            baseKey += $":{departAt.Value.ToString("yyyyMMddHHmm")}";
+        }
+        return baseKey.ToLowerInvariant();
+    }
 
-    private static string BuildSingleKey((double Lat, double Lng) origin, (double Lat, double Lng) destination)
-        => $"single:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}".ToLowerInvariant();
+    private static string BuildSingleKey((double Lat, double Lng) origin, (double Lat, double Lng) destination, DateTimeOffset? departAt)
+    {
+        var baseKey = $"single:{origin.Lat:F6}:{origin.Lng:F6}:{destination.Lat:F6}:{destination.Lng:F6}";
+        if (departAt.HasValue)
+        {
+            baseKey += $":{departAt.Value.ToString("yyyyMMddHHmm")}";
+        }
+        return baseKey.ToLowerInvariant();
+    }
 
     private void LogCacheSummary(string direction, int hitCount, int missCount, int providerCallCount)
     {

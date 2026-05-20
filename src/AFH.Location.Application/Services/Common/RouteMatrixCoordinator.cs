@@ -1,4 +1,4 @@
-﻿using AFH.Location.Application.Abstractions.Coverage;
+using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 
 namespace AFH.Location.Application.Services.Common;
@@ -45,7 +45,7 @@ public sealed class RouteMatrixCoordinator
                 new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase));
         }
 
-        return _matrix.GetOneToManyAsync(origin, destinations, ct);
+        return _matrix.GetOneToManyAsync(origin, destinations, departAt: null, ct: ct);
     }
 
     private static IEnumerable<IReadOnlyDictionary<string, (double Lat, double Lng)>> Batch(
