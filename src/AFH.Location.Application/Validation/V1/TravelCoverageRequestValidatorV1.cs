@@ -26,6 +26,26 @@ public static class TravelCoverageRequestValidatorV1
         else if (request.TimeContext.SearchIntervalMinutes <= 0)
             errors.Add("timeContext.searchIntervalMinutes must be greater than zero.");
 
+        if (request.TimeContext.StartTime.HasValue && request.TimeContext.EndTime.HasValue && request.TimeContext.StartTime.Value < request.TimeContext.EndTime.Value)
+        {
+            var interval = request.TimeContext.SearchIntervalMinutes ?? 30;
+            if (interval > 0)
+            {
+                var count = 0;
+                var current = request.TimeContext.StartTime.Value;
+                var end = request.TimeContext.EndTime.Value;
+                while (current < end)
+                {
+                    count++;
+                    current = current.AddMinutes(interval);
+                }
+                if (count > 24)
+                {
+                    errors.Add("The requested time range generates too many slots. Maximum allowed is 24 slots.");
+                }
+            }
+        }
+
         if (request.Destinations.Count == 0)
             errors.Add("destinations is required and cannot be empty.");
 

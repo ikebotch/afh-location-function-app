@@ -11,6 +11,8 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
     private readonly IRouteCache _cache;
     private readonly ILogger<CachedRouteMatrixService>? _logger;
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, RouteResult> _requestCache = new(StringComparer.OrdinalIgnoreCase);
+
     public CachedRouteMatrixService(
         IRouteMatrixService inner,
         IRouteCache cache,
@@ -123,12 +125,26 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         out RouteResult route)
     {
         var specificKey = BuildKey(origin, destination, id, departAt);
-        if (_cache.TryGet(specificKey, out route))
+        if (_requestCache.TryGetValue(specificKey, out route!))
             return true;
 
+        if (_cache.TryGet(specificKey, out route))
+        {
+            _requestCache[specificKey] = route;
+            return true;
+        }
+
         var singleKey = BuildSingleKey(origin, destination, departAt);
+        if (_requestCache.TryGetValue(singleKey, out route!))
+        {
+            _requestCache[specificKey] = route;
+            return true;
+        }
+
         if (_cache.TryGet(singleKey, out route))
         {
+            _requestCache[specificKey] = route;
+            _requestCache[singleKey] = route;
             _cache.Set(specificKey, route, GetTtl(route));
             return true;
         }
@@ -145,8 +161,14 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         DateTimeOffset? departAt = null)
     {
         var ttl = GetTtl(route);
-        _cache.Set(BuildKey(origin, destination, id, departAt), route, ttl);
-        _cache.Set(BuildSingleKey(origin, destination, departAt), route, ttl);
+        var specificKey = BuildKey(origin, destination, id, departAt);
+        var singleKey = BuildSingleKey(origin, destination, departAt);
+
+        _requestCache[specificKey] = route;
+        _requestCache[singleKey] = route;
+
+        _cache.Set(specificKey, route, ttl);
+        _cache.Set(singleKey, route, ttl);
     }
 
     private static TimeSpan GetTtl(RouteResult route)

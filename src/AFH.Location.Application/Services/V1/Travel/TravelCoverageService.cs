@@ -2,6 +2,7 @@ using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Application.Models.V1.Travel;
 using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace AFH.Location.Application.Services.V1.Travel;
 
@@ -10,15 +11,18 @@ public sealed class TravelCoverageService : ITravelCoverageService
     private readonly IPostcodeCoordinateResolver _coordinateResolver;
     private readonly ITravelRouteOutcomeProvider _routeOutcomeProvider;
     private readonly ILogger<TravelCoverageService> _logger;
+    private readonly IConfiguration? _configuration;
 
     public TravelCoverageService(
         IPostcodeCoordinateResolver coordinateResolver,
         ITravelRouteOutcomeProvider routeOutcomeProvider,
-        ILogger<TravelCoverageService> logger)
+        ILogger<TravelCoverageService> logger,
+        IConfiguration? configuration = null)
     {
         _coordinateResolver = coordinateResolver;
         _routeOutcomeProvider = routeOutcomeProvider;
         _logger = logger;
+        _configuration = configuration;
     }
 
     public async Task<TravelCoverageResult> EvaluateAsync(TravelCoverageRequest request, CancellationToken ct)
@@ -59,6 +63,16 @@ public sealed class TravelCoverageService : ITravelCoverageService
         }
 
         // 1. Generate sequence of time intervals
+        var maxSlots = 24;
+        if (_configuration != null)
+        {
+            var configValStr = _configuration.GetSection("TravelCoverage:MaxGeneratedSlots")?.Value;
+            if (int.TryParse(configValStr, out var configVal) && configVal > 0)
+            {
+                maxSlots = configVal;
+            }
+        }
+
         var intervals = new List<(DateTimeOffset? Start, DateTimeOffset? End)>();
         if (!request.TimeContext.StartTime.HasValue || !request.TimeContext.EndTime.HasValue)
         {
@@ -85,6 +99,12 @@ public sealed class TravelCoverageService : ITravelCoverageService
                 intervals.Add((current, next));
                 current = next;
             }
+
+            if (intervals.Count > maxSlots)
+            {
+                _logger.LogWarning("Generated {GeneratedCount} intervals, which exceeds the max configured slots of {MaxSlots}. Capping to {MaxSlots}.", intervals.Count, maxSlots, maxSlots);
+                intervals = intervals.Take(maxSlots).ToList();
+            }
         }
 
         var destinationSlots = request.Destinations.ToDictionary(
@@ -96,83 +116,121 @@ public sealed class TravelCoverageService : ITravelCoverageService
 
         if (isTimeDependent && intervals.Count > 1)
         {
-            // Evaluate routing and coverage per interval departure time
-            foreach (var interval in intervals)
+            var maxParallelism = 4;
+            if (_configuration != null)
             {
-                var intervalTimeContext = request.TimeContext with { RequestedDepartureTime = interval.Start };
-                var intervalRoutes = new Dictionary<string, TravelRouteOutcome>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (var item in destinationResolutions)
+                var configValStr = _configuration.GetSection("TravelCoverage:MaxDegreeOfParallelism")?.Value;
+                if (int.TryParse(configValStr, out var configVal) && configVal > 0)
                 {
-                    if (!item.Value.Succeeded)
-                        continue;
-
-                    var destPostcode = NormalisePostcode(item.Value.Postcode);
-                    var destCoords = item.Value.Coordinates!;
-
-                    bool isSameOrigin = string.Equals(sourcePostcode, destPostcode, StringComparison.OrdinalIgnoreCase)
-                        || (source.Coordinates != null && source.Coordinates.Latitude == destCoords.Latitude && source.Coordinates.Longitude == destCoords.Longitude);
-
-                    if (isSameOrigin)
-                    {
-                        intervalRoutes[item.Key] = new TravelRouteOutcome(0, 0d, "High", TravelRouteResolutionSource.Unknown);
-                    }
+                    maxParallelism = configVal;
                 }
+            }
 
-                var activeDestinations = routeDestinations.Keys.Where(k => !intervalRoutes.ContainsKey(k)).ToList();
-                if (activeDestinations.Count > 0)
+            // Evaluate routing and coverage per interval departure time concurrently with bounded parallelism
+            using var semaphore = new System.Threading.SemaphoreSlim(maxParallelism);
+            var tasks = intervals.Select(async (interval, index) =>
+            {
+                await semaphore.WaitAsync(ct);
+                try
                 {
-                    var batchDestinations = activeDestinations.ToDictionary(k => k, k => routeDestinations[k], StringComparer.OrdinalIgnoreCase);
-                    var providerRoutes = await _routeOutcomeProvider.GetOutcomesAsync(
-                        new TravelRouteOutcomeRequest
+                    var intervalTimeContext = request.TimeContext with { RequestedDepartureTime = interval.Start };
+                    var intervalRoutes = new Dictionary<string, TravelRouteOutcome>(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var item in destinationResolutions)
+                    {
+                        if (!item.Value.Succeeded)
+                            continue;
+
+                        var destPostcode = NormalisePostcode(item.Value.Postcode);
+                        var destCoords = item.Value.Coordinates!;
+
+                        bool isSameOrigin = string.Equals(sourcePostcode, destPostcode, StringComparison.OrdinalIgnoreCase)
+                            || (source.Coordinates != null && source.Coordinates.Latitude == destCoords.Latitude && source.Coordinates.Longitude == destCoords.Longitude);
+
+                        if (isSameOrigin)
                         {
-                            Source = source.Coordinates!,
-                            Destinations = batchDestinations,
-                            TimeContext = intervalTimeContext
-                        },
-                        ct);
-
-                    foreach (var route in providerRoutes)
-                    {
-                        intervalRoutes[route.Key] = route.Value;
-                    }
-                }
-
-                foreach (var destination in request.Destinations)
-                {
-                    var key = BuildDestinationKey(destination);
-                    if (!destinationResolutions.TryGetValue(key, out var resolved) || !resolved.Succeeded)
-                    {
-                        continue;
+                            intervalRoutes[item.Key] = new TravelRouteOutcome(0, 0d, "High", TravelRouteResolutionSource.Unknown);
+                        }
                     }
 
-                    if (!intervalRoutes.TryGetValue(key, out var route) || !route.HasUsableRoute)
+                    var activeDestinations = routeDestinations.Keys.Where(k => !intervalRoutes.ContainsKey(k)).ToList();
+                    if (activeDestinations.Count > 0)
                     {
-                        destinationSlots[key].Add(new TravelCoverageSlotOutcome
+                        var batchDestinations = activeDestinations.ToDictionary(k => k, k => routeDestinations[k], StringComparer.OrdinalIgnoreCase);
+                        var providerRoutes = await _routeOutcomeProvider.GetOutcomesAsync(
+                            new TravelRouteOutcomeRequest
+                            {
+                                Source = source.Coordinates!,
+                                Destinations = batchDestinations,
+                                TimeContext = intervalTimeContext
+                            },
+                            ct);
+
+                        foreach (var route in providerRoutes)
+                        {
+                            intervalRoutes[route.Key] = route.Value;
+                        }
+                    }
+
+                    var intervalOutcomes = new Dictionary<string, TravelCoverageSlotOutcome>(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var destination in request.Destinations)
+                    {
+                        var key = BuildDestinationKey(destination);
+                        if (!destinationResolutions.TryGetValue(key, out var resolved) || !resolved.Succeeded)
+                        {
+                            continue;
+                        }
+
+                        if (!intervalRoutes.TryGetValue(key, out var route) || !route.HasUsableRoute)
+                        {
+                            intervalOutcomes[key] = new TravelCoverageSlotOutcome
+                            {
+                                StartTime = interval.Start,
+                                EndTime = interval.End,
+                                Route = null,
+                                Coverage = null
+                            };
+                            continue;
+                        }
+
+                        var policy = new TravelCoveragePolicy(destination.MaxTravelTimeMinutes, destination.MaxDistanceMiles);
+                        var decision = policy.Evaluate(route);
+
+                        intervalOutcomes[key] = new TravelCoverageSlotOutcome
                         {
                             StartTime = interval.Start,
                             EndTime = interval.End,
-                            Route = null,
-                            Coverage = null
-                        });
-                        continue;
+                            Route = route,
+                            Coverage = new TravelCoverageOutcome
+                            {
+                                IsWithinCoverage = decision.IsWithinCoverage,
+                                MaxTravelTimeMinutes = destination.MaxTravelTimeMinutes,
+                                MaxDistanceMiles = destination.MaxDistanceMiles
+                            }
+                        };
                     }
 
-                    var policy = new TravelCoveragePolicy(destination.MaxTravelTimeMinutes, destination.MaxDistanceMiles);
-                    var decision = policy.Evaluate(route);
+                    return new { Index = index, Outcomes = intervalOutcomes };
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }).ToList();
 
-                    destinationSlots[key].Add(new TravelCoverageSlotOutcome
+            var results = await Task.WhenAll(tasks);
+            var orderedResults = results.OrderBy(r => r.Index).ToList();
+
+            foreach (var result in orderedResults)
+            {
+                foreach (var destination in request.Destinations)
+                {
+                    var key = BuildDestinationKey(destination);
+                    if (result.Outcomes.TryGetValue(key, out var slotOutcome))
                     {
-                        StartTime = interval.Start,
-                        EndTime = interval.End,
-                        Route = route,
-                        Coverage = new TravelCoverageOutcome
-                        {
-                            IsWithinCoverage = decision.IsWithinCoverage,
-                            MaxTravelTimeMinutes = destination.MaxTravelTimeMinutes,
-                            MaxDistanceMiles = destination.MaxDistanceMiles
-                        }
-                    });
+                        destinationSlots[key].Add(slotOutcome);
+                    }
                 }
             }
         }

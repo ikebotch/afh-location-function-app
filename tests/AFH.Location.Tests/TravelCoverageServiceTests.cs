@@ -705,6 +705,201 @@ public sealed class TravelCoverageServiceTests
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Performance Optimization, Bounded Parallelism, Max Slots & Cache Tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void TravelCoverageRequestValidator_RejectsOverlyLargeSlotRange_Above24Slots()
+    {
+        // Arrange
+        var request = new TravelCoverageRequest
+        {
+            SourcePostcode = "CM1 2FG",
+            TimeContext = new TravelCoverageTimeContext
+            {
+                StartTime = DateTimeOffset.Parse("2026-05-22T08:00:00Z"),
+                EndTime = DateTimeOffset.Parse("2026-05-22T21:00:00Z"), // 13 hours
+                SearchIntervalMinutes = 30, // 26 slots
+                TimingMode = TravelCoverageTimingMode.DepartureTime,
+                SlotResponseMode = TravelCoverageSlotResponseMode.Expanded
+            },
+            Destinations = new List<TravelCoverageDestinationRequest>
+            {
+                new TravelCoverageDestinationRequest
+                {
+                    CorrelationId = "dest-1",
+                    Postcode = "CM1 2GG",
+                    MaxTravelTimeMinutes = 60,
+                    MaxDistanceMiles = 30.0
+                }
+            },
+            RequestContext = new LocationRequestContext { CorrelationId = "req-1" }
+        };
+
+        // Act
+        var errors = AFH.Location.Application.Validation.V1.TravelCoverageRequestValidatorV1.Validate(request);
+
+        // Assert
+        Assert.NotEmpty(errors);
+        Assert.Contains(errors, e => e.Contains("The requested time range generates too many slots. Maximum allowed is 24 slots."));
+    }
+
+    [Fact]
+    public async Task TravelCoverageService_ExecutesTimeDependentSlotsConcurrentlyWithBoundedParallelism_AndPreservesDeterministicOrdering()
+    {
+        // Arrange
+        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CM1 2FG"] = new LocationCoordinates(51.73, 0.47),
+            ["CM1 2GG"] = new LocationCoordinates(51.74, 0.48)
+        });
+
+        var delayProvider = new DelayingRouteOutcomeProvider();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["TravelCoverage:MaxDegreeOfParallelism"] = "2",
+                ["TravelCoverage:MaxGeneratedSlots"] = "24"
+            })
+            .Build();
+
+        var service = new TravelCoverageService(resolver, delayProvider, NullLogger<TravelCoverageService>.Instance, configuration);
+
+        var request = new TravelCoverageRequest
+        {
+            SourcePostcode = "CM1 2FG",
+            TimeContext = new TravelCoverageTimeContext
+            {
+                StartTime = DateTimeOffset.Parse("2026-05-22T08:00:00Z"),
+                EndTime = DateTimeOffset.Parse("2026-05-22T12:00:00Z"), // 4 hours -> 8 slots
+                SearchIntervalMinutes = 30,
+                TimingMode = TravelCoverageTimingMode.DepartureTime,
+                SlotResponseMode = TravelCoverageSlotResponseMode.Expanded
+            },
+            Destinations = new List<TravelCoverageDestinationRequest>
+            {
+                new TravelCoverageDestinationRequest
+                {
+                    CorrelationId = "dest-1",
+                    Postcode = "CM1 2GG",
+                    MaxTravelTimeMinutes = 60,
+                    MaxDistanceMiles = 30.0
+                }
+            },
+            RequestContext = new LocationRequestContext { CorrelationId = "req-1" }
+        };
+
+        // Act
+        var result = await service.EvaluateAsync(request, CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Destinations);
+        
+        var dest = result.Destinations[0];
+        Assert.Equal(8, dest.Slots.Count);
+
+        // Assert ordering is deterministic and sequential by StartTime
+        var currentExpectedStart = DateTimeOffset.Parse("2026-05-22T08:00:00Z");
+        for (int i = 0; i < dest.Slots.Count; i++)
+        {
+            var slot = dest.Slots[i];
+            Assert.Equal(currentExpectedStart, slot.StartTime);
+            currentExpectedStart = currentExpectedStart.AddMinutes(30);
+        }
+
+        // Assert that the max concurrency did not exceed the configured limit of 2
+        Assert.True(delayProvider.MaxConcurrentCalls > 0);
+        Assert.True(delayProvider.MaxConcurrentCalls <= 2, $"Concurrency exceeded: {delayProvider.MaxConcurrentCalls}");
+    }
+
+    [Fact]
+    public async Task CachedRouteMatrixService_UsesRequestScopedInMemoryCache_ToAvoidRepeatedPersistentCacheHits()
+    {
+        // Arrange
+        var mockInner = new FixedRouteMatrixService(new RouteResult(15, 10.0, "High", TravelRouteResolutionSource.AzureMaps));
+        var mockPersistentCache = new CountingRouteCache();
+        var sut = new CachedRouteMatrixService(mockInner, mockPersistentCache);
+
+        var origin = (51.73, 0.47);
+        var destinations = new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["dest-1"] = (51.74, 0.48)
+        };
+        var departAt = DateTimeOffset.Parse("2026-05-22T08:00:00Z");
+
+        // Act - Call 1 (misses cache, queries inner, caches to persistent cache and request cache)
+        var result1 = await sut.GetOneToManyAsync(origin, destinations, departAt, CancellationToken.None);
+
+        // Act - Call 2 (in the same request context, should hit the scoped request cache directly, NOT querying persistent cache again!)
+        var result2 = await sut.GetOneToManyAsync(origin, destinations, departAt, CancellationToken.None);
+
+        // Assert
+        Assert.Single(result1);
+        Assert.Single(result2);
+        
+        // The first call did two TryGet calls (specificKey miss, singleKey miss), then stored it (Set).
+        // The second call hit in-memory request cache, so TryGet was NOT called on the persistent cache again.
+        // Thus, TryGet count on persistent cache should be exactly 2.
+        Assert.Equal(2, mockPersistentCache.TryGetCount);
+        Assert.Equal(2, mockPersistentCache.SetCount); // It sets both specific and single keys
+    }
+
+    private sealed class DelayingRouteOutcomeProvider : ITravelRouteOutcomeProvider
+    {
+        private int _activeCalls = 0;
+        private readonly object _lock = new();
+        public int MaxConcurrentCalls { get; private set; }
+
+        public async Task<IReadOnlyDictionary<string, TravelRouteOutcome>> GetOutcomesAsync(
+            TravelRouteOutcomeRequest request, CancellationToken ct)
+        {
+            int currentActive;
+            lock (_lock)
+            {
+                _activeCalls++;
+                currentActive = _activeCalls;
+                if (currentActive > MaxConcurrentCalls)
+                {
+                    MaxConcurrentCalls = currentActive;
+                }
+            }
+
+            // Simulate slight route lookup/processing latency
+            await Task.Delay(50, ct);
+
+            lock (_lock)
+            {
+                _activeCalls--;
+            }
+
+            var results = new Dictionary<string, TravelRouteOutcome>(StringComparer.OrdinalIgnoreCase);
+            results["dest-1"] = new TravelRouteOutcome(10, 5.0, "High", TravelRouteResolutionSource.AzureMaps);
+            return results;
+        }
+    }
+
+    private sealed class CountingRouteCache : IRouteCache
+    {
+        public int TryGetCount { get; private set; }
+        public int SetCount { get; private set; }
+        private readonly Dictionary<string, RouteResult> _store = new(StringComparer.OrdinalIgnoreCase);
+
+        public bool TryGet(string key, out RouteResult result)
+        {
+            TryGetCount++;
+            return _store.TryGetValue(key, out result!);
+        }
+
+        public void Set(string key, RouteResult result, TimeSpan ttl)
+        {
+            SetCount++;
+            _store[key] = result;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Test doubles
     // ─────────────────────────────────────────────────────────────────────────
 
