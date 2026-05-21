@@ -5,7 +5,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 using System.Reflection;
 using AFH.Location.Domain;
-using AFH.Location.Function.Functions.V1;
+using AFH.Location.Function.Functions.V1.Location;
 
 namespace AFH.Location.Tests;
 

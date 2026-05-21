@@ -1,8 +1,9 @@
-﻿using AFH.Common.SharePointUtils.Abstractions;
+using AFH.Adviser.Application.Services.Skills;
+using AFH.Common.SharePointUtils.Abstractions;
 using AFH.Common.SharePointUtils.Extensions;
-using AFH.Adviser.Application.Abstractions;
+using AFH.Adviser.Application.Abstractions.Repositories;
 using Entities = AFH.Adviser.Domain.Entities;
-using AFH.Adviser.Application.Advisers;
+
 using AFH.Adviser.Domain.Entities;
 using AFH.Adviser.Infrastructure.Options;
 using Microsoft.Extensions.Logging;

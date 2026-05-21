@@ -1,4 +1,5 @@
-using AFH.Location.Application.Travel;
+using AFH.Location.Application.Models.Travel;
+
 
 namespace AFH.Location.Application.Abstractions.Travel;
 

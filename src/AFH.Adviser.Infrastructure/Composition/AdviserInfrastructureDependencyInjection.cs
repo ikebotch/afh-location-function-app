@@ -1,4 +1,5 @@
-using AFH.Adviser.Application.Abstractions;
+using AFH.Adviser.Application.Abstractions.Repositories;
+using AFH.Adviser.Application.Abstractions.Clients;
 using AFH.Adviser.Infrastructure.External.Calendar;
 using AFH.Adviser.Infrastructure.Options;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
@@ -48,10 +49,10 @@ public static class AdviserInfrastructureDependencyInjection
         
         services.AddSharePoint(configuration);
         services.AddScoped<AdviserSourceRefreshCoordinator>();
-        services.AddScoped<AFH.Adviser.Application.Abstractions.IAdviserCacheSyncService, AFH.Adviser.Application.Admin.AdviserCacheSyncService>();
+        services.AddScoped<AFH.Adviser.Application.Abstractions.Sync.IAdviserCacheSyncService, AFH.Adviser.Application.Services.Sync.AdviserCacheSyncService>();
         services.AddScoped<IAdviserRepository, CachedAdviserRepository>();
-        services.AddScoped<AFH.Adviser.Application.Licences.ILicenseCatalogService, AFH.Adviser.Application.Licences.LicenseCatalogService>();
-        services.AddScoped<AFH.Adviser.Application.Admin.IAdviserCoverageFeedService, AFH.Adviser.Application.Admin.AdviserCoverageFeedService>();
+        services.AddScoped<AFH.Adviser.Application.Abstractions.Skills.IAdviserSkillCatalogService, AFH.Adviser.Application.Services.Skills.AdviserSkillCatalogService>();
+        services.AddScoped<AFH.Adviser.Application.Abstractions.Feed.IAdviserFeedService, AFH.Adviser.Application.Services.Feed.AdviserFeedService>();
 
         return services;
     }

@@ -1,7 +1,8 @@
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Travel;
-using AFH.Location.Application.Travel;
+using AFH.Location.Application.Models.Travel;
+using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Domain.Travel;
 
 namespace AFH.Location.Infrastructure.External.Maps;

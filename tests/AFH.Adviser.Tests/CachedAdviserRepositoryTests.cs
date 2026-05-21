@@ -2,7 +2,7 @@ using AFH.Adviser.Domain.Entities;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
-using AFH.Adviser.Application.Abstractions;
+using AFH.Adviser.Application.Abstractions.Repositories;
 using Entities = AFH.Adviser.Domain.Entities;
 
 namespace AFH.Adviser.Tests;

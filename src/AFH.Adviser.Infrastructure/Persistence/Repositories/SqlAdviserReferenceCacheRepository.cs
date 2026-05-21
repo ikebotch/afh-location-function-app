@@ -1,6 +1,7 @@
-using AFH.Adviser.Application.Abstractions;
+using AFH.Adviser.Application.Services.Skills;
+using AFH.Adviser.Application.Abstractions.Repositories;
 using Entities = AFH.Adviser.Domain.Entities;
-using AFH.Adviser.Application.Advisers;
+
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 using Microsoft.EntityFrameworkCore;

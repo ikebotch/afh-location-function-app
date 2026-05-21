@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using AFH.Adviser.Application.Abstractions;
+using AFH.Adviser.Application.Abstractions.Clients;
 
 namespace AFH.Adviser.Infrastructure.External.Calendar;
 

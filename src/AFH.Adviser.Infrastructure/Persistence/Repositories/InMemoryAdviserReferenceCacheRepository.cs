@@ -1,4 +1,5 @@
-using AFH.Adviser.Application.Abstractions;
+using AFH.Adviser.Application.Services.Skills;
+using AFH.Adviser.Application.Abstractions.Repositories;
 using Entities = AFH.Adviser.Domain.Entities;
 
 namespace AFH.Adviser.Infrastructure.Persistence.Repositories;

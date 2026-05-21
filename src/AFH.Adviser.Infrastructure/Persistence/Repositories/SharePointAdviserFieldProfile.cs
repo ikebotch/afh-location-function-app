@@ -1,3 +1,4 @@
+using AFH.Adviser.Application.Services.Skills;
 using AFH.Common.SharePointUtils.Abstractions;
 using AFH.Common.SharePointUtils.Models;
 using AFH.Adviser.Infrastructure.Options;

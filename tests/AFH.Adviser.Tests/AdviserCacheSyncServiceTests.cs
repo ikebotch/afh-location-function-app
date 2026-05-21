@@ -1,7 +1,10 @@
-using AFH.Adviser.Application.Abstractions;
+// using AFH.Adviser.Application.Abstractions;
 using Entities = AFH.Adviser.Domain.Entities;
 
-using AFH.Adviser.Application.Admin;
+using AFH.Adviser.Application.Abstractions.Sync;
+using AFH.Adviser.Application.Abstractions.Repositories;
+using AFH.Adviser.Application.Abstractions.Clients;
+using AFH.Adviser.Application.Services.Sync;
 using AFH.Adviser.Domain.Entities;
 using AFH.Adviser.Infrastructure.External.Calendar;
 using Microsoft.Extensions.Logging.Abstractions;
