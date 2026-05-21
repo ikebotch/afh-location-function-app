@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions.Search;
+using AFH.Location.Application.Abstractions.Licences;
 using AFH.Location.Function.Mapping.V1;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -27,7 +27,7 @@ public sealed class LicenseListFunctionV1
         CancellationToken ct)
     {
         var result = await _licenseCatalogService.GetLicensesAsync(ct);
-        var response = LocationContractMapper.ToContractResponse(result);
+        var response = LicenseCatalogContractMapper.ToContractResponse(result);
 
         var ok = req.CreateResponse(HttpStatusCode.OK);
         await ok.WriteAsJsonAsync(response, ct);

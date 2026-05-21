@@ -1,7 +1,11 @@
-﻿using AFH.Location.Application.Abstractions.Travel;
-using AFH.Location.Application.Services.Common;
-using AFH.Location.Application.Services.V1;
-using AFH.Location.Application.Services.V1.Travel;
+﻿using AFH.Location.Application.Admin;
+using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Location.Application.Abstractions.Calendar;
+using AFH.Location.Application.Abstractions.Coverage;
+using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Application.Abstractions.Travel;
+using AFH.Location.Application.Calendar;
+using AFH.Location.Application.Travel;
 using AFH.Location.Infrastructure.Caching;
 using AFH.Location.Infrastructure.External.Calendar;
 using AFH.Location.Infrastructure.External.Graph;
@@ -20,12 +24,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
-using AFH.Location.Application.Abstractions.Calendar;
-using AFH.Location.Application.Abstractions.Advisers;
-using AFH.Location.Application.Abstractions.Geo;
-using AFH.Location.Application.Abstractions.Common;
-using AFH.Location.Application.Abstractions.Coverage;
-using AFH.Location.Application.Abstractions.Search;
 
 namespace AFH.Location.Infrastructure.Composition;
 
@@ -82,7 +80,6 @@ public static class DependencyInjection
         services.AddScoped<ITravelCoverageService, TravelCoverageService>();
         services.AddScoped<IRouteTimeService, RouteTimeService>();
         services.AddSingleton<IBusinessTimeZoneProvider, BusinessTimeZoneProvider>();
-        services.AddSingleton<ICoveragePresentationSettings, CoveragePresentationSettings>();
         services.AddScoped<AvailabilityEvaluator>();
 
         services.Configure<SharePointAdviserOptions>(configuration.GetSection(SharePointAdviserOptions.SectionName));
@@ -96,13 +93,11 @@ public static class DependencyInjection
             services.AddScoped<IAdviserSourceRepository, SharePointAdviserRepository>();
         }
 
-        services.AddScoped<IOfficeRepository, InMemoryOfficeRepository>();
-
         services.AddPolicyStoreModule(configuration);
 
         services.AddMemoryCache();
         services.AddSharePoint(configuration);
-        services.AddSearchModule();
+        services.AddLocationApplicationModule();
         services.AddLoggingModule();
         services.AddScoped<LocationHandledErrorTelemetryEmitter>();
 

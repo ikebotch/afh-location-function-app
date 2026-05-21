@@ -15,7 +15,6 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("LocationHealthV1", EndpointAccessPolicy.Public)]
     [InlineData("OpenApiV1", EndpointAccessPolicy.Public)]
     [InlineData("ScalarUi", EndpointAccessPolicy.Public)]
-    [InlineData("AdviserCoverageV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("LicenseListV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("RouteTimeV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("SyncAdviserCacheV1", EndpointAccessPolicy.InternalOnly)]

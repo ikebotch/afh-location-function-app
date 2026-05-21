@@ -1,5 +1,5 @@
 using AFH.Location.Application.Abstractions.Calendar;
-using AFH.Location.Application.Models.V1.Requests;
+using AFH.Location.Application.Calendar;
 
 namespace AFH.Location.Infrastructure.External.Calendar;
 

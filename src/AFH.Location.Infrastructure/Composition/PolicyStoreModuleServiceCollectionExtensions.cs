@@ -2,7 +2,6 @@ using AFH.Common.Errors.EntityFramework.DependencyInjection;
 using AFH.Location.Application.Abstractions.Advisers;
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
-using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Infrastructure.Caching;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;
@@ -25,7 +24,6 @@ internal static class PolicyStoreModuleServiceCollectionExtensions
                 options => options.UseSqlServer(policyDbConnectionString),
                 ServiceLifetime.Scoped);
             services.AddAfhCommonErrorsEntityFramework<LocationPolicyDbContext>();
-            services.AddScoped<ICoveragePolicyProvider, SqlCoveragePolicyProvider>();
             services.AddScoped<IAdviserReferenceCacheRepository, SqlAdviserReferenceCacheRepository>();
             services.AddScoped<IGeoCache, SqlGeoCache>();
             services.AddScoped<IAdviserGeoCache, SqlGeoCache>();
@@ -33,13 +31,11 @@ internal static class PolicyStoreModuleServiceCollectionExtensions
         }
         else
         {
-            services.AddSingleton<ICoveragePolicyProvider, InMemoryCoveragePolicyProvider>();
             services.AddSingleton<IAdviserReferenceCacheRepository, InMemoryAdviserReferenceCacheRepository>();
             services.AddSingleton<IGeoCache, InMemoryGeoCache>();
             services.AddSingleton<IAdviserGeoCache, InMemoryAdviserGeoCache>();
         }
 
-        services.AddSingleton<IBaseOfficePolicyProvider, InMemoryBaseOfficePolicyProvider>();
         services.AddSingleton<IRouteMatrixPolicyProvider, InMemoryRouteMatrixPolicyProvider>();
         services.AddSingleton<IGeoCachePolicyProvider, InMemoryGeoCachePolicyProvider>();
 

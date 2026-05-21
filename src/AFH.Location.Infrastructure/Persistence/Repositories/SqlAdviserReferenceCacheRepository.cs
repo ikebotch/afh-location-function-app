@@ -1,5 +1,5 @@
 using AFH.Location.Application.Abstractions.Advisers;
-using AFH.Location.Application.Services.Common;
+using AFH.Location.Application.Advisers;
 using AFH.Location.Domain.Entities;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;

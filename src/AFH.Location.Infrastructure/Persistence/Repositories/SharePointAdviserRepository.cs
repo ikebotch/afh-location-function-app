@@ -1,7 +1,7 @@
 ﻿using AFH.Common.SharePointUtils.Abstractions;
 using AFH.Common.SharePointUtils.Extensions;
 using AFH.Location.Application.Abstractions.Advisers;
-using AFH.Location.Application.Services.Common;
+using AFH.Location.Application.Advisers;
 using AFH.Location.Domain.Entities;
 using AFH.Location.Infrastructure.Options;
 using Microsoft.Extensions.Logging;

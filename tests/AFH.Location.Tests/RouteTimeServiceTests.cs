@@ -1,6 +1,5 @@
 using AFH.Location.Application.Abstractions.Geo;
-using AFH.Location.Application.Models.V1.Travel;
-using AFH.Location.Application.Services.V1.Travel;
+using AFH.Location.Application.Travel;
 using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Logging.Abstractions;
 

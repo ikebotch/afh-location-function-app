@@ -1,6 +1,6 @@
 using AFH.Location.Application.Abstractions.Advisers;
 using AFH.Location.Application.Abstractions.Calendar;
-using AFH.Location.Application.Services.V1;
+using AFH.Location.Application.Admin;
 using AFH.Location.Domain.Entities;
 using AFH.Location.Infrastructure.External.Calendar;
 using Microsoft.Extensions.Logging.Abstractions;

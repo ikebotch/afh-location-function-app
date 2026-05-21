@@ -1,4 +1,4 @@
-﻿namespace AFH.Location.Application.Services.Common.Enums;
+﻿namespace AFH.Location.Domain.Enums;
 
 public enum OriginSource
 {

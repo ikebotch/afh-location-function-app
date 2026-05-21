@@ -1,5 +1,5 @@
 using AFH.Location.Application.Abstractions.Travel;
-using AFH.Location.Application.Validation.V1;
+using AFH.Location.Application.Travel;
 using AFH.Location.Contract.V1.Requests.Travel;
 using AFH.Location.Function.Functions.Common;
 using AFH.Location.Function.Mapping.V1;
@@ -40,8 +40,8 @@ public sealed class RouteTimeFunctionV1
                 ct);
         }
 
-        var request = LocationContractMapper.ToApplicationRequest(payload);
-        var errors = RouteTimeRequestValidatorV1.Validate(request);
+        var request = RouteTimeContractMapper.ToApplicationRequest(payload);
+        var errors = RouteTimeRequestValidator.Validate(request);
         if (errors.Count > 0)
         {
             return await req.WriteFailureAsync(
@@ -51,6 +51,6 @@ public sealed class RouteTimeFunctionV1
         }
 
         var result = await _service.CalculateAsync(request, ct);
-        return await req.WriteSuccessAsync(LocationContractMapper.ToContractResponse(result), ct);
+        return await req.WriteSuccessAsync(RouteTimeContractMapper.ToContractResponse(result), ct);
     }
 }

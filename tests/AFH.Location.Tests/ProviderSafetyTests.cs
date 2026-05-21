@@ -1,9 +1,7 @@
-using AFH.Location.Application.Services.Common;
-using AFH.Location.Application.Models.V1;
+using AFH.Location.Application.Abstractions.Calendar;
+using AFH.Location.Application.Calendar;
 using AFH.Location.Infrastructure.External.Maps.Google;
 using Microsoft.Extensions.Configuration;
-using AFH.Location.Application.Abstractions.Common;
-using AFH.Location.Application.Models.V1.Requests;
 
 namespace AFH.Location.Tests;
 

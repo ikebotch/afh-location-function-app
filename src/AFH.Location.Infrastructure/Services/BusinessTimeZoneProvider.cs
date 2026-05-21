@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions.Common;
+using AFH.Location.Application.Abstractions.Calendar;
 using Microsoft.Extensions.Configuration;
 
 namespace AFH.Location.Infrastructure.Services;

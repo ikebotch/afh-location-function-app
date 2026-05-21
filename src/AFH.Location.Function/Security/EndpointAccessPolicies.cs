@@ -10,7 +10,6 @@ public static class EndpointAccessPolicies
             ["OpenApiV1"] = EndpointAccessPolicy.Public,
             ["ScalarUi"] = EndpointAccessPolicy.Public,
             ["LocationHealthV1"] = EndpointAccessPolicy.Public,
-            ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly,
             ["LicenseListV1"] = EndpointAccessPolicy.InternalOnly,
 
             ["RouteTimeV1"] = EndpointAccessPolicy.InternalOnly,

@@ -1,8 +1,7 @@
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Travel;
-using AFH.Location.Application.Models.V1.Travel;
-using AFH.Location.Application.Services.V1.Travel;
+using AFH.Location.Application.Travel;
 using AFH.Location.Contract.V1.Requests.Travel;
 using AFH.Location.Contract.V1.Responses.Travel;
 using AFH.Location.Domain;
@@ -406,7 +405,7 @@ public sealed class TravelCoverageServiceTests
     // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void LocationContractMapper_ToContractResponse_WithTimeIndependentWindow_GeneratesCorrectSlots()
+    public void TravelCoverageContractMapper_ToContractResponse_WithTimeIndependentWindow_GeneratesCorrectSlots()
     {
         // Arrange
         var startTime = DateTimeOffset.Parse("2026-05-20T08:00:00Z");
@@ -444,7 +443,7 @@ public sealed class TravelCoverageServiceTests
         };
 
         // Act
-        var contractResponse = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(result);
+        var contractResponse = AFH.Location.Function.Mapping.V1.TravelCoverageContractMapper.ToContractResponse(result);
 
         // Assert
         Assert.NotNull(contractResponse);
@@ -469,7 +468,7 @@ public sealed class TravelCoverageServiceTests
     }
 
     [Fact]
-    public void LocationContractMapper_ToContractResponse_OnFailure_HasNullSlotsAndPopulatedWarnings()
+    public void TravelCoverageContractMapper_ToContractResponse_OnFailure_HasNullSlotsAndPopulatedWarnings()
     {
         // Arrange
         var result = new TravelCoverageResult
@@ -493,7 +492,7 @@ public sealed class TravelCoverageServiceTests
         };
 
         // Act
-        var contractResponse = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(result);
+        var contractResponse = AFH.Location.Function.Mapping.V1.TravelCoverageContractMapper.ToContractResponse(result);
 
         // Assert
         Assert.NotNull(contractResponse);
@@ -610,7 +609,7 @@ public sealed class TravelCoverageServiceTests
         // Act & Assert 1: Expanded Mode
         var requestExpanded = request with { TimeContext = request.TimeContext with { SlotResponseMode = TravelCoverageSlotResponseMode.Expanded } };
         var resultExpanded = await service.EvaluateAsync(requestExpanded, CancellationToken.None);
-        var responseExpanded = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(resultExpanded);
+        var responseExpanded = AFH.Location.Function.Mapping.V1.TravelCoverageContractMapper.ToContractResponse(resultExpanded);
 
         Assert.NotNull(responseExpanded);
         Assert.Single(responseExpanded.Destinations);
@@ -644,7 +643,7 @@ public sealed class TravelCoverageServiceTests
         // Act & Assert 2: Grouped Mode (default / requested)
         var requestGrouped = request with { TimeContext = request.TimeContext with { SlotResponseMode = TravelCoverageSlotResponseMode.Grouped } };
         var resultGrouped = await service.EvaluateAsync(requestGrouped, CancellationToken.None);
-        var responseGrouped = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(resultGrouped);
+        var responseGrouped = AFH.Location.Function.Mapping.V1.TravelCoverageContractMapper.ToContractResponse(resultGrouped);
 
         Assert.NotNull(responseGrouped);
         var destGrouped = responseGrouped.Destinations[0];
@@ -670,7 +669,7 @@ public sealed class TravelCoverageServiceTests
         // Act & Assert 3: Summary Mode
         var requestSummary = request with { TimeContext = request.TimeContext with { SlotResponseMode = TravelCoverageSlotResponseMode.Summary } };
         var resultSummary = await service.EvaluateAsync(requestSummary, CancellationToken.None);
-        var responseSummary = AFH.Location.Function.Mapping.V1.LocationContractMapper.ToContractResponse(resultSummary);
+        var responseSummary = AFH.Location.Function.Mapping.V1.TravelCoverageContractMapper.ToContractResponse(resultSummary);
 
         Assert.NotNull(responseSummary);
         var destSummary = responseSummary.Destinations[0];
@@ -737,7 +736,7 @@ public sealed class TravelCoverageServiceTests
         };
 
         // Act
-        var errors = AFH.Location.Application.Validation.V1.TravelCoverageRequestValidatorV1.Validate(request);
+        var errors = AFH.Location.Application.Travel.TravelCoverageRequestValidator.Validate(request);
 
         // Assert
         Assert.NotEmpty(errors);
