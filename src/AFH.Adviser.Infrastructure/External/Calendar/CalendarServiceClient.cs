@@ -94,10 +94,14 @@ public sealed class CalendarServiceClient : ICalendarServiceClient
 
             return JsonSerializer.Deserialize<T>(json, options);
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Failed to parse calendar response. Body: {Json}", json);
-            return default;
+            _logger.LogWarning(
+                ex,
+                "Calendar service returned malformed JSON while ensuring adviser subscriptions. Status={StatusCode}",
+                (int)response.StatusCode);
+
+            throw new InvalidOperationException("Calendar service returned malformed JSON.", ex);
         }
     }
 

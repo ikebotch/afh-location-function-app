@@ -91,7 +91,7 @@ public sealed class HttpAdviserFeedRepository : IAdviserSourceRepository
         return $"{baseUrl}{path}{separator}ids={joinedIds}";
     }
 
-    private static async Task<List<AdviserDto>> ReadPayloadAsync(HttpResponseMessage response, CancellationToken ct)
+    private async Task<List<AdviserDto>> ReadPayloadAsync(HttpResponseMessage response, CancellationToken ct)
     {
         var json = await response.Content.ReadAsStringAsync(ct);
         if (string.IsNullOrWhiteSpace(json))
@@ -108,9 +108,14 @@ public sealed class HttpAdviserFeedRepository : IAdviserSourceRepository
             var direct = JsonSerializer.Deserialize<List<AdviserDto>>(json, options);
             return direct ?? [];
         }
-        catch
+        catch (JsonException ex)
         {
-            return [];
+            _logger.LogWarning(
+                ex,
+                "Adviser feed returned malformed JSON. Status={StatusCode}",
+                (int)response.StatusCode);
+
+            throw new InvalidOperationException("Adviser feed returned malformed JSON.", ex);
         }
     }
 
