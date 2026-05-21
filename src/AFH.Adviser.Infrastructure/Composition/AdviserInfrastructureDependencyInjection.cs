@@ -51,6 +51,7 @@ public static class AdviserInfrastructureDependencyInjection
         services.AddScoped<AFH.Adviser.Application.Abstractions.IAdviserCacheSyncService, AFH.Adviser.Application.Admin.AdviserCacheSyncService>();
         services.AddScoped<IAdviserRepository, CachedAdviserRepository>();
         services.AddScoped<AFH.Adviser.Application.Licences.ILicenseCatalogService, AFH.Adviser.Application.Licences.LicenseCatalogService>();
+        services.AddScoped<AFH.Adviser.Application.Admin.IAdviserCoverageFeedService, AFH.Adviser.Application.Admin.AdviserCoverageFeedService>();
 
         return services;
     }

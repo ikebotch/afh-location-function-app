@@ -14,7 +14,8 @@ public static class EndpointAccessPolicies
 
             ["RouteTimeV1"] = EndpointAccessPolicy.InternalOnly,
             ["TravelCoverageV1"] = EndpointAccessPolicy.InternalOnly,
-            ["SyncAdviserCacheV1"] = EndpointAccessPolicy.InternalOnly
+            ["SyncAdviserCacheV1"] = EndpointAccessPolicy.InternalOnly,
+            ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly
         };
 
     internal static IReadOnlyCollection<string> KnownHttpFunctions => Policies.Keys.ToArray();
