@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AFH.Location.Contract\AFH.Location.Contract.csproj" />
     <ProjectReference Include="..\AFH.Location.Domain\AFH.Location.Domain.csproj" />
   </ItemGroup>
 

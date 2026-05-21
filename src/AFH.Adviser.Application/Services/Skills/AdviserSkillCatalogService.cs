@@ -13,13 +13,13 @@ public sealed class AdviserSkillCatalogService : IAdviserSkillCatalogService
         _adviserRepository = adviserRepository;
     }
 
-    public async Task<AdviserSkillCatalogResult> GetLicensesAsync(CancellationToken ct)
+    public async Task<AdviserSkillCatalogResult> GetSkillsAsync(CancellationToken ct)
     {
         var advisers = await _adviserRepository.GetAllAsync(null, ct);
 
         return new AdviserSkillCatalogResult
         {
-            Licenses = advisers
+            Skills = advisers
                 .Where(a => a.IsActive)
                 .SelectMany(a => a.Skills)
                 .Where(s => !string.IsNullOrWhiteSpace(s))

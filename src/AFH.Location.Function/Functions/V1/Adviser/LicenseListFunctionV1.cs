@@ -27,7 +27,7 @@ public sealed class LicenseListFunctionV1
         HttpRequestData req,
         CancellationToken ct)
     {
-        var result = await _licenseCatalogService.GetLicensesAsync(ct);
+        var result = await _licenseCatalogService.GetSkillsAsync(ct);
         var response = LicenseCatalogContractMapper.ToContractResponse(result);
 
         var ok = req.CreateResponse(HttpStatusCode.OK);

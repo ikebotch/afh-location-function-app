@@ -31,6 +31,7 @@ public sealed class AdviserCoverageFunctionV1
         var query = QueryHelpers.ParseQuery(req.Url.Query);
         DateTime? sinceUtc = null;
         
+        // sinceUtc is accepted for backward compatibility only; this endpoint intentionally returns a full snapshot feed.
         if (query.TryGetValue("sinceUtc", out var sinceUtcValues) && 
             DateTime.TryParse(sinceUtcValues.FirstOrDefault(), out var parsedSinceUtc))
         {

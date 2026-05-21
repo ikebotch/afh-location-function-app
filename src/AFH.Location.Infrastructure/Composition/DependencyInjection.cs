@@ -2,8 +2,6 @@ using AFH.Location.Application.Services.Travel;
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Travel;
-using AFH.Location.Application.Models.Travel;
-using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Infrastructure.Caching;
 using AFH.Location.Infrastructure.External.Maps;
 using AFH.Location.Infrastructure.External.Maps.Azure;

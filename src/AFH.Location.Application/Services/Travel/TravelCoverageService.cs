@@ -42,13 +42,13 @@ public sealed class TravelCoverageService : ITravelCoverageService
                 totalStopwatch.ElapsedMilliseconds,
                 request.Destinations.Count);
 
-            return new TravelCoverageResult
+            return PresentResult(new TravelCoverageResult
             {
                 SourcePostcode = sourcePostcode,
                 TimeContext = request.TimeContext,
                 RequestContext = request.RequestContext,
                 Destinations = request.Destinations.Select(destination => BuildSourceUnresolved(destination)).ToList()
-            };
+            });
         }
 
         var destinationResolutions = await ResolveDestinationsAsync(request.Destinations, ct);
@@ -267,13 +267,29 @@ public sealed class TravelCoverageService : ITravelCoverageService
             totalStopwatch.ElapsedMilliseconds,
             outcomes.Count);
 
-        return new TravelCoverageResult
+        return PresentResult(new TravelCoverageResult
         {
             SourcePostcode = sourcePostcode,
             SourceCoordinates = source.Coordinates,
             TimeContext = request.TimeContext,
             Destinations = outcomes,
             RequestContext = request.RequestContext
+        });
+    }
+
+    private static TravelCoverageResult PresentResult(TravelCoverageResult result)
+    {
+        return result with
+        {
+            Destinations = result.Destinations
+                .Select(destination => destination with
+                {
+                    PresentedSlots = TravelCoverageResponsePresenter.PresentSlots(
+                        result.TimeContext.SlotResponseMode,
+                        result.TimeContext,
+                        destination)
+                })
+                .ToList()
         };
     }
 

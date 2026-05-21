@@ -2,7 +2,6 @@ using AFH.Location.Function.Mapping.V1.Location;
 using AFH.Location.Application.Validation.Travel;
 using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Application.Models.Travel;
-using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Contract.V1.Requests.Travel;
 using AFH.Location.Function.Functions.Common;
 using AFH.Location.Function.Mapping.V1;

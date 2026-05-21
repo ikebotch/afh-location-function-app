@@ -4,5 +4,5 @@ namespace AFH.Adviser.Application.Abstractions.Skills;
 
 public interface IAdviserSkillCatalogService
 {
-    Task<AdviserSkillCatalogResult> GetLicensesAsync(CancellationToken ct);
+    Task<AdviserSkillCatalogResult> GetSkillsAsync(CancellationToken ct);
 }

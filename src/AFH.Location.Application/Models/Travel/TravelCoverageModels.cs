@@ -77,6 +77,7 @@ public sealed record TravelCoverageDestinationOutcome
     public TravelRouteOutcome? Route { get; init; }
     public TravelCoverageOutcome? Coverage { get; init; }
     public IReadOnlyList<TravelCoverageSlotOutcome> Slots { get; init; } = [];
+    public IReadOnlyList<TravelCoveragePresentedSlot>? PresentedSlots { get; init; }
     public IReadOnlyList<TravelCoverageWarning> Warnings { get; init; } = [];
 }
 

@@ -4,7 +4,6 @@ using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Application.Models.Travel;
-using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Contract.V1.Requests.Travel;
 using AFH.Location.Contract.V1.Responses.Travel;
 using AFH.Location.Domain;
@@ -440,7 +439,18 @@ public sealed class TravelCoverageServiceTests
                         IsWithinCoverage = true,
                         MaxTravelTimeMinutes = 30,
                         MaxDistanceMiles = 10.0
-                    }
+                    },
+                    PresentedSlots =
+                    [
+                        new TravelCoveragePresentedSlot
+                        {
+                            StartTime = startTime,
+                            EndTime = endTime,
+                            TravelTimeMinutes = 12,
+                            TravelDistanceMiles = 3.5,
+                            IsWithinCoverage = true
+                        }
+                    ]
                 }
             ]
         };

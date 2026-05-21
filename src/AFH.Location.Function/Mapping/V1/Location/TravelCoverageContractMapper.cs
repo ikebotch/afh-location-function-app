@@ -1,4 +1,3 @@
-using AFH.Location.Application.Services.Travel;
 using AFH.Location.Application.Models.Travel;
 using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Contract.V1.Requests.Travel;
@@ -78,7 +77,7 @@ public static class TravelCoverageContractMapper
                 Postcode = destination.Postcode,
                 Coordinates = ToContractCoordinates(destination.Coordinates),
                 Status = ToContractStatus(destination.Status),
-                Slots = MapSlots(result.TimeContext.SlotResponseMode, result.TimeContext, destination),
+                Slots = MapSlots(destination.PresentedSlots),
                 Warnings = destination.Warnings != null
                     ? destination.Warnings.Select(warning => new ApiWarning
                       {
@@ -95,12 +94,9 @@ public static class TravelCoverageContractMapper
     }
 
     private static IReadOnlyList<TravelCoverageSlotV1>? MapSlots(
-        TravelCoverageSlotResponseMode responseMode,
-        TravelCoverageTimeContext timeContext,
-        TravelCoverageDestinationOutcome destination)
+        IReadOnlyList<TravelCoveragePresentedSlot>? slots)
     {
-        return TravelCoverageResponsePresenter.PresentSlots(responseMode, timeContext, destination)
-            ?.Select(s => new TravelCoverageSlotV1
+        return slots?.Select(s => new TravelCoverageSlotV1
             {
                 StartTime = s.StartTime,
                 EndTime = s.EndTime,

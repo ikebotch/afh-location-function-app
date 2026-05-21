@@ -9,7 +9,7 @@ public static class LicenseCatalogContractMapper
     {
         return new LicenseListResponseV1
         {
-            Licenses = result.Licenses
+            Licenses = result.Skills
         };
     }
 }

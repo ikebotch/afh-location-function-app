@@ -2,7 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AFH.Adviser.Domain\AFH.Adviser.Domain.csproj" />
-    <ProjectReference Include="..\AFH.Adviser.Contract\AFH.Adviser.Contract.csproj" />
   </ItemGroup>
 
   <ItemGroup>

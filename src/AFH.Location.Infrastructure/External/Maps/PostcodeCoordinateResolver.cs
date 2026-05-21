@@ -1,7 +1,6 @@
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Application.Models.Travel;
-using AFH.Location.Application.Abstractions.Travel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
