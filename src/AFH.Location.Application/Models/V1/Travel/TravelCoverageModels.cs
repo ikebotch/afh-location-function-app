@@ -114,3 +114,27 @@ public sealed record TravelRouteOutcomeRequest
         new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase);
     public TravelCoverageTimeContext TimeContext { get; init; } = new();
 }
+
+public sealed record RouteTimeRequest
+{
+    public string? CorrelationId { get; init; }
+    public DateTimeOffset DepartAt { get; init; }
+    public LocationCoordinates Source { get; init; } = new(0, 0);
+    public LocationCoordinates Destination { get; init; } = new(0, 0);
+}
+
+public sealed record RouteTimeResult
+{
+    public string? CorrelationId { get; init; }
+    public int? TravelTimeMinutes { get; init; }
+    public double? TravelDistanceMiles { get; init; }
+    public RouteTimeStatus Status { get; init; }
+    public IReadOnlyList<TravelCoverageWarning> Warnings { get; init; } = [];
+}
+
+public enum RouteTimeStatus
+{
+    Succeeded = 0,
+    RouteUnavailable = 1,
+    Failed = 2
+}

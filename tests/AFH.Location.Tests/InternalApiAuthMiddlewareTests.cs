@@ -19,7 +19,9 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("LicenseListV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("LocationSearchV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("LocationSearchBatchV1", EndpointAccessPolicy.InternalOnly)]
+    [InlineData("RouteTimeV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("SyncAdviserCacheV1", EndpointAccessPolicy.InternalOnly)]
+    [InlineData("TravelCoverageV1", EndpointAccessPolicy.InternalOnly)]
     public void EndpointAccessPolicies_ClassifiesFunctions(string functionName, EndpointAccessPolicy expected)
     {
         Assert.Equal(expected, EndpointAccessPolicies.GetPolicy(functionName));

@@ -80,6 +80,7 @@ public static class DependencyInjection
         services.AddScoped<IPostcodeCoordinateResolver, PostcodeCoordinateResolver>();
         services.AddScoped<ITravelRouteOutcomeProvider, TravelRouteOutcomeProvider>();
         services.AddScoped<ITravelCoverageService, TravelCoverageService>();
+        services.AddScoped<IRouteTimeService, RouteTimeService>();
         services.AddSingleton<IBusinessTimeZoneProvider, BusinessTimeZoneProvider>();
         services.AddSingleton<ICoveragePresentationSettings, CoveragePresentationSettings>();
         services.AddScoped<AvailabilityEvaluator>();

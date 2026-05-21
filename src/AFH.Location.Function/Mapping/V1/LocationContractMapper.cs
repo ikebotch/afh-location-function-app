@@ -59,6 +59,7 @@ public static class LocationContractMapper
         return new TravelCoverageResponseV1
         {
             SourcePostcode = result.SourcePostcode,
+            SourceCoordinates = ToContractCoordinates(result.SourceCoordinates),
             TimeContext = new TravelCoverageTimeContextV1
             {
                 TravelEvaluationMode = result.TimeContext.TimingMode == TravelCoverageTimingMode.DepartureTime
@@ -78,6 +79,7 @@ public static class LocationContractMapper
             {
                 CorrelationId = destination.CorrelationId,
                 Postcode = destination.Postcode,
+                Coordinates = ToContractCoordinates(destination.Coordinates),
                 Status = ToContractStatus(destination.Status),
                 Slots = MapSlots(result.TimeContext.SlotResponseMode, result.TimeContext, destination),
                 Warnings = destination.Warnings != null
@@ -92,6 +94,38 @@ public static class LocationContractMapper
             {
                 CorrelationId = result.RequestContext.CorrelationId
             }
+        };
+    }
+
+    public static RouteTimeRequest ToApplicationRequest(RouteTimeRequestV1 contract)
+    {
+        return new RouteTimeRequest
+        {
+            CorrelationId = contract.CorrelationId,
+            DepartAt = contract.DepartAt,
+            Source = new LocationCoordinates(contract.Source.Latitude, contract.Source.Longitude),
+            Destination = new LocationCoordinates(contract.Destination.Latitude, contract.Destination.Longitude)
+        };
+    }
+
+    public static RouteTimeResponseV1 ToContractResponse(RouteTimeResult result)
+    {
+        return new RouteTimeResponseV1
+        {
+            CorrelationId = result.CorrelationId,
+            TravelTimeMinutes = result.TravelTimeMinutes,
+            TravelDistanceMiles = result.TravelDistanceMiles,
+            Status = result.Status switch
+            {
+                RouteTimeStatus.Succeeded => RouteTimeStatusV1.Succeeded,
+                RouteTimeStatus.RouteUnavailable => RouteTimeStatusV1.RouteUnavailable,
+                _ => RouteTimeStatusV1.Failed
+            },
+            Warnings = result.Warnings.Select(warning => new ApiWarning
+            {
+                Code = warning.Code,
+                Message = warning.Message
+            }).ToList()
         };
     }
 
@@ -289,6 +323,17 @@ public static class LocationContractMapper
             ApplicationTravelCoverageStatus.RouteUnavailable => ContractTravelCoverageStatus.RouteUnavailable,
             _ => ContractTravelCoverageStatus.Failed
         };
+    }
+
+    private static TravelCoverageCoordinatesV1? ToContractCoordinates(LocationCoordinates? coordinates)
+    {
+        return coordinates is null
+            ? null
+            : new TravelCoverageCoordinatesV1
+            {
+                Latitude = coordinates.Latitude,
+                Longitude = coordinates.Longitude
+            };
     }
 
     private static IReadOnlyList<TravelCoverageSlotV1>? MapSlots(
