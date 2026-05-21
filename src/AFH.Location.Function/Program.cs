@@ -2,6 +2,7 @@ using AFH.Common.Errors.Abstractions;
 using AFH.Common.Errors.AzureFunctions.DependencyInjection;
 using AFH.Location.Function.Middleware;
 using AFH.Location.Infrastructure.Composition;
+using AFH.Adviser.Infrastructure.Composition;
 using Azure.Core.Serialization;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,7 @@ var host = new HostBuilder()
     {
         AddSharedErrorHandling(services, ctx.Configuration, "[AFH Location Error]", "location");
         services.AddLocationInfrastructure(ctx.Configuration);
+        services.AddAdviserInfrastructure(ctx.Configuration);
         ConfigureWorkerSerialization(services, caseInsensitivePropertyNames: true);
     })
     .Build();

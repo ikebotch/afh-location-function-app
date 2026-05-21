@@ -1,4 +1,4 @@
-using AFH.Location.Application.Licences;
+using AFH.Adviser.Application.Licences;
 using AFH.Location.Contract.V1.Responses;
 
 namespace AFH.Location.Function.Mapping.V1;

@@ -1,9 +1,9 @@
-using AFH.Location.Application.Abstractions.Advisers;
+using AFH.Adviser.Application.Abstractions;
 using AFH.Location.Function.Functions.Common;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using AFH.Location.Function.Functions.V1.Docs;
-using AFH.Location.Contract.V1.Responses;
+using AFH.Adviser.Contract.V1.Responses;
 
 namespace AFH.Location.Function.Functions.V1.Admin;
 

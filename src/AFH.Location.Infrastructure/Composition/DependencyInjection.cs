@@ -1,24 +1,16 @@
-﻿using AFH.Location.Application.Admin;
-using AFH.Location.Application.Abstractions.Advisers;
-using AFH.Location.Application.Abstractions.Calendar;
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Travel;
-using AFH.Location.Application.Calendar;
 using AFH.Location.Application.Travel;
 using AFH.Location.Infrastructure.Caching;
-using AFH.Location.Infrastructure.External.Calendar;
-using AFH.Location.Infrastructure.External.Graph;
 using AFH.Location.Infrastructure.External.Maps;
 using AFH.Location.Infrastructure.External.Maps.Azure;
 using AFH.Location.Infrastructure.Logging;
 using AFH.Location.Infrastructure.Options;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;
-using AFH.Location.Infrastructure.Services;
 using AFH.Common.Errors.ApplicationInsights.DependencyInjection;
 using AFH.Common.Errors.EntityFramework.DependencyInjection;
-using AFH.Common.SharePointUtils.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -36,11 +28,6 @@ public static class DependencyInjection
         services.AddHttpClient();
         services.Configure<ApplicationLoggingOptions>(configuration.GetSection(ApplicationLoggingOptions.SectionName));
 
-        services.AddOptions<CalendarServiceOptions>()
-            .Bind(configuration.GetSection(CalendarServiceOptions.SectionName))
-            .Validate(options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _), $"{CalendarServiceOptions.SectionName}:BaseUrl must be an absolute URI.")
-            .Validate(options => options.ScheduleLookbackMinutes > 0, $"{CalendarServiceOptions.SectionName}:ScheduleLookbackMinutes must be greater than zero.")
-            .ValidateOnStart();
         services.AddSingleton<IValidateOptions<InternalApiAuthOptions>, InternalApiAuthOptionsValidator>();
         services.AddOptions<InternalApiAuthOptions>()
             .Bind(configuration.GetSection(InternalApiAuthOptions.SectionName))
@@ -53,14 +40,8 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(GoogleMapsOptions.SectionName))
             .Validate(options => !options.Enabled, "Maps:Google:Enabled cannot be set because the Google provider path is intentionally disabled until it is fully implemented.")
             .ValidateOnStart();
-        services.AddOptions<AdviserFeedOptions>()
-            .Bind(configuration.GetSection(AdviserFeedOptions.SectionName))
-            .Validate(options => !options.Enabled || Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _), $"{AdviserFeedOptions.SectionName}:BaseUrl must be an absolute URI when the adviser feed is enabled.")
-            .ValidateOnStart();
 
         services.AddAfhCommonErrorsApplicationInsights();
-        services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
-        services.AddScoped<ICalendarAvailabilityService, CalendarAvailabilityService>();
         services.AddScoped<AzureMapsGeocodingService>();
         services.AddScoped<AzureMapsRoutingService>();
         services.AddScoped<AzureMapsRouteMatrixService>();
@@ -79,24 +60,10 @@ public static class DependencyInjection
         services.AddScoped<ITravelRouteOutcomeProvider, TravelRouteOutcomeProvider>();
         services.AddScoped<ITravelCoverageService, TravelCoverageService>();
         services.AddScoped<IRouteTimeService, RouteTimeService>();
-        services.AddSingleton<IBusinessTimeZoneProvider, BusinessTimeZoneProvider>();
-        services.AddScoped<AvailabilityEvaluator>();
-
-        services.Configure<SharePointAdviserOptions>(configuration.GetSection(SharePointAdviserOptions.SectionName));
-        var useAdviserFeed = configuration.GetValue<bool>("AdviserFeed:Enabled");
-        if (useAdviserFeed)
-        {
-            services.AddScoped<IAdviserSourceRepository, HttpAdviserFeedRepository>();
-        }
-        else
-        {
-            services.AddScoped<IAdviserSourceRepository, SharePointAdviserRepository>();
-        }
 
         services.AddPolicyStoreModule(configuration);
 
         services.AddMemoryCache();
-        services.AddSharePoint(configuration);
         services.AddLocationApplicationModule();
         services.AddLoggingModule();
         services.AddScoped<LocationHandledErrorTelemetryEmitter>();

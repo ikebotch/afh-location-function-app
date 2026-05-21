@@ -1,4 +1,4 @@
-using AFH.Location.Application.Abstractions.Licences;
+using AFH.Adviser.Application.Licences;
 using AFH.Location.Function.Mapping.V1;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;

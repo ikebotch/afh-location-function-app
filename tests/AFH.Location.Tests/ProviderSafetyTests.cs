@@ -1,5 +1,3 @@
-using AFH.Location.Application.Abstractions.Calendar;
-using AFH.Location.Application.Calendar;
 using AFH.Location.Infrastructure.External.Maps.Google;
 using Microsoft.Extensions.Configuration;
 
@@ -26,30 +24,6 @@ public class ProviderSafetyTests
             sut.GetRouteAsync((51.5, -0.1), (51.6, -0.2), CancellationToken.None));
 
         Assert.Contains("fake routing data", ex.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void AvailabilityEvaluator_UsesConfiguredBusinessTimezone()
-    {
-        var sut = new AvailabilityEvaluator(new StubTimeZoneProvider("UTC"));
-
-        var meeting = new LocationMeetingWindow
-        {
-            RequestedStartUtc = new DateTime(2026, 03, 25, 7, 5, 0, DateTimeKind.Utc),
-            DurationMinutes = 60,
-            SearchHorizonMinutes = 180
-        };
-
-        var result = sut.Evaluate(meeting, []);
-
-        Assert.Equal("Available", result.Status);
-        Assert.Equal(new DateTime(2026, 03, 25, 8, 0, 0, DateTimeKind.Utc), result.ProposedStartUtc);
-    }
-
-    private sealed class StubTimeZoneProvider : IBusinessTimeZoneProvider
-    {
-        public StubTimeZoneProvider(string timeZoneId) => TimeZoneId = timeZoneId;
-        public string TimeZoneId { get; }
     }
 
     private sealed class StubHttpClientFactory : IHttpClientFactory

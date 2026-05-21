@@ -1,4 +1,3 @@
-using AFH.Location.Application.Abstractions.Advisers;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
@@ -7,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace AFH.Location.Infrastructure.Persistence.Repositories;
 
-public sealed class SqlGeoCache : IGeoCache, IAdviserGeoCache
+public sealed class SqlGeoCache : IGeoCache
 {
     private readonly IDbContextFactory<LocationPolicyDbContext> _dbContextFactory;
     private readonly ILogger<SqlGeoCache>? _logger;

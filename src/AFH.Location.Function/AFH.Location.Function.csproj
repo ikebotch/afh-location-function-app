@@ -37,6 +37,12 @@
 		<ProjectReference Include="..\AFH.Location.Infrastructure\AFH.Location.Infrastructure.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <ProjectReference Include="..\AFH.Adviser.Application\AFH.Adviser.Application.csproj" />
+	  <ProjectReference Include="..\AFH.Adviser.Contract\AFH.Adviser.Contract.csproj" />
+	  <ProjectReference Include="..\AFH.Adviser.Infrastructure\AFH.Adviser.Infrastructure.csproj" />
+	</ItemGroup>
+
 
 
 
