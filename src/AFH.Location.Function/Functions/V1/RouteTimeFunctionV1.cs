@@ -7,6 +7,9 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 
+using AFH.Location.Function.Functions.V1.Docs;
+using AFH.Location.Contract.V1.Responses.Travel;
+
 namespace AFH.Location.Function.Functions.V1;
 
 public sealed class RouteTimeFunctionV1
@@ -19,6 +22,10 @@ public sealed class RouteTimeFunctionV1
     }
 
     [Function("RouteTimeV1")]
+    [LocationOpenApiOperation("RouteTime", "Calculate route time",
+        Description = "Calculates travel time and distance between a source and a destination coordinate.",
+        RequestBodyType = typeof(RouteTimeRequestV1),
+        ResponseType = typeof(RouteTimeResponseV1))]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/location/route-time")]
         HttpRequestData req,

@@ -10,6 +10,9 @@ using AFH.Location.Application.Models.V1.Batch;
 using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Function.Functions.Common;
 
+using AFH.Location.Function.Functions.V1.Docs;
+using AFH.Location.Contract.V1.Responses;
+
 namespace AFH.Location.Function.Functions.V1;
 
 public sealed class LocationSearchBatchFunctionV1
@@ -26,6 +29,10 @@ public sealed class LocationSearchBatchFunctionV1
     }
 
     [Function("LocationSearchBatchV1")]
+    [LocationOpenApiOperation("AdviserSearch", "Batch search in-person advisers",
+        Description = "Performs multiple concurrent in-person adviser searches in a single batch request.",
+        RequestBodyType = typeof(LocationSearchBatchRequestV1),
+        ResponseType = typeof(LocationSearchBatchResponseV1))]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/location/inperson/advisers/search/batch")]
         HttpRequestData req,

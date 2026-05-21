@@ -7,6 +7,10 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 
+using AFH.Location.Function.Functions.V1.Docs;
+using AFH.Location.Contract.V1.Requests.Travel;
+using AFH.Location.Contract.V1.Responses.Travel;
+
 namespace AFH.Location.Function.Functions.V1;
 
 public sealed class TravelCoverageFunctionV1
@@ -19,6 +23,10 @@ public sealed class TravelCoverageFunctionV1
     }
 
     [Function("TravelCoverageV1")]
+    [LocationOpenApiOperation("TravelCoverage", "Evaluate travel coverage",
+        Description = "Evaluates travel times and distances from a source postcode to a list of destinations.",
+        RequestBodyType = typeof(TravelCoverageRequestV1),
+        ResponseType = typeof(TravelCoverageResponseV1))]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/location/travel-coverage")]
         HttpRequestData req,

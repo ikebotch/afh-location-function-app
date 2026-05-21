@@ -1,8 +1,33 @@
 using System.Text.Json.Serialization;
 using System.Text.Json;
 
+using AFH.Location.Contract.V1.Docs;
+
 namespace AFH.Location.Contract.V1.Requests.Travel;
 
+[OpenApiExample("""
+{
+  "sourcePostcode": "B1 1AA",
+  "timeContext": {
+    "travelEvaluationMode": "TimeDependent",
+    "slotResponseMode": "Grouped",
+    "startTime": "2026-05-22T09:00:00Z",
+    "endTime": "2026-05-22T17:00:00Z",
+    "searchIntervalMinutes": 30
+  },
+  "destinations": [
+    {
+      "correlationId": "client-123",
+      "postcode": "CV1 1AA",
+      "maxTravelTimeMinutes": 60,
+      "maxDistanceMiles": 50
+    }
+  ],
+  "requestContext": {
+    "correlationId": "req-456"
+  }
+}
+""")]
 public sealed record TravelCoverageRequestV1
 {
     public string SourcePostcode { get; init; } = string.Empty;

@@ -1,5 +1,21 @@
+using AFH.Location.Contract.V1.Docs;
+
 namespace AFH.Location.Contract.V1.Requests.Travel;
 
+[OpenApiExample("""
+{
+  "correlationId": "rt-123",
+  "departAt": "2026-05-22T09:00:00Z",
+  "source": {
+    "latitude": 52.4862,
+    "longitude": -1.8904
+  },
+  "destination": {
+    "latitude": 52.4068,
+    "longitude": -1.5197
+  }
+}
+""")]
 public sealed record RouteTimeRequestV1
 {
     public string? CorrelationId { get; init; }

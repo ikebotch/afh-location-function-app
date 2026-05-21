@@ -1,4 +1,4 @@
-﻿using AFH.Location.Function.Mapping.V1;
+using AFH.Location.Function.Mapping.V1;
 using AFH.Location.Contract.V1.Requests;
 using AFH.Location.Application.Validation.V1;
 using Microsoft.Azure.Functions.Worker;
@@ -6,6 +6,9 @@ using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 using AFH.Location.Application.Abstractions.Search;
 using AFH.Location.Function.Functions.Common;
+
+using AFH.Location.Function.Functions.V1.Docs;
+using AFH.Location.Contract.V1.Responses;
 
 namespace AFH.Location.Function.Functions.V1;
 
@@ -19,6 +22,10 @@ public sealed class LocationSearchFunctionV1
     }
 
     [Function("LocationSearchV1")]
+    [LocationOpenApiOperation("AdviserSearch", "Search in-person advisers",
+        Description = "Searches and ranks in-person advisers matching the client's destination, meeting window, and filters.",
+        RequestBodyType = typeof(LocationSearchRequestV1),
+        ResponseType = typeof(LocationSearchResponseV1))]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/location/inperson/advisers/search")]
         HttpRequestData req,

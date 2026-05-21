@@ -1,7 +1,18 @@
 using System.Text.Json.Serialization;
 
+using AFH.Location.Contract.V1.Docs;
+
 namespace AFH.Location.Contract.V1.Responses.Travel;
 
+[OpenApiExample("""
+{
+  "correlationId": "rt-123",
+  "travelTimeMinutes": 35,
+  "travelDistanceMiles": 22.4,
+  "status": "Succeeded",
+  "warnings": []
+}
+""")]
 public sealed record RouteTimeResponseV1
 {
     public string? CorrelationId { get; init; }
