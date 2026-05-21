@@ -11,14 +11,9 @@ public sealed class AdviserCoverageFeedService : IAdviserCoverageFeedService
         _adviserRepository = adviserRepository;
     }
 
-    public async Task<AdviserCoverageFeedResult> GetCoverageFeedAsync(DateTime? sinceUtc, CancellationToken ct)
+    public async Task<AdviserCoverageFeedResult> GetCoverageFeedAsync(CancellationToken ct)
     {
         var advisers = await _adviserRepository.GetAllAsync(null, ct);
-
-        if (sinceUtc.HasValue)
-        {
-            advisers = advisers.Where(x => x.LastSyncedUtc >= sinceUtc.Value).ToList();
-        }
 
         var activeAdvisers = advisers.Where(x => x.IsActive).ToList();
 

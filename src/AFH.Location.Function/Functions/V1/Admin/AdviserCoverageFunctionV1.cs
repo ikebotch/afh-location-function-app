@@ -36,7 +36,7 @@ public sealed class AdviserCoverageFunctionV1
             sinceUtc = parsedSinceUtc;
         }
 
-        var result = await _feedService.GetCoverageFeedAsync(sinceUtc, ct);
+        var result = await _feedService.GetCoverageFeedAsync(ct);
         var response = AdviserCoverageContractMapper.ToContractResponse(result);
         return await req.WriteSuccessAsync(response, ct, ApiEnvelopeExtensions.SinglePage(response.Advisers.Count));
     }
