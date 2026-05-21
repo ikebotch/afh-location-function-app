@@ -117,7 +117,7 @@ internal sealed class TestHttpRequestData(FunctionContext functionContext, Uri? 
     public override Stream Body { get; } = new MemoryStream();
     public override HttpHeadersCollection Headers { get; } = [];
     public override IReadOnlyCollection<IHttpCookie> Cookies { get; } = [];
-    public override Uri Url { get; } = url ?? new Uri("https://localhost/api/v1/location/inperson/advisers/search");
+    public override Uri Url { get; } = url ?? new Uri("https://localhost/api/v1/location/travel-coverage");
     public override IEnumerable<ClaimsIdentity> Identities { get; } = [];
     public override string Method { get; } = method;
     public override HttpResponseData CreateResponse() => new TestHttpResponseData(FunctionContext);

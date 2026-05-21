@@ -248,8 +248,7 @@ internal static class LocationOpenApiDocumentFactory
     {
         if (source.Contains(".Admin", StringComparison.OrdinalIgnoreCase))
             return "Admin";
-        if (fallback.Contains("Search", StringComparison.OrdinalIgnoreCase))
-            return "LocationSearch";
+
         if (fallback.Contains("Health", StringComparison.OrdinalIgnoreCase))
             return "Health";
 

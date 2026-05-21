@@ -17,8 +17,6 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("ScalarUi", EndpointAccessPolicy.Public)]
     [InlineData("AdviserCoverageV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("LicenseListV1", EndpointAccessPolicy.InternalOnly)]
-    [InlineData("LocationSearchV1", EndpointAccessPolicy.InternalOnly)]
-    [InlineData("LocationSearchBatchV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("RouteTimeV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("SyncAdviserCacheV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("TravelCoverageV1", EndpointAccessPolicy.InternalOnly)]
@@ -30,7 +28,7 @@ public class InternalApiAuthMiddlewareTests
     [Fact]
     public void EndpointAccessPolicies_CoversEveryHttpTriggeredFunctionExplicitly()
     {
-        var httpFunctionNames = typeof(LocationSearchFunctionV1).Assembly
+        var httpFunctionNames = typeof(TravelCoverageFunctionV1).Assembly
             .GetTypes()
             .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static))
             .Where(method => method.GetCustomAttribute<FunctionAttribute>() is not null)

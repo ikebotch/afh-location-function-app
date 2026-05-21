@@ -54,18 +54,6 @@ public sealed class LocationPolicyDbInitializer : IHostedService
             });
         }
 
-        if (!await db.AvailabilityDefaults.AnyAsync(ct))
-        {
-            db.AvailabilityDefaults.Add(new AvailabilityDefaultPolicyEntity
-            {
-                DefaultTravelBufferMinutes = Math.Max(0, _configuration.GetValue<int?>("LocationSearch:Availability:DefaultBufferMinutes") ?? 0),
-                MaxTravelBufferMinutes = Math.Max(0, _configuration.GetValue<int?>("LocationSearch:Availability:MaxBufferMinutes") ?? 180),
-                DefaultCompanyBufferMinutes = Math.Max(0, _configuration.GetValue<int?>("LocationSearch:Availability:DefaultCompanyBufferMinutes") ?? 30),
-                MaxCompanyBufferMinutes = Math.Max(0, _configuration.GetValue<int?>("LocationSearch:Availability:MaxCompanyBufferMinutes") ?? 180),
-                PreviousClientProximityMinutes = Math.Max(0, _configuration.GetValue<int?>("LocationSearch:Availability:PreviousClientProximityMinutes") ?? 180)
-            });
-        }
-
         if (!await db.CoverageRegions.AnyAsync(ct))
         {
             foreach (var child in _configuration.GetSection("LocationSearch:Coverage:RegionRadiusMiles").GetChildren())

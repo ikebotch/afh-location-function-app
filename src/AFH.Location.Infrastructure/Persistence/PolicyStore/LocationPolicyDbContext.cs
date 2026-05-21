@@ -17,8 +17,6 @@ public sealed class LocationPolicyDbContext : DbContext
     public DbSet<CoverageDefaultPolicyEntity> CoverageDefaults => Set<CoverageDefaultPolicyEntity>();
     public DbSet<CoverageRegionPolicyEntity> CoverageRegions => Set<CoverageRegionPolicyEntity>();
     public DbSet<CoverageAdviserPolicyEntity> CoverageAdvisers => Set<CoverageAdviserPolicyEntity>();
-    public DbSet<AvailabilityDefaultPolicyEntity> AvailabilityDefaults => Set<AvailabilityDefaultPolicyEntity>();
-    public DbSet<SearchAuditRecordEntity> SearchAuditRecords => Set<SearchAuditRecordEntity>();
     public DbSet<IntegrationOperationAuditEntity> IntegrationOperationAudits => Set<IntegrationOperationAuditEntity>();
     public DbSet<ApplicationLogEntity> ApplicationLogs => Set<ApplicationLogEntity>();
     public DbSet<AdviserReferenceCacheEntity> AdviserReferenceCache => Set<AdviserReferenceCacheEntity>();
@@ -51,37 +49,6 @@ public sealed class LocationPolicyDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.AdviserId).HasMaxLength(100).IsRequired();
             entity.HasIndex(x => x.AdviserId).IsUnique();
-        });
-
-        modelBuilder.Entity<AvailabilityDefaultPolicyEntity>(entity =>
-        {
-            entity.ToTable("AvailabilityDefaultPolicies");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.DefaultTravelBufferMinutes).IsRequired();
-            entity.Property(x => x.MaxTravelBufferMinutes).IsRequired();
-            entity.Property(x => x.DefaultCompanyBufferMinutes).IsRequired();
-            entity.Property(x => x.MaxCompanyBufferMinutes).IsRequired();
-            entity.Property(x => x.PreviousClientProximityMinutes).IsRequired();
-        });
-
-        modelBuilder.Entity<SearchAuditRecordEntity>(entity =>
-        {
-            entity.ToTable("SearchAuditRecords");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.RequestId).HasMaxLength(120).IsRequired();
-            entity.Property(x => x.CreatedUtc).IsRequired();
-            entity.Property(x => x.RequestedStartUtc).IsRequired();
-            entity.Property(x => x.DurationMinutes).IsRequired();
-            entity.Property(x => x.SearchHorizonMinutes).IsRequired();
-            entity.Property(x => x.DestinationPostcode).HasMaxLength(24);
-            entity.Property(x => x.RegionsCsv).HasMaxLength(1000);
-            entity.Property(x => x.CandidatesReturned).IsRequired();
-            entity.Property(x => x.SelectedAdviserId).HasMaxLength(100);
-            entity.Property(x => x.SelectedOriginSource).HasMaxLength(40);
-            entity.Property(x => x.PayloadJson).IsRequired();
-
-            entity.HasIndex(x => x.CreatedUtc);
-            entity.HasIndex(x => x.RequestId);
         });
 
         modelBuilder.Entity<IntegrationOperationAuditEntity>(entity =>

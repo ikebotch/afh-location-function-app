@@ -1,6 +1,5 @@
 using AFH.Common.Errors.Abstractions;
 using AFH.Common.Errors.AzureFunctions.DependencyInjection;
-using AFH.Location.Application.Services.Common;
 using AFH.Location.Function.Middleware;
 using AFH.Location.Infrastructure.Composition;
 using Azure.Core.Serialization;
@@ -70,7 +69,6 @@ static void AddSharedErrorHandling(
     services.AddLocationErrorNotificationModule(configuration, defaultSubjectPrefix, serviceName);
     services.AddSingleton<LocationExceptionMapper>();
     services.AddSingleton<IExceptionMapper>(sp => sp.GetRequiredService<LocationExceptionMapper>());
-    services.AddTransient<AdviserCandidateSource>();
 
 }
 

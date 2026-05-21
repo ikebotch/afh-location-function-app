@@ -26,8 +26,6 @@ internal static class PolicyStoreModuleServiceCollectionExtensions
                 ServiceLifetime.Scoped);
             services.AddAfhCommonErrorsEntityFramework<LocationPolicyDbContext>();
             services.AddScoped<ICoveragePolicyProvider, SqlCoveragePolicyProvider>();
-            services.AddScoped<IAvailabilityPolicyProvider, SqlAvailabilityPolicyProvider>();
-            services.AddScoped<ISearchAuditRepository, SqlSearchAuditRepository>();
             services.AddScoped<IAdviserReferenceCacheRepository, SqlAdviserReferenceCacheRepository>();
             services.AddScoped<IGeoCache, SqlGeoCache>();
             services.AddScoped<IAdviserGeoCache, SqlGeoCache>();
@@ -36,14 +34,11 @@ internal static class PolicyStoreModuleServiceCollectionExtensions
         else
         {
             services.AddSingleton<ICoveragePolicyProvider, InMemoryCoveragePolicyProvider>();
-            services.AddSingleton<IAvailabilityPolicyProvider, InMemoryAvailabilityPolicyProvider>();
-            services.AddSingleton<ISearchAuditRepository, NoOpSearchAuditRepository>();
             services.AddSingleton<IAdviserReferenceCacheRepository, InMemoryAdviserReferenceCacheRepository>();
             services.AddSingleton<IGeoCache, InMemoryGeoCache>();
             services.AddSingleton<IAdviserGeoCache, InMemoryAdviserGeoCache>();
         }
 
-        services.AddSingleton<IRankingPolicyProvider, InMemoryRankingPolicyProvider>();
         services.AddSingleton<IBaseOfficePolicyProvider, InMemoryBaseOfficePolicyProvider>();
         services.AddSingleton<IRouteMatrixPolicyProvider, InMemoryRouteMatrixPolicyProvider>();
         services.AddSingleton<IGeoCachePolicyProvider, InMemoryGeoCachePolicyProvider>();

@@ -12,8 +12,7 @@ public static class EndpointAccessPolicies
             ["LocationHealthV1"] = EndpointAccessPolicy.Public,
             ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly,
             ["LicenseListV1"] = EndpointAccessPolicy.InternalOnly,
-            ["LocationSearchV1"] = EndpointAccessPolicy.InternalOnly,
-            ["LocationSearchBatchV1"] = EndpointAccessPolicy.InternalOnly,
+
             ["RouteTimeV1"] = EndpointAccessPolicy.InternalOnly,
             ["TravelCoverageV1"] = EndpointAccessPolicy.InternalOnly,
             ["SyncAdviserCacheV1"] = EndpointAccessPolicy.InternalOnly

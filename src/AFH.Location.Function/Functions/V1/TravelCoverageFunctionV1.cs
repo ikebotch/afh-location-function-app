@@ -8,7 +8,6 @@ using Microsoft.Azure.Functions.Worker.Http;
 using System.Net;
 
 using AFH.Location.Function.Functions.V1.Docs;
-using AFH.Location.Contract.V1.Requests.Travel;
 using AFH.Location.Contract.V1.Responses.Travel;
 
 namespace AFH.Location.Function.Functions.V1;
