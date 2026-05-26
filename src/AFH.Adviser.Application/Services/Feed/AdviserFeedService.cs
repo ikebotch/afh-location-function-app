@@ -8,18 +8,26 @@ namespace AFH.Adviser.Application.Services.Feed;
 public sealed class AdviserFeedService : IAdviserFeedService
 {
     private readonly IAdviserRepository _advisers;
+    private readonly IEffectiveCoveragePolicyResolver _coveragePolicyResolver;
 
-    public AdviserFeedService(IAdviserRepository advisers)
+    public AdviserFeedService(
+        IAdviserRepository advisers,
+        IEffectiveCoveragePolicyResolver coveragePolicyResolver)
     {
         _advisers = advisers;
+        _coveragePolicyResolver = coveragePolicyResolver;
     }
 
     public async Task<AdviserFeedResult> GetCoverageFeedAsync(CancellationToken ct)
     {
         var advisers = await _advisers.GetAllAsync(null, ct);
         var activeAdvisers = advisers.Where(x => x.IsActive).ToList();
+        var effectiveCoverage = await _coveragePolicyResolver.ResolveAsync(activeAdvisers, ct);
 
-        var adviserPoints = activeAdvisers.Select(MapAdviser).OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var adviserPoints = activeAdvisers
+            .Select(adviser => MapAdviser(adviser, effectiveCoverage))
+            .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         
         var regionPoints = activeAdvisers
             .Where(x => !string.IsNullOrWhiteSpace(x.Region))
@@ -41,9 +49,12 @@ public sealed class AdviserFeedService : IAdviserFeedService
         };
     }
 
-    private static AdviserFeedItem MapAdviser(Domain.Entities.Adviser adviser)
+    private static AdviserFeedItem MapAdviser(
+        Domain.Entities.Adviser adviser,
+        IReadOnlyDictionary<string, EffectiveCoveragePolicy> effectiveCoverage)
     {
-        var radiusMiles = adviser.CoverageRadiusMiles ?? 0d;
+        effectiveCoverage.TryGetValue(adviser.AdviserId, out var coverage);
+        var radiusMiles = coverage?.RadiusMiles ?? 0d;
         
         return new AdviserFeedItem
         {
@@ -57,10 +68,10 @@ public sealed class AdviserFeedService : IAdviserFeedService
             Rating = adviser.Rating,
             Latitude = 0,
             Longitude = 0,
-            MaxTravelTimeMinutes = adviser.MaxTravelTimeMinutes ?? 0,
+            MaxTravelTimeMinutes = coverage?.MaxTravelTimeMinutes ?? 0,
             RadiusMiles = radiusMiles,
             RadiusKm = Math.Max(1, (int)Math.Round(radiusMiles * 1.609344)),
-            RadiusSource = adviser.CoverageRadiusMiles.HasValue ? "SharePointRadiusMiles" : "Default"
+            RadiusSource = coverage?.RadiusSource ?? "None"
         };
     }
 }

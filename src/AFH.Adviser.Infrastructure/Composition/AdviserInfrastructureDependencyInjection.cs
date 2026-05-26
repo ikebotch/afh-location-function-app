@@ -1,5 +1,6 @@
 using AFH.Adviser.Application.Abstractions.Repositories;
 using AFH.Adviser.Application.Abstractions.Clients;
+using AFH.Adviser.Application.Abstractions.Feed;
 using AFH.Adviser.Infrastructure.External.Calendar;
 using AFH.Adviser.Infrastructure.Options;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
@@ -51,6 +52,7 @@ public static class AdviserInfrastructureDependencyInjection
         services.AddScoped<AdviserSourceRefreshCoordinator>();
         services.AddScoped<AFH.Adviser.Application.Abstractions.Sync.IAdviserCacheSyncService, AFH.Adviser.Application.Services.Sync.AdviserCacheSyncService>();
         services.AddScoped<IAdviserRepository, CachedAdviserRepository>();
+        services.AddScoped<IEffectiveCoveragePolicyResolver, SqlEffectiveCoveragePolicyResolver>();
         services.AddScoped<AFH.Adviser.Application.Abstractions.Skills.IAdviserSkillCatalogService, AFH.Adviser.Application.Services.Skills.AdviserSkillCatalogService>();
         services.AddScoped<AFH.Adviser.Application.Abstractions.Feed.IAdviserFeedService, AFH.Adviser.Application.Services.Feed.AdviserFeedService>();
 
