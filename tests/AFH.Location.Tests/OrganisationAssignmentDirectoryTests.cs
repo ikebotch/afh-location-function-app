@@ -1,6 +1,7 @@
+using AFH.Adviser.Application.Models.Auth;
+using AFH.Adviser.Application.Models.OrganisationAssignments;
+using AFH.Adviser.Contract.V1.OrganisationAssignments;
 using AFH.Location.Application.Models.Auth;
-using AFH.Location.Application.Models.BusinessContacts;
-using AFH.Location.Contract.V1.BusinessContacts;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;
@@ -8,14 +9,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AFH.Location.Tests;
 
-public sealed class BusinessContactDirectoryTests
+public sealed class OrganisationAssignmentDirectoryTests
 {
     [Fact]
     public async Task SearchAsync_ReturnsEnabledContactsByNeutralRoleTerms()
     {
         await using var db = CreateDb();
-        var directory = new SqlBusinessContactDirectory(db);
-        await directory.CreateAsync(new BusinessContactUpsert(
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await directory.CreateAsync(new OrganisationAssignmentUpsert(
             "Booking",
             "Manager",
             null,
@@ -28,7 +29,7 @@ public sealed class BusinessContactDirectoryTests
             ["Email"],
             IsEnabled: true,
             Priority: 10), CancellationToken.None);
-        await directory.CreateAsync(new BusinessContactUpsert(
+        await directory.CreateAsync(new OrganisationAssignmentUpsert(
             "Booking",
             "Manager",
             null,
@@ -42,7 +43,7 @@ public sealed class BusinessContactDirectoryTests
             IsEnabled: false,
             Priority: 1), CancellationToken.None);
 
-        var contacts = await directory.SearchAsync(new BusinessContactSearch(
+        var assignments = await directory.SearchAsync(new OrganisationAssignmentSearch(
             "Booking",
             ["Manager"],
             null,
@@ -50,20 +51,20 @@ public sealed class BusinessContactDirectoryTests
             "North",
             null), CancellationToken.None);
 
-        var contact = Assert.Single(contacts);
-        Assert.Equal("Manager", contact.ContactType);
-        Assert.Equal("manager@example.com", contact.Email);
-        Assert.DoesNotContain("notification", string.Join(' ', typeof(BusinessContactDto).GetProperties().Select(x => x.Name)), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("recipient", string.Join(' ', typeof(BusinessContactDto).GetProperties().Select(x => x.Name)), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("dispatch", string.Join(' ', typeof(BusinessContactDto).GetProperties().Select(x => x.Name)), StringComparison.OrdinalIgnoreCase);
+        var assignment = Assert.Single(assignments);
+        Assert.Equal("Manager", assignment.AssignmentType);
+        Assert.Equal("manager@example.com", assignment.Email);
+        Assert.DoesNotContain("notification", string.Join(' ', typeof(OrganisationAssignmentDto).GetProperties().Select(x => x.Name)), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("recipient", string.Join(' ', typeof(OrganisationAssignmentDto).GetProperties().Select(x => x.Name)), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("dispatch", string.Join(' ', typeof(OrganisationAssignmentDto).GetProperties().Select(x => x.Name)), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public async Task UpdateDisableAndDelete_AreDbDriven()
     {
         await using var db = CreateDb();
-        var directory = new SqlBusinessContactDirectory(db);
-        var created = await directory.CreateAsync(new BusinessContactUpsert(
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        var created = await directory.CreateAsync(new OrganisationAssignmentUpsert(
             "Booking",
             "ContactCentre",
             null,
@@ -71,13 +72,13 @@ public sealed class BusinessContactDirectoryTests
             null,
             null,
             "Contact Centre",
-            "contact@example.com",
+            "assignment@example.com",
             null,
             ["Email"],
             IsEnabled: true,
             Priority: 20), CancellationToken.None);
 
-        var updated = await directory.UpdateAsync(created.Id, new BusinessContactUpsert(
+        var updated = await directory.UpdateAsync(created.Id, new OrganisationAssignmentUpsert(
             "Booking",
             "ContactCentre",
             null,
@@ -93,10 +94,10 @@ public sealed class BusinessContactDirectoryTests
         Assert.Equal("updated@example.com", updated?.Email);
 
         Assert.True(await directory.DisableAsync(created.Id, CancellationToken.None));
-        var enabled = await directory.SearchAsync(new BusinessContactSearch("Booking", ["ContactCentre"], null, null, null, null), CancellationToken.None);
+        var enabled = await directory.SearchAsync(new OrganisationAssignmentSearch("Booking", ["ContactCentre"], null, null, null, null), CancellationToken.None);
         Assert.Empty(enabled);
 
-        var disabled = await directory.SearchAsync(new BusinessContactSearch("Booking", ["ContactCentre"], null, null, null, null, IncludeDisabled: true), CancellationToken.None);
+        var disabled = await directory.SearchAsync(new OrganisationAssignmentSearch("Booking", ["ContactCentre"], null, null, null, null, IncludeDisabled: true), CancellationToken.None);
         Assert.Single(disabled);
 
         Assert.True(await directory.DeleteAsync(created.Id, CancellationToken.None));
@@ -107,12 +108,12 @@ public sealed class BusinessContactDirectoryTests
     public async Task DomainUserPermissionStore_GrantsReadToManagerFromDbRoleMapping()
     {
         await using var db = CreateDb();
-        await SeedRoleAsync(db, "Manager", "Manager", [BusinessContactPermissions.Read]);
+        await SeedRoleAsync(db, "Manager", "Manager", [OrganisationAssignmentPermissions.Read]);
         var store = new SqlDomainUserPermissionStore(db);
 
         var allowed = await store.HasPermissionAsync(
             new DomainUserIdentity("manager@afh.co.uk", ["Manager"], []),
-            BusinessContactPermissions.Read,
+            OrganisationAssignmentPermissions.Read,
             CancellationToken.None);
 
         Assert.True(allowed);
@@ -122,12 +123,12 @@ public sealed class BusinessContactDirectoryTests
     public async Task DomainUserPermissionStore_DeniesCreateToManager()
     {
         await using var db = CreateDb();
-        await SeedRoleAsync(db, "Manager", "Manager", [BusinessContactPermissions.Read]);
+        await SeedRoleAsync(db, "Manager", "Manager", [OrganisationAssignmentPermissions.Read]);
         var store = new SqlDomainUserPermissionStore(db);
 
         var allowed = await store.HasPermissionAsync(
             new DomainUserIdentity("manager@afh.co.uk", ["Manager"], []),
-            BusinessContactPermissions.Create,
+            OrganisationAssignmentPermissions.Create,
             CancellationToken.None);
 
         Assert.False(allowed);
@@ -139,20 +140,20 @@ public sealed class BusinessContactDirectoryTests
         await using var db = CreateDb();
         await SeedRoleAsync(db, "Operations", "Operations",
         [
-            BusinessContactPermissions.Read,
-            BusinessContactPermissions.Create,
-            BusinessContactPermissions.Update,
-            BusinessContactPermissions.Disable,
-            BusinessContactPermissions.Delete
+            OrganisationAssignmentPermissions.Read,
+            OrganisationAssignmentPermissions.Create,
+            OrganisationAssignmentPermissions.Update,
+            OrganisationAssignmentPermissions.Disable,
+            OrganisationAssignmentPermissions.Delete
         ]);
         var store = new SqlDomainUserPermissionStore(db);
 
         var identity = new DomainUserIdentity("ops@afh.co.uk", ["Operations"], []);
 
-        Assert.True(await store.HasPermissionAsync(identity, BusinessContactPermissions.Create, CancellationToken.None));
-        Assert.True(await store.HasPermissionAsync(identity, BusinessContactPermissions.Update, CancellationToken.None));
-        Assert.True(await store.HasPermissionAsync(identity, BusinessContactPermissions.Disable, CancellationToken.None));
-        Assert.True(await store.HasPermissionAsync(identity, BusinessContactPermissions.Delete, CancellationToken.None));
+        Assert.True(await store.HasPermissionAsync(identity, OrganisationAssignmentPermissions.Create, CancellationToken.None));
+        Assert.True(await store.HasPermissionAsync(identity, OrganisationAssignmentPermissions.Update, CancellationToken.None));
+        Assert.True(await store.HasPermissionAsync(identity, OrganisationAssignmentPermissions.Disable, CancellationToken.None));
+        Assert.True(await store.HasPermissionAsync(identity, OrganisationAssignmentPermissions.Delete, CancellationToken.None));
     }
 
     private static async Task SeedRoleAsync(

@@ -1,8 +1,8 @@
-namespace AFH.Location.Application.Models.BusinessContacts;
+namespace AFH.Adviser.Application.Models.OrganisationAssignments;
 
-public sealed record BusinessContactUpsert(
+public sealed record OrganisationAssignmentUpsert(
     string Context,
-    string ContactType,
+    string AssignmentType,
     string? OrganisationId,
     string? ClientId,
     string? Region,

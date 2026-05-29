@@ -1,10 +1,10 @@
 namespace AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 
-public sealed class BusinessContactEntity
+public sealed class OrganisationAssignmentEntity
 {
     public Guid Id { get; set; }
     public string Context { get; set; } = default!;
-    public string ContactType { get; set; } = default!;
+    public string AssignmentType { get; set; } = default!;
     public string? OrganisationId { get; set; }
     public string? ClientId { get; set; }
     public string? Region { get; set; }

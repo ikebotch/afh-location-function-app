@@ -22,7 +22,7 @@ public sealed class LocationPolicyDbContext : DbContext
     public DbSet<AdviserReferenceCacheEntity> AdviserReferenceCache => Set<AdviserReferenceCacheEntity>();
     public DbSet<GeoCacheEntryEntity> GeoCacheEntries => Set<GeoCacheEntryEntity>();
     public DbSet<RouteCacheEntryEntity> RouteCacheEntries => Set<RouteCacheEntryEntity>();
-    public DbSet<BusinessContactEntity> BusinessContacts => Set<BusinessContactEntity>();
+    public DbSet<OrganisationAssignmentEntity> OrganisationAssignments => Set<OrganisationAssignmentEntity>();
     public DbSet<DomainRoleEntity> DomainRoles => Set<DomainRoleEntity>();
     public DbSet<DomainUserRoleMappingEntity> DomainUserRoleMappings => Set<DomainUserRoleMappingEntity>();
     public DbSet<DomainRolePermissionEntity> DomainRolePermissions => Set<DomainRolePermissionEntity>();
@@ -132,12 +132,12 @@ public sealed class LocationPolicyDbContext : DbContext
             entity.HasIndex(x => x.ExpiresUtc);
         });
 
-        modelBuilder.Entity<BusinessContactEntity>(entity =>
+        modelBuilder.Entity<OrganisationAssignmentEntity>(entity =>
         {
-            entity.ToTable("BusinessContacts");
+            entity.ToTable("OrganisationAssignments");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Context).HasMaxLength(100).IsRequired();
-            entity.Property(x => x.ContactType).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.AssignmentType).HasMaxLength(100).IsRequired();
             entity.Property(x => x.OrganisationId).HasMaxLength(100);
             entity.Property(x => x.ClientId).HasMaxLength(100);
             entity.Property(x => x.Region).HasMaxLength(128);
@@ -146,7 +146,7 @@ public sealed class LocationPolicyDbContext : DbContext
             entity.Property(x => x.Email).HasMaxLength(320);
             entity.Property(x => x.MobileNumber).HasMaxLength(50);
             entity.Property(x => x.Channels).HasMaxLength(200).IsRequired();
-            entity.HasIndex(x => new { x.Context, x.ContactType, x.IsEnabled, x.Priority });
+            entity.HasIndex(x => new { x.Context, x.AssignmentType, x.IsEnabled, x.Priority });
             entity.HasIndex(x => x.Region);
             entity.HasIndex(x => x.AdviserId);
             entity.HasIndex(x => x.ClientId);

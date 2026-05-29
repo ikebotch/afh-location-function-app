@@ -1,35 +1,35 @@
-using AFH.Location.Application.Abstractions.BusinessContacts;
-using AFH.Location.Application.Models.BusinessContacts;
+using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
+using AFH.Adviser.Application.Models.OrganisationAssignments;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace AFH.Location.Infrastructure.Persistence.Repositories;
 
-public sealed class SqlBusinessContactDirectory : IBusinessContactDirectory
+public sealed class SqlOrganisationAssignmentDirectory : IOrganisationAssignmentDirectory
 {
     private readonly LocationPolicyDbContext _db;
 
-    public SqlBusinessContactDirectory(LocationPolicyDbContext db)
+    public SqlOrganisationAssignmentDirectory(LocationPolicyDbContext db)
     {
         _db = db;
     }
 
-    public async Task<IReadOnlyList<BusinessContact>> SearchAsync(BusinessContactSearch search, CancellationToken ct)
+    public async Task<IReadOnlyList<OrganisationAssignment>> SearchAsync(OrganisationAssignmentSearch search, CancellationToken ct)
     {
-        var query = _db.BusinessContacts.AsNoTracking();
+        var query = _db.OrganisationAssignments.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(search.Context))
             query = query.Where(x => x.Context == search.Context.Trim());
 
-        if (search.ContactTypes.Count > 0)
+        if (search.AssignmentTypes.Count > 0)
         {
-            var types = search.ContactTypes
+            var types = search.AssignmentTypes
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            query = query.Where(x => types.Contains(x.ContactType));
+            query = query.Where(x => types.Contains(x.AssignmentType));
         }
 
         if (!string.IsNullOrWhiteSpace(search.OrganisationId))
@@ -49,36 +49,36 @@ public sealed class SqlBusinessContactDirectory : IBusinessContactDirectory
 
         var rows = await query
             .OrderBy(x => x.Priority)
-            .ThenBy(x => x.ContactType)
+            .ThenBy(x => x.AssignmentType)
             .ThenBy(x => x.DisplayName)
             .ToArrayAsync(ct);
 
         return rows.Select(ToModel).ToArray();
     }
 
-    public async Task<BusinessContact?> GetAsync(Guid id, CancellationToken ct)
+    public async Task<OrganisationAssignment?> GetAsync(Guid id, CancellationToken ct)
     {
-        var row = await _db.BusinessContacts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        var row = await _db.OrganisationAssignments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         return row is null ? null : ToModel(row);
     }
 
-    public async Task<BusinessContact> CreateAsync(BusinessContactUpsert request, CancellationToken ct)
+    public async Task<OrganisationAssignment> CreateAsync(OrganisationAssignmentUpsert request, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var row = new BusinessContactEntity
+        var row = new OrganisationAssignmentEntity
         {
             Id = Guid.NewGuid(),
             CreatedUtc = now
         };
         Apply(row, request, now);
-        _db.BusinessContacts.Add(row);
+        _db.OrganisationAssignments.Add(row);
         await _db.SaveChangesAsync(ct);
         return ToModel(row);
     }
 
-    public async Task<BusinessContact?> UpdateAsync(Guid id, BusinessContactUpsert request, CancellationToken ct)
+    public async Task<OrganisationAssignment?> UpdateAsync(Guid id, OrganisationAssignmentUpsert request, CancellationToken ct)
     {
-        var row = await _db.BusinessContacts.FirstOrDefaultAsync(x => x.Id == id, ct);
+        var row = await _db.OrganisationAssignments.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (row is null)
             return null;
 
@@ -89,7 +89,7 @@ public sealed class SqlBusinessContactDirectory : IBusinessContactDirectory
 
     public async Task<bool> DisableAsync(Guid id, CancellationToken ct)
     {
-        var row = await _db.BusinessContacts.FirstOrDefaultAsync(x => x.Id == id, ct);
+        var row = await _db.OrganisationAssignments.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (row is null)
             return false;
 
@@ -101,19 +101,19 @@ public sealed class SqlBusinessContactDirectory : IBusinessContactDirectory
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct)
     {
-        var row = await _db.BusinessContacts.FirstOrDefaultAsync(x => x.Id == id, ct);
+        var row = await _db.OrganisationAssignments.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (row is null)
             return false;
 
-        _db.BusinessContacts.Remove(row);
+        _db.OrganisationAssignments.Remove(row);
         await _db.SaveChangesAsync(ct);
         return true;
     }
 
-    private static void Apply(BusinessContactEntity row, BusinessContactUpsert request, DateTime now)
+    private static void Apply(OrganisationAssignmentEntity row, OrganisationAssignmentUpsert request, DateTime now)
     {
         row.Context = Require(request.Context, "context");
-        row.ContactType = Require(request.ContactType, "contactType");
+        row.AssignmentType = Require(request.AssignmentType, "assignmentType");
         row.OrganisationId = TrimToNull(request.OrganisationId);
         row.ClientId = TrimToNull(request.ClientId);
         row.Region = TrimToNull(request.Region);
@@ -127,11 +127,11 @@ public sealed class SqlBusinessContactDirectory : IBusinessContactDirectory
         row.UpdatedUtc = now;
     }
 
-    private static BusinessContact ToModel(BusinessContactEntity row)
+    private static OrganisationAssignment ToModel(OrganisationAssignmentEntity row)
         => new(
             row.Id,
             row.Context,
-            row.ContactType,
+            row.AssignmentType,
             row.OrganisationId,
             row.ClientId,
             row.Region,

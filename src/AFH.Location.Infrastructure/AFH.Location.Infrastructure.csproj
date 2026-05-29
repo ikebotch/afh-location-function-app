@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<ItemGroup>
+		<ProjectReference Include="..\AFH.Adviser.Application\AFH.Adviser.Application.csproj" />
 		<ProjectReference Include="..\AFH.Location.Application\AFH.Location.Application.csproj" />
 		<ProjectReference Include="..\AFH.Location.Domain\AFH.Location.Domain.csproj" />
 		</ItemGroup>

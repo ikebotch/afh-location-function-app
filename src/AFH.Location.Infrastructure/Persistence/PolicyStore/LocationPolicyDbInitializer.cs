@@ -1,5 +1,5 @@
 using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
-using AFH.Location.Application.Models.Auth;
+using AFH.Adviser.Application.Models.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,7 +36,7 @@ public sealed class LocationPolicyDbInitializer : IHostedService
         var db = scope.ServiceProvider.GetRequiredService<LocationPolicyDbContext>();
 
         await db.Database.EnsureCreatedAsync(cancellationToken);
-        await EnsureBusinessContactsTableAsync(db, cancellationToken);
+        await EnsureOrganisationAssignmentsTableAsync(db, cancellationToken);
         await EnsureDomainRbacTablesAsync(db, cancellationToken);
         await SeedDomainRbacAsync(db, cancellationToken);
         await SeedIfEmptyAsync(db, cancellationToken);
@@ -44,14 +44,14 @@ public sealed class LocationPolicyDbInitializer : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private static Task EnsureBusinessContactsTableAsync(LocationPolicyDbContext db, CancellationToken ct)
+    private static Task EnsureOrganisationAssignmentsTableAsync(LocationPolicyDbContext db, CancellationToken ct)
         => db.Database.ExecuteSqlRawAsync("""
-            IF OBJECT_ID(N'[dbo].[BusinessContacts]', N'U') IS NULL
+            IF OBJECT_ID(N'[dbo].[OrganisationAssignments]', N'U') IS NULL
             BEGIN
-                CREATE TABLE [dbo].[BusinessContacts] (
+                CREATE TABLE [dbo].[OrganisationAssignments] (
                     [Id] uniqueidentifier NOT NULL,
                     [Context] nvarchar(100) NOT NULL,
-                    [ContactType] nvarchar(100) NOT NULL,
+                    [AssignmentType] nvarchar(100) NOT NULL,
                     [OrganisationId] nvarchar(100) NULL,
                     [ClientId] nvarchar(100) NULL,
                     [Region] nvarchar(128) NULL,
@@ -64,24 +64,24 @@ public sealed class LocationPolicyDbInitializer : IHostedService
                     [Priority] int NOT NULL,
                     [CreatedUtc] datetime2 NOT NULL,
                     [UpdatedUtc] datetime2 NULL,
-                    CONSTRAINT [PK_BusinessContacts] PRIMARY KEY ([Id])
+                    CONSTRAINT [PK_OrganisationAssignments] PRIMARY KEY ([Id])
                 );
             END
 
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_BusinessContacts_Context_ContactType_IsEnabled_Priority' AND [object_id] = OBJECT_ID(N'[dbo].[BusinessContacts]'))
-                CREATE INDEX [IX_BusinessContacts_Context_ContactType_IsEnabled_Priority] ON [dbo].[BusinessContacts] ([Context], [ContactType], [IsEnabled], [Priority]);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_OrganisationAssignments_Context_AssignmentType_IsEnabled_Priority' AND [object_id] = OBJECT_ID(N'[dbo].[OrganisationAssignments]'))
+                CREATE INDEX [IX_OrganisationAssignments_Context_AssignmentType_IsEnabled_Priority] ON [dbo].[OrganisationAssignments] ([Context], [AssignmentType], [IsEnabled], [Priority]);
 
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_BusinessContacts_Region' AND [object_id] = OBJECT_ID(N'[dbo].[BusinessContacts]'))
-                CREATE INDEX [IX_BusinessContacts_Region] ON [dbo].[BusinessContacts] ([Region]);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_OrganisationAssignments_Region' AND [object_id] = OBJECT_ID(N'[dbo].[OrganisationAssignments]'))
+                CREATE INDEX [IX_OrganisationAssignments_Region] ON [dbo].[OrganisationAssignments] ([Region]);
 
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_BusinessContacts_AdviserId' AND [object_id] = OBJECT_ID(N'[dbo].[BusinessContacts]'))
-                CREATE INDEX [IX_BusinessContacts_AdviserId] ON [dbo].[BusinessContacts] ([AdviserId]);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_OrganisationAssignments_AdviserId' AND [object_id] = OBJECT_ID(N'[dbo].[OrganisationAssignments]'))
+                CREATE INDEX [IX_OrganisationAssignments_AdviserId] ON [dbo].[OrganisationAssignments] ([AdviserId]);
 
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_BusinessContacts_ClientId' AND [object_id] = OBJECT_ID(N'[dbo].[BusinessContacts]'))
-                CREATE INDEX [IX_BusinessContacts_ClientId] ON [dbo].[BusinessContacts] ([ClientId]);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_OrganisationAssignments_ClientId' AND [object_id] = OBJECT_ID(N'[dbo].[OrganisationAssignments]'))
+                CREATE INDEX [IX_OrganisationAssignments_ClientId] ON [dbo].[OrganisationAssignments] ([ClientId]);
 
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_BusinessContacts_OrganisationId' AND [object_id] = OBJECT_ID(N'[dbo].[BusinessContacts]'))
-                CREATE INDEX [IX_BusinessContacts_OrganisationId] ON [dbo].[BusinessContacts] ([OrganisationId]);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_OrganisationAssignments_OrganisationId' AND [object_id] = OBJECT_ID(N'[dbo].[OrganisationAssignments]'))
+                CREATE INDEX [IX_OrganisationAssignments_OrganisationId] ON [dbo].[OrganisationAssignments] ([OrganisationId]);
             """, ct);
 
     private static Task EnsureDomainRbacTablesAsync(LocationPolicyDbContext db, CancellationToken ct)
@@ -163,23 +163,23 @@ public sealed class LocationPolicyDbInitializer : IHostedService
         var roles = await db.DomainRoles.ToDictionaryAsync(x => x.Role, x => x.Id, StringComparer.OrdinalIgnoreCase, ct);
         var permissionsByRole = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
-            ["LeadTech"] = [BusinessContactPermissions.Read],
-            ["Manager"] = [BusinessContactPermissions.Read],
+            ["LeadTech"] = [OrganisationAssignmentPermissions.Read],
+            ["Manager"] = [OrganisationAssignmentPermissions.Read],
             ["Operations"] =
             [
-                BusinessContactPermissions.Read,
-                BusinessContactPermissions.Create,
-                BusinessContactPermissions.Update,
-                BusinessContactPermissions.Disable,
-                BusinessContactPermissions.Delete
+                OrganisationAssignmentPermissions.Read,
+                OrganisationAssignmentPermissions.Create,
+                OrganisationAssignmentPermissions.Update,
+                OrganisationAssignmentPermissions.Disable,
+                OrganisationAssignmentPermissions.Delete
             ],
             ["Admin"] =
             [
-                BusinessContactPermissions.Read,
-                BusinessContactPermissions.Create,
-                BusinessContactPermissions.Update,
-                BusinessContactPermissions.Disable,
-                BusinessContactPermissions.Delete
+                OrganisationAssignmentPermissions.Read,
+                OrganisationAssignmentPermissions.Create,
+                OrganisationAssignmentPermissions.Update,
+                OrganisationAssignmentPermissions.Disable,
+                OrganisationAssignmentPermissions.Delete
             ]
         };
 

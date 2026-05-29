@@ -1,8 +1,8 @@
-namespace AFH.Location.Contract.V1.BusinessContacts;
+namespace AFH.Adviser.Contract.V1.OrganisationAssignments;
 
-public sealed record BusinessContactDto(
+public sealed record OrganisationAssignmentDto(
     Guid Id,
-    string ContactType,
+    string AssignmentType,
     string DisplayName,
     string? Email,
     string? MobileNumber,

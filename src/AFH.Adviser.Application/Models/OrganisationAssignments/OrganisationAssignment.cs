@@ -1,9 +1,9 @@
-namespace AFH.Location.Application.Models.BusinessContacts;
+namespace AFH.Adviser.Application.Models.OrganisationAssignments;
 
-public sealed record BusinessContact(
+public sealed record OrganisationAssignment(
     Guid Id,
     string Context,
-    string ContactType,
+    string AssignmentType,
     string? OrganisationId,
     string? ClientId,
     string? Region,
