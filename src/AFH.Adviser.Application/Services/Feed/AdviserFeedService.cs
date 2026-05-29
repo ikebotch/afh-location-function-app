@@ -28,7 +28,7 @@ public sealed class AdviserFeedService : IAdviserFeedService
             .Select(adviser => MapAdviser(adviser, effectiveCoverage))
             .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        
+
         var regionPoints = activeAdvisers
             .Where(x => !string.IsNullOrWhiteSpace(x.Region))
             .GroupBy(x => x.Region!.Trim(), StringComparer.OrdinalIgnoreCase)
@@ -55,7 +55,7 @@ public sealed class AdviserFeedService : IAdviserFeedService
     {
         effectiveCoverage.TryGetValue(adviser.AdviserId, out var coverage);
         var radiusMiles = coverage?.RadiusMiles ?? 0d;
-        
+
         return new AdviserFeedItem
         {
             Id = adviser.AdviserId,

@@ -47,7 +47,7 @@ public static class AdviserInfrastructureDependencyInjection
 
         services.AddScoped<IAdviserReferenceCacheRepository, SqlAdviserReferenceCacheRepository>();
         // Or if in-memory was used for fallback/tests, keep it if needed, but Sql was primary.
-        
+
         services.AddSharePoint(configuration);
         services.AddScoped<AdviserSourceRefreshCoordinator>();
         services.AddScoped<AFH.Adviser.Application.Abstractions.Sync.IAdviserCacheSyncService, AFH.Adviser.Application.Services.Sync.AdviserCacheSyncService>();

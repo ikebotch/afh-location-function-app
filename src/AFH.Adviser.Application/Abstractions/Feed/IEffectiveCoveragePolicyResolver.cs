@@ -1,4 +1,4 @@
-using AFH.Adviser.Application.Models.Feed;
+﻿using AFH.Adviser.Application.Models.Feed;
 using Entities = AFH.Adviser.Domain.Entities;
 
 namespace AFH.Adviser.Application.Abstractions.Feed;

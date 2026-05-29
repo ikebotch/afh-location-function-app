@@ -1,4 +1,4 @@
-namespace AFH.Adviser.Application.Models.Feed;
+﻿namespace AFH.Adviser.Application.Models.Feed;
 
 public sealed record EffectiveCoveragePolicy(
     double? RadiusMiles,

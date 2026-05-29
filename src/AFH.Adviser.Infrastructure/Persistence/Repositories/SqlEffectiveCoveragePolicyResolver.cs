@@ -1,4 +1,4 @@
-using AFH.Adviser.Application.Abstractions.Feed;
+﻿using AFH.Adviser.Application.Abstractions.Feed;
 using AFH.Adviser.Application.Models.Feed;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using Microsoft.EntityFrameworkCore;
