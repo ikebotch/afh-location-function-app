@@ -19,6 +19,11 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("RouteTimeV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("SyncAdviserCacheV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("TravelCoverageV1", EndpointAccessPolicy.InternalOnly)]
+    [InlineData("BusinessContactsListV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("BusinessContactsCreateV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("BusinessContactsUpdateV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("BusinessContactsDisableV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("BusinessContactsDeleteV1", EndpointAccessPolicy.UserAuthenticated)]
     public void EndpointAccessPolicies_ClassifiesFunctions(string functionName, EndpointAccessPolicy expected)
     {
         Assert.Equal(expected, EndpointAccessPolicies.GetPolicy(functionName));

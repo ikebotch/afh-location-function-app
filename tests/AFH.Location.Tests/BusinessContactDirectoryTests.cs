@@ -1,5 +1,7 @@
+using AFH.Location.Application.Models.Auth;
 using AFH.Location.Application.Models.BusinessContacts;
 using AFH.Location.Contract.V1.BusinessContacts;
+using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -101,6 +103,88 @@ public sealed class BusinessContactDirectoryTests
         Assert.Null(await directory.GetAsync(created.Id, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task DomainUserPermissionStore_GrantsReadToManagerFromDbRoleMapping()
+    {
+        await using var db = CreateDb();
+        await SeedRoleAsync(db, "Manager", "Manager", [BusinessContactPermissions.Read]);
+        var store = new SqlDomainUserPermissionStore(db);
+
+        var allowed = await store.HasPermissionAsync(
+            new DomainUserIdentity("manager@afh.co.uk", ["Manager"], []),
+            BusinessContactPermissions.Read,
+            CancellationToken.None);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task DomainUserPermissionStore_DeniesCreateToManager()
+    {
+        await using var db = CreateDb();
+        await SeedRoleAsync(db, "Manager", "Manager", [BusinessContactPermissions.Read]);
+        var store = new SqlDomainUserPermissionStore(db);
+
+        var allowed = await store.HasPermissionAsync(
+            new DomainUserIdentity("manager@afh.co.uk", ["Manager"], []),
+            BusinessContactPermissions.Create,
+            CancellationToken.None);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public async Task DomainUserPermissionStore_GrantsManagementToOperations()
+    {
+        await using var db = CreateDb();
+        await SeedRoleAsync(db, "Operations", "Operations",
+        [
+            BusinessContactPermissions.Read,
+            BusinessContactPermissions.Create,
+            BusinessContactPermissions.Update,
+            BusinessContactPermissions.Disable,
+            BusinessContactPermissions.Delete
+        ]);
+        var store = new SqlDomainUserPermissionStore(db);
+
+        var identity = new DomainUserIdentity("ops@afh.co.uk", ["Operations"], []);
+
+        Assert.True(await store.HasPermissionAsync(identity, BusinessContactPermissions.Create, CancellationToken.None));
+        Assert.True(await store.HasPermissionAsync(identity, BusinessContactPermissions.Update, CancellationToken.None));
+        Assert.True(await store.HasPermissionAsync(identity, BusinessContactPermissions.Disable, CancellationToken.None));
+        Assert.True(await store.HasPermissionAsync(identity, BusinessContactPermissions.Delete, CancellationToken.None));
+    }
+
+    private static async Task SeedRoleAsync(
+        LocationPolicyDbContext db,
+        string role,
+        string externalRole,
+        IReadOnlyList<string> permissions)
+    {
+        var roleId = Guid.NewGuid();
+        db.DomainRoles.Add(new DomainRoleEntity { Id = roleId, Role = role, CreatedUtc = DateTime.UtcNow });
+        db.DomainUserRoleMappings.Add(new DomainUserRoleMappingEntity
+        {
+            Id = Guid.NewGuid(),
+            RoleId = roleId,
+            ExternalRole = externalRole,
+            IsEnabled = true,
+            CreatedUtc = DateTime.UtcNow
+        });
+        foreach (var permission in permissions)
+        {
+            db.DomainRolePermissions.Add(new DomainRolePermissionEntity
+            {
+                Id = Guid.NewGuid(),
+                RoleId = roleId,
+                Permission = permission,
+                CreatedUtc = DateTime.UtcNow
+            });
+        }
+
+        await db.SaveChangesAsync();
+    }
+
     private static LocationPolicyDbContext CreateDb()
     {
         var options = new DbContextOptionsBuilder<LocationPolicyDbContext>()
@@ -109,4 +193,3 @@ public sealed class BusinessContactDirectoryTests
         return new LocationPolicyDbContext(options);
     }
 }
-

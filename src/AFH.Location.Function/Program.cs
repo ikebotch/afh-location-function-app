@@ -1,6 +1,7 @@
 using AFH.Common.Errors.Abstractions;
 using AFH.Common.Errors.AzureFunctions.DependencyInjection;
 using AFH.Location.Function.Middleware;
+using AFH.Location.Function.Security;
 using AFH.Location.Infrastructure.Composition;
 using AFH.Adviser.Infrastructure.Composition;
 using Azure.Core.Serialization;
@@ -25,6 +26,7 @@ var host = new HostBuilder()
         AddSharedErrorHandling(services, ctx.Configuration, "[AFH Location Error]", "location");
         services.AddLocationInfrastructure(ctx.Configuration);
         services.AddAdviserInfrastructure(ctx.Configuration);
+        services.AddScoped<IDomainUserAuthorizationService, DomainUserAuthorizationService>();
         ConfigureWorkerSerialization(services, caseInsensitivePropertyNames: true);
     })
     .Build();

@@ -16,11 +16,11 @@ public static class EndpointAccessPolicies
             ["TravelCoverageV1"] = EndpointAccessPolicy.InternalOnly,
             ["SyncAdviserCacheV1"] = EndpointAccessPolicy.InternalOnly,
             ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly,
-            ["BusinessContactsListV1"] = EndpointAccessPolicy.InternalOnly,
-            ["BusinessContactsCreateV1"] = EndpointAccessPolicy.InternalOnly,
-            ["BusinessContactsUpdateV1"] = EndpointAccessPolicy.InternalOnly,
-            ["BusinessContactsDisableV1"] = EndpointAccessPolicy.InternalOnly,
-            ["BusinessContactsDeleteV1"] = EndpointAccessPolicy.InternalOnly
+            ["BusinessContactsListV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["BusinessContactsCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["BusinessContactsUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["BusinessContactsDisableV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["BusinessContactsDeleteV1"] = EndpointAccessPolicy.UserAuthenticated
         };
 
     internal static IReadOnlyCollection<string> KnownHttpFunctions => Policies.Keys.ToArray();

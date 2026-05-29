@@ -1,8 +1,10 @@
 using System.Net;
 using AFH.Location.Application.Abstractions.BusinessContacts;
 using AFH.Location.Application.Models.BusinessContacts;
+using AFH.Location.Application.Models.Auth;
 using AFH.Location.Contract.V1.BusinessContacts;
 using AFH.Location.Function.Functions.Common;
+using AFH.Location.Function.Security;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -12,18 +14,26 @@ namespace AFH.Location.Function.Functions.V1.Admin;
 public sealed class BusinessContactsFunctionV1
 {
     private readonly IBusinessContactDirectory _directory;
+    private readonly IDomainUserAuthorizationService _auth;
 
-    public BusinessContactsFunctionV1(IBusinessContactDirectory directory)
+    public BusinessContactsFunctionV1(
+        IBusinessContactDirectory directory,
+        IDomainUserAuthorizationService auth)
     {
         _directory = directory;
+        _auth = auth;
     }
 
     [Function("BusinessContactsListV1")]
     public async Task<HttpResponseData> ListAsync(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "v1/admin/business-contacts")]
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/admin/business-contacts")]
         HttpRequestData req,
         CancellationToken ct)
     {
+        var authFailure = await _auth.AuthorizeAsync(req, BusinessContactPermissions.Read, allowInternal: true, ct);
+        if (authFailure is not null)
+            return authFailure;
+
         var search = ToSearch(req.Url.Query);
         var contacts = await _directory.SearchAsync(search, ct);
         var response = new BusinessContactsResponseV1(contacts.Select(ToDto).ToArray());
@@ -32,10 +42,14 @@ public sealed class BusinessContactsFunctionV1
 
     [Function("BusinessContactsCreateV1")]
     public async Task<HttpResponseData> CreateAsync(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/admin/business-contacts")]
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/admin/business-contacts")]
         HttpRequestData req,
         CancellationToken ct)
     {
+        var authFailure = await _auth.AuthorizeAsync(req, BusinessContactPermissions.Create, allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
         var body = await req.ReadFromJsonAsync<BusinessContactUpsertRequestV1>(ct);
         var validation = Validate(body);
         if (validation is not null)
@@ -47,11 +61,15 @@ public sealed class BusinessContactsFunctionV1
 
     [Function("BusinessContactsUpdateV1")]
     public async Task<HttpResponseData> UpdateAsync(
-        [HttpTrigger(AuthorizationLevel.Function, "put", Route = "v1/admin/business-contacts/{id:guid}")]
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/admin/business-contacts/{id:guid}")]
         HttpRequestData req,
         Guid id,
         CancellationToken ct)
     {
+        var authFailure = await _auth.AuthorizeAsync(req, BusinessContactPermissions.Update, allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
         var body = await req.ReadFromJsonAsync<BusinessContactUpsertRequestV1>(ct);
         var validation = Validate(body);
         if (validation is not null)
@@ -65,11 +83,15 @@ public sealed class BusinessContactsFunctionV1
 
     [Function("BusinessContactsDisableV1")]
     public async Task<HttpResponseData> DisableAsync(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "v1/admin/business-contacts/{id:guid}/disable")]
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/admin/business-contacts/{id:guid}/disable")]
         HttpRequestData req,
         Guid id,
         CancellationToken ct)
     {
+        var authFailure = await _auth.AuthorizeAsync(req, BusinessContactPermissions.Disable, allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
         var disabled = await _directory.DisableAsync(id, ct);
         return disabled
             ? await req.WriteSuccessAsync(new { id, disabled = true }, ct)
@@ -78,11 +100,15 @@ public sealed class BusinessContactsFunctionV1
 
     [Function("BusinessContactsDeleteV1")]
     public async Task<HttpResponseData> DeleteAsync(
-        [HttpTrigger(AuthorizationLevel.Function, "delete", Route = "v1/admin/business-contacts/{id:guid}")]
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/admin/business-contacts/{id:guid}")]
         HttpRequestData req,
         Guid id,
         CancellationToken ct)
     {
+        var authFailure = await _auth.AuthorizeAsync(req, BusinessContactPermissions.Delete, allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
         var deleted = await _directory.DeleteAsync(id, ct);
         return deleted
             ? await req.WriteSuccessAsync(new { id, deleted = true }, ct)
@@ -158,4 +184,3 @@ public sealed class BusinessContactsFunctionV1
             contact.IsEnabled,
             contact.Priority);
 }
-

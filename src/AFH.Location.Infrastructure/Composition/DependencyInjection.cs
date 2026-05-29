@@ -27,6 +27,7 @@ public static class DependencyInjection
     {
         services.AddHttpClient();
         services.Configure<ApplicationLoggingOptions>(configuration.GetSection(ApplicationLoggingOptions.SectionName));
+        services.Configure<DomainUserAuthOptions>(configuration.GetSection(DomainUserAuthOptions.SectionName));
 
         services.AddSingleton<IValidateOptions<InternalApiAuthOptions>, InternalApiAuthOptionsValidator>();
         services.AddOptions<InternalApiAuthOptions>()
