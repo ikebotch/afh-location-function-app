@@ -1,13 +1,9 @@
-using AFH.Adviser.Application.Models.Auth;
 using AFH.Adviser.Application.Models.OrganisationAssignments;
 using AFH.Adviser.Contract.V1.OrganisationAssignments;
-using AFH.Location.Application.Models.Auth;
-using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
-using AFH.Location.Infrastructure.Persistence.PolicyStore;
-using AFH.Location.Infrastructure.Persistence.Repositories;
+using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using Microsoft.EntityFrameworkCore;
 
-namespace AFH.Location.Tests;
+namespace AFH.Adviser.Tests;
 
 public sealed class OrganisationAssignmentDirectoryTests
 {
@@ -104,93 +100,11 @@ public sealed class OrganisationAssignmentDirectoryTests
         Assert.Null(await directory.GetAsync(created.Id, CancellationToken.None));
     }
 
-    [Fact]
-    public async Task DomainUserPermissionStore_GrantsReadToManagerFromDbRoleMapping()
+    private static AdviserDirectoryDbContext CreateDb()
     {
-        await using var db = CreateDb();
-        await SeedRoleAsync(db, "Manager", "Manager", [OrganisationAssignmentPermissions.Read]);
-        var store = new SqlDomainUserPermissionStore(db);
-
-        var allowed = await store.HasPermissionAsync(
-            new DomainUserIdentity("manager@afh.co.uk", ["Manager"], []),
-            OrganisationAssignmentPermissions.Read,
-            CancellationToken.None);
-
-        Assert.True(allowed);
-    }
-
-    [Fact]
-    public async Task DomainUserPermissionStore_DeniesCreateToManager()
-    {
-        await using var db = CreateDb();
-        await SeedRoleAsync(db, "Manager", "Manager", [OrganisationAssignmentPermissions.Read]);
-        var store = new SqlDomainUserPermissionStore(db);
-
-        var allowed = await store.HasPermissionAsync(
-            new DomainUserIdentity("manager@afh.co.uk", ["Manager"], []),
-            OrganisationAssignmentPermissions.Create,
-            CancellationToken.None);
-
-        Assert.False(allowed);
-    }
-
-    [Fact]
-    public async Task DomainUserPermissionStore_GrantsManagementToOperations()
-    {
-        await using var db = CreateDb();
-        await SeedRoleAsync(db, "Operations", "Operations",
-        [
-            OrganisationAssignmentPermissions.Read,
-            OrganisationAssignmentPermissions.Create,
-            OrganisationAssignmentPermissions.Update,
-            OrganisationAssignmentPermissions.Disable,
-            OrganisationAssignmentPermissions.Delete
-        ]);
-        var store = new SqlDomainUserPermissionStore(db);
-
-        var identity = new DomainUserIdentity("ops@afh.co.uk", ["Operations"], []);
-
-        Assert.True(await store.HasPermissionAsync(identity, OrganisationAssignmentPermissions.Create, CancellationToken.None));
-        Assert.True(await store.HasPermissionAsync(identity, OrganisationAssignmentPermissions.Update, CancellationToken.None));
-        Assert.True(await store.HasPermissionAsync(identity, OrganisationAssignmentPermissions.Disable, CancellationToken.None));
-        Assert.True(await store.HasPermissionAsync(identity, OrganisationAssignmentPermissions.Delete, CancellationToken.None));
-    }
-
-    private static async Task SeedRoleAsync(
-        LocationPolicyDbContext db,
-        string role,
-        string externalRole,
-        IReadOnlyList<string> permissions)
-    {
-        var roleId = Guid.NewGuid();
-        db.DomainRoles.Add(new DomainRoleEntity { Id = roleId, Role = role, CreatedUtc = DateTime.UtcNow });
-        db.DomainUserRoleMappings.Add(new DomainUserRoleMappingEntity
-        {
-            Id = Guid.NewGuid(),
-            RoleId = roleId,
-            ExternalRole = externalRole,
-            IsEnabled = true,
-            CreatedUtc = DateTime.UtcNow
-        });
-        foreach (var permission in permissions)
-        {
-            db.DomainRolePermissions.Add(new DomainRolePermissionEntity
-            {
-                Id = Guid.NewGuid(),
-                RoleId = roleId,
-                Permission = permission,
-                CreatedUtc = DateTime.UtcNow
-            });
-        }
-
-        await db.SaveChangesAsync();
-    }
-
-    private static LocationPolicyDbContext CreateDb()
-    {
-        var options = new DbContextOptionsBuilder<LocationPolicyDbContext>()
+        var options = new DbContextOptionsBuilder<AdviserDirectoryDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
-        return new LocationPolicyDbContext(options);
+        return new AdviserDirectoryDbContext(options);
     }
 }

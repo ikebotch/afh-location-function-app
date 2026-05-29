@@ -1,7 +1,7 @@
 using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
 using AFH.Adviser.Application.Models.OrganisationAssignments;
 
-namespace AFH.Location.Infrastructure.Persistence.Repositories;
+namespace AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 
 public sealed class InMemoryOrganisationAssignmentDirectory : IOrganisationAssignmentDirectory
 {

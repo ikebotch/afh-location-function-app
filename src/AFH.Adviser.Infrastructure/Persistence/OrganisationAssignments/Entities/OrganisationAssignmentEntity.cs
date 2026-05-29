@@ -1,4 +1,4 @@
-namespace AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
+namespace AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments.Entities;
 
 public sealed class OrganisationAssignmentEntity
 {

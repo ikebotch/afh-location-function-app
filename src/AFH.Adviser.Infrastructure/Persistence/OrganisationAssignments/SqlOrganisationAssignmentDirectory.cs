@@ -1,16 +1,15 @@
 using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
 using AFH.Adviser.Application.Models.OrganisationAssignments;
-using AFH.Location.Infrastructure.Persistence.PolicyStore;
-using AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
+using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace AFH.Location.Infrastructure.Persistence.Repositories;
+namespace AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 
 public sealed class SqlOrganisationAssignmentDirectory : IOrganisationAssignmentDirectory
 {
-    private readonly LocationPolicyDbContext _db;
+    private readonly AdviserDirectoryDbContext _db;
 
-    public SqlOrganisationAssignmentDirectory(LocationPolicyDbContext db)
+    public SqlOrganisationAssignmentDirectory(AdviserDirectoryDbContext db)
     {
         _db = db;
     }

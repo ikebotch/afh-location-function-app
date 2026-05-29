@@ -1,10 +1,13 @@
 using AFH.Adviser.Application.Abstractions.Repositories;
 using AFH.Adviser.Application.Abstractions.Clients;
 using AFH.Adviser.Application.Abstractions.Feed;
+using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.External.Calendar;
 using AFH.Adviser.Infrastructure.Options;
+using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
 using AFH.Common.SharePointUtils.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -33,6 +36,18 @@ public static class AdviserInfrastructureDependencyInjection
 
         services.Configure<SharePointAdviserOptions>(configuration.GetSection(SharePointAdviserOptions.SectionName));
 
+        var adviserDirectoryConnectionString = ResolveAdviserDirectoryDbConnectionString(configuration);
+        if (!string.IsNullOrWhiteSpace(adviserDirectoryConnectionString))
+        {
+            services.AddDbContext<AdviserDirectoryDbContext>(options => options.UseSqlServer(adviserDirectoryConnectionString));
+            services.AddScoped<IOrganisationAssignmentDirectory, SqlOrganisationAssignmentDirectory>();
+            services.AddHostedService<AdviserDirectoryDbInitializer>();
+        }
+        else
+        {
+            services.AddSingleton<IOrganisationAssignmentDirectory, InMemoryOrganisationAssignmentDirectory>();
+        }
+
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
 
         var useAdviserFeed = configuration.GetValue<bool>("AdviserFeed:Enabled");
@@ -58,4 +73,14 @@ public static class AdviserInfrastructureDependencyInjection
 
         return services;
     }
+
+    private static string? ResolveAdviserDirectoryDbConnectionString(IConfiguration configuration) =>
+        configuration.GetConnectionString("AdviserDirectoryDb")
+        ?? configuration["ConnectionStrings:AdviserDirectoryDb"]
+        ?? configuration["Values:ConnectionStrings:AdviserDirectoryDb"]
+        ?? configuration.GetConnectionString("LocationPolicyDb")
+        ?? configuration["ConnectionStrings:LocationPolicyDb"]
+        ?? configuration["Values:ConnectionStrings:LocationPolicyDb"]
+        ?? configuration["LocationSearch:PolicyStore:ConnectionString"]
+        ?? configuration["Values:LocationSearch:PolicyStore:ConnectionString"];
 }

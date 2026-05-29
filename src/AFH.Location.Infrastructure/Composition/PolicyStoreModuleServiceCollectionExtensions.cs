@@ -1,6 +1,5 @@
 using AFH.Common.Errors.EntityFramework.DependencyInjection;
 using AFH.Location.Application.Abstractions.Auth;
-using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Infrastructure.Caching;
@@ -26,14 +25,12 @@ internal static class PolicyStoreModuleServiceCollectionExtensions
                 ServiceLifetime.Scoped);
             services.AddAfhCommonErrorsEntityFramework<LocationPolicyDbContext>();
             services.AddScoped<IGeoCache, SqlGeoCache>();
-            services.AddScoped<IOrganisationAssignmentDirectory, SqlOrganisationAssignmentDirectory>();
             services.AddScoped<IDomainUserPermissionStore, SqlDomainUserPermissionStore>();
             services.AddHostedService<LocationPolicyDbInitializer>();
         }
         else
         {
             services.AddSingleton<IGeoCache, InMemoryGeoCache>();
-            services.AddSingleton<IOrganisationAssignmentDirectory, InMemoryOrganisationAssignmentDirectory>();
             services.AddSingleton<IDomainUserPermissionStore, InMemoryDomainUserPermissionStore>();
         }
 
