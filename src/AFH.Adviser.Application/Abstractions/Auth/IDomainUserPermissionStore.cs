@@ -1,6 +1,6 @@
-using AFH.Location.Application.Models.Auth;
+using AFH.Adviser.Application.Models.Auth;
 
-namespace AFH.Location.Application.Abstractions.Auth;
+namespace AFH.Adviser.Application.Abstractions.Auth;
 
 public interface IDomainUserPermissionStore
 {

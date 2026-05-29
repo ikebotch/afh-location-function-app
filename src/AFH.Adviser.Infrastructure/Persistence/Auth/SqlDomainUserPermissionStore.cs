@@ -1,15 +1,15 @@
-using AFH.Location.Application.Abstractions.Auth;
-using AFH.Location.Application.Models.Auth;
-using AFH.Location.Infrastructure.Persistence.PolicyStore;
+using AFH.Adviser.Application.Abstractions.Auth;
+using AFH.Adviser.Application.Models.Auth;
+using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using Microsoft.EntityFrameworkCore;
 
-namespace AFH.Location.Infrastructure.Persistence.Repositories;
+namespace AFH.Adviser.Infrastructure.Persistence.Auth;
 
 public sealed class SqlDomainUserPermissionStore : IDomainUserPermissionStore
 {
-    private readonly LocationPolicyDbContext _db;
+    private readonly AdviserDirectoryDbContext _db;
 
-    public SqlDomainUserPermissionStore(LocationPolicyDbContext db)
+    public SqlDomainUserPermissionStore(AdviserDirectoryDbContext db)
     {
         _db = db;
     }

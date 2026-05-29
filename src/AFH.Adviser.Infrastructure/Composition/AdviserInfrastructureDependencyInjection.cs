@@ -1,9 +1,11 @@
+using AFH.Adviser.Application.Abstractions.Auth;
 using AFH.Adviser.Application.Abstractions.Repositories;
 using AFH.Adviser.Application.Abstractions.Clients;
 using AFH.Adviser.Application.Abstractions.Feed;
 using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.External.Calendar;
 using AFH.Adviser.Infrastructure.Options;
+using AFH.Adviser.Infrastructure.Persistence.Auth;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
 using AFH.Common.SharePointUtils.Extensions;
@@ -41,11 +43,13 @@ public static class AdviserInfrastructureDependencyInjection
         {
             services.AddDbContext<AdviserDirectoryDbContext>(options => options.UseSqlServer(adviserDirectoryConnectionString));
             services.AddScoped<IOrganisationAssignmentDirectory, SqlOrganisationAssignmentDirectory>();
+            services.AddScoped<IDomainUserPermissionStore, SqlDomainUserPermissionStore>();
             services.AddHostedService<AdviserDirectoryDbInitializer>();
         }
         else
         {
             services.AddSingleton<IOrganisationAssignmentDirectory, InMemoryOrganisationAssignmentDirectory>();
+            services.AddSingleton<IDomainUserPermissionStore, InMemoryDomainUserPermissionStore>();
         }
 
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();

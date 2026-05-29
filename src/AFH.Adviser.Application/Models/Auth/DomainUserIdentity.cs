@@ -1,4 +1,4 @@
-namespace AFH.Location.Application.Models.Auth;
+namespace AFH.Adviser.Application.Models.Auth;
 
 public sealed record DomainUserIdentity(
     string Email,

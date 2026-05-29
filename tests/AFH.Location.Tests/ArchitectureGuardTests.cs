@@ -51,7 +51,9 @@ public sealed class ArchitectureGuardTests
 
         var allowedFunctionWrapperFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            Path.Combine("src", "AFH.Location.Function", "Functions", "V1", "Admin", "OrganisationAssignmentsFunctionV1.cs")
+            Path.Combine("src", "AFH.Location.Function", "Functions", "V1", "Admin", "OrganisationAssignmentsFunctionV1.cs"),
+            Path.Combine("src", "AFH.Location.Function", "Security", "DomainUserAuthorizationService.cs"),
+            Path.Combine("src", "AFH.Location.Function", "Security", "EndpointAccessPolicies.cs")
         };
 
         var violations = EnumerateSourceFiles(

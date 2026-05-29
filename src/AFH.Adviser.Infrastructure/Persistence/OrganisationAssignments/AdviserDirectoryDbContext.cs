@@ -1,3 +1,4 @@
+using AFH.Adviser.Infrastructure.Persistence.Auth.Entities;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,10 +12,16 @@ public sealed class AdviserDirectoryDbContext : DbContext
     }
 
     public DbSet<OrganisationAssignmentEntity> OrganisationAssignments => Set<OrganisationAssignmentEntity>();
+    public DbSet<DomainRoleEntity> DomainRoles => Set<DomainRoleEntity>();
+    public DbSet<DomainUserRoleMappingEntity> DomainUserRoleMappings => Set<DomainUserRoleMappingEntity>();
+    public DbSet<DomainRolePermissionEntity> DomainRolePermissions => Set<DomainRolePermissionEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<OrganisationAssignmentEntity>(ConfigureOrganisationAssignment);
+        modelBuilder.Entity<DomainRoleEntity>(ConfigureDomainRole);
+        modelBuilder.Entity<DomainUserRoleMappingEntity>(ConfigureDomainUserRoleMapping);
+        modelBuilder.Entity<DomainRolePermissionEntity>(ConfigureDomainRolePermission);
     }
 
     internal static void ConfigureOrganisationAssignment(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<OrganisationAssignmentEntity> entity)
@@ -36,5 +43,34 @@ public sealed class AdviserDirectoryDbContext : DbContext
         entity.HasIndex(x => x.AdviserId);
         entity.HasIndex(x => x.ClientId);
         entity.HasIndex(x => x.OrganisationId);
+    }
+
+    internal static void ConfigureDomainRole(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainRoleEntity> entity)
+    {
+        entity.ToTable("DomainRoles");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Role).HasMaxLength(100).IsRequired();
+        entity.HasIndex(x => x.Role).IsUnique();
+    }
+
+    internal static void ConfigureDomainUserRoleMapping(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserRoleMappingEntity> entity)
+    {
+        entity.ToTable("DomainUserRoleMappings");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Email).HasMaxLength(320);
+        entity.Property(x => x.ExternalRole).HasMaxLength(100);
+        entity.Property(x => x.ExternalGroupId).HasMaxLength(128);
+        entity.HasIndex(x => x.Email);
+        entity.HasIndex(x => x.ExternalRole);
+        entity.HasIndex(x => x.ExternalGroupId);
+        entity.HasIndex(x => new { x.RoleId, x.IsEnabled });
+    }
+
+    internal static void ConfigureDomainRolePermission(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainRolePermissionEntity> entity)
+    {
+        entity.ToTable("DomainRolePermissions");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Permission).HasMaxLength(128).IsRequired();
+        entity.HasIndex(x => new { x.RoleId, x.Permission }).IsUnique();
     }
 }

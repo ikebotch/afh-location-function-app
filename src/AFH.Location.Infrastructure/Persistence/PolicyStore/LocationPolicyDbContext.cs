@@ -22,9 +22,6 @@ public sealed class LocationPolicyDbContext : DbContext
     public DbSet<AdviserReferenceCacheEntity> AdviserReferenceCache => Set<AdviserReferenceCacheEntity>();
     public DbSet<GeoCacheEntryEntity> GeoCacheEntries => Set<GeoCacheEntryEntity>();
     public DbSet<RouteCacheEntryEntity> RouteCacheEntries => Set<RouteCacheEntryEntity>();
-    public DbSet<DomainRoleEntity> DomainRoles => Set<DomainRoleEntity>();
-    public DbSet<DomainUserRoleMappingEntity> DomainUserRoleMappings => Set<DomainUserRoleMappingEntity>();
-    public DbSet<DomainRolePermissionEntity> DomainRolePermissions => Set<DomainRolePermissionEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -131,33 +128,5 @@ public sealed class LocationPolicyDbContext : DbContext
             entity.HasIndex(x => x.ExpiresUtc);
         });
 
-        modelBuilder.Entity<DomainRoleEntity>(entity =>
-        {
-            entity.ToTable("DomainRoles");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.Role).HasMaxLength(100).IsRequired();
-            entity.HasIndex(x => x.Role).IsUnique();
-        });
-
-        modelBuilder.Entity<DomainUserRoleMappingEntity>(entity =>
-        {
-            entity.ToTable("DomainUserRoleMappings");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.Email).HasMaxLength(320);
-            entity.Property(x => x.ExternalRole).HasMaxLength(100);
-            entity.Property(x => x.ExternalGroupId).HasMaxLength(128);
-            entity.HasIndex(x => x.Email);
-            entity.HasIndex(x => x.ExternalRole);
-            entity.HasIndex(x => x.ExternalGroupId);
-            entity.HasIndex(x => new { x.RoleId, x.IsEnabled });
-        });
-
-        modelBuilder.Entity<DomainRolePermissionEntity>(entity =>
-        {
-            entity.ToTable("DomainRolePermissions");
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.Permission).HasMaxLength(128).IsRequired();
-            entity.HasIndex(x => new { x.RoleId, x.Permission }).IsUnique();
-        });
     }
 }

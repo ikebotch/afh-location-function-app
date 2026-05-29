@@ -1,7 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
-using AFH.Location.Application.Abstractions.Auth;
-using AFH.Location.Application.Models.Auth;
+using AFH.Adviser.Application.Abstractions.Auth;
+using AFH.Adviser.Application.Models.Auth;
 using AFH.Location.Function.Functions.Common;
 using AFH.Location.Function.Middleware;
 using AFH.Location.Infrastructure.Options;

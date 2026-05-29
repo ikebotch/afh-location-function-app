@@ -1,7 +1,7 @@
-using AFH.Location.Application.Abstractions.Auth;
-using AFH.Location.Application.Models.Auth;
+using AFH.Adviser.Application.Abstractions.Auth;
+using AFH.Adviser.Application.Models.Auth;
 
-namespace AFH.Location.Infrastructure.Persistence.Repositories;
+namespace AFH.Adviser.Infrastructure.Persistence.Auth;
 
 public sealed class InMemoryDomainUserPermissionStore : IDomainUserPermissionStore
 {
