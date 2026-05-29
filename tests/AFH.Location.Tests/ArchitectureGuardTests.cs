@@ -7,6 +7,8 @@ namespace AFH.Location.Tests;
 
 public sealed class ArchitectureGuardTests
 {
+    private static readonly string RepositoryRoot = FindRepositoryRoot();
+
     [Fact]
     public void Application_Infrastructure_And_Domain_DoNotReferenceFunctionAssembly()
     {
@@ -14,6 +16,62 @@ public sealed class ArchitectureGuardTests
         AssertDoesNotReference("AFH.Location.Infrastructure", "AFH.Location.Function");
         AssertDoesNotReference("AFH.Location.Domain", "AFH.Location.Function");
         AssertDoesNotReference("AFH.Location.Contract", "AFH.Location.Function");
+    }
+
+    [Fact]
+    public void Adviser_And_Location_ApplicationDomainBoundaries_DoNotCross()
+    {
+        AssertDoesNotReference("AFH.Location.Application", "AFH.Adviser.Application");
+        AssertDoesNotReference("AFH.Location.Application", "AFH.Adviser.Domain");
+        AssertDoesNotReference("AFH.Location.Domain", "AFH.Adviser.Application");
+        AssertDoesNotReference("AFH.Location.Domain", "AFH.Adviser.Domain");
+
+        AssertDoesNotReference("AFH.Adviser.Application", "AFH.Location.Application");
+        AssertDoesNotReference("AFH.Adviser.Application", "AFH.Location.Domain");
+        AssertDoesNotReference("AFH.Adviser.Domain", "AFH.Location.Application");
+        AssertDoesNotReference("AFH.Adviser.Domain", "AFH.Location.Domain");
+    }
+
+    [Fact]
+    public void LocationProjects_DoNotOwnOrganisationAssignmentsOrDomainRbac()
+    {
+        var forbiddenTerms = new[]
+        {
+            "OrganisationAssignment",
+            "OrganisationAssignments",
+            "DomainRole",
+            "DomainRoles",
+            "DomainUserRoleMapping",
+            "DomainUserRoleMappings",
+            "DomainRolePermission",
+            "DomainRolePermissions",
+            "DomainUserPermissionStore",
+            "OrganisationAssignmentPermissions"
+        };
+
+        var allowedFunctionWrapperFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.Combine("src", "AFH.Location.Function", "Functions", "V1", "Admin", "OrganisationAssignmentsFunctionV1.cs")
+        };
+
+        var violations = EnumerateSourceFiles(
+                "src/AFH.Location.Application",
+                "src/AFH.Location.Contract",
+                "src/AFH.Location.Domain",
+                "src/AFH.Location.Infrastructure",
+                "src/AFH.Location.Function")
+            .Where(path => !allowedFunctionWrapperFiles.Contains(Path.GetRelativePath(RepositoryRoot, path)))
+            .Select(path => new
+            {
+                Path = Path.GetRelativePath(RepositoryRoot, path),
+                Text = File.ReadAllText(path)
+            })
+            .Where(file => forbiddenTerms.Any(term => file.Text.Contains(term, StringComparison.Ordinal)))
+            .Select(file => file.Path)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(violations);
     }
 
     [Fact]
@@ -131,13 +189,28 @@ public sealed class ArchitectureGuardTests
 
     private static string GetProgramPath(string functionProjectName)
     {
+        return Path.Combine(RepositoryRoot, "src", functionProjectName, "Program.cs");
+    }
+
+    private static IEnumerable<string> EnumerateSourceFiles(params string[] relativeDirectories)
+        => relativeDirectories
+            .Select(path => Path.Combine(RepositoryRoot, path))
+            .Where(Directory.Exists)
+            .SelectMany(path => Directory.EnumerateFiles(path, "*.cs", SearchOption.AllDirectories))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
+
+    private static string FindRepositoryRoot()
+    {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {
-            var candidate = Path.Combine(directory.FullName, "src", functionProjectName, "Program.cs");
-            if (File.Exists(candidate))
-                return candidate;
+            if (Directory.Exists(Path.Combine(directory.FullName, "src"))
+                && File.Exists(Path.Combine(directory.FullName, "AFH.Location.sln")))
+            {
+                return directory.FullName;
+            }
         }
 
-        throw new DirectoryNotFoundException($"Could not locate Program.cs for {functionProjectName}.");
+        throw new DirectoryNotFoundException("Could not locate AFH.Location solution root.");
     }
 }
