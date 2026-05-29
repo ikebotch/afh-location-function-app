@@ -44,12 +44,14 @@ public static class AdviserInfrastructureDependencyInjection
             services.AddDbContext<AdviserDirectoryDbContext>(options => options.UseSqlServer(adviserDirectoryConnectionString));
             services.AddScoped<IOrganisationAssignmentDirectory, SqlOrganisationAssignmentDirectory>();
             services.AddScoped<IDomainUserPermissionStore, SqlDomainUserPermissionStore>();
+            services.AddScoped<IDomainUserContextStore, SqlDomainUserContextStore>();
             services.AddHostedService<AdviserDirectoryDbInitializer>();
         }
         else
         {
             services.AddSingleton<IOrganisationAssignmentDirectory, InMemoryOrganisationAssignmentDirectory>();
             services.AddSingleton<IDomainUserPermissionStore, InMemoryDomainUserPermissionStore>();
+            services.AddSingleton<IDomainUserContextStore, InMemoryDomainUserContextStore>();
         }
 
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
@@ -78,7 +80,7 @@ public static class AdviserInfrastructureDependencyInjection
         return services;
     }
 
-    private static string? ResolveAdviserDirectoryDbConnectionString(IConfiguration configuration) =>
+    internal static string? ResolveAdviserDirectoryDbConnectionString(IConfiguration configuration) =>
         configuration.GetConnectionString("AdviserDirectoryDb")
         ?? configuration["ConnectionStrings:AdviserDirectoryDb"]
         ?? configuration["Values:ConnectionStrings:AdviserDirectoryDb"]

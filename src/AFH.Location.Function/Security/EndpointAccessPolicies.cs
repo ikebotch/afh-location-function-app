@@ -16,6 +16,7 @@ public static class EndpointAccessPolicies
             ["TravelCoverageV1"] = EndpointAccessPolicy.InternalOnly,
             ["SyncAdviserCacheV1"] = EndpointAccessPolicy.InternalOnly,
             ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly,
+            ["Adviser_CurrentUserContextV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsListV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,

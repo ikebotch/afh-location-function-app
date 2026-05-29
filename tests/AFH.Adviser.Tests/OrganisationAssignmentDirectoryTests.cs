@@ -1,4 +1,7 @@
+using AFH.Adviser.Application.Models.Auth;
 using AFH.Adviser.Application.Models.OrganisationAssignments;
+using AFH.Adviser.Infrastructure.Persistence.Auth;
+using AFH.Adviser.Infrastructure.Persistence.Auth.Entities;
 using AFH.Adviser.Contract.V1.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using Microsoft.EntityFrameworkCore;
@@ -98,6 +101,78 @@ public sealed class OrganisationAssignmentDirectoryTests
 
         Assert.True(await directory.DeleteAsync(created.Id, CancellationToken.None));
         Assert.Null(await directory.GetAsync(created.Id, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UserContextStore_ReturnsAllRolesAndPermissionsForMappedUser()
+    {
+        await using var db = CreateDb();
+        var managerRoleId = Guid.NewGuid();
+        var adminRoleId = Guid.NewGuid();
+        db.DomainRoles.AddRange(
+            new DomainRoleEntity
+            {
+                Id = managerRoleId,
+                Role = "Manager",
+                CreatedUtc = DateTime.UtcNow
+            },
+            new DomainRoleEntity
+            {
+                Id = adminRoleId,
+                Role = "Admin",
+                CreatedUtc = DateTime.UtcNow
+            });
+        db.DomainUserRoleMappings.AddRange(
+            new DomainUserRoleMappingEntity
+            {
+                Id = Guid.NewGuid(),
+                RoleId = managerRoleId,
+                Email = "alex@afh.co.uk",
+                IsEnabled = true,
+                CreatedUtc = DateTime.UtcNow
+            },
+            new DomainUserRoleMappingEntity
+            {
+                Id = Guid.NewGuid(),
+                RoleId = adminRoleId,
+                ExternalRole = "BookingAdmin",
+                IsEnabled = true,
+                CreatedUtc = DateTime.UtcNow
+            });
+        db.DomainRolePermissions.AddRange(
+            new DomainRolePermissionEntity
+            {
+                Id = Guid.NewGuid(),
+                RoleId = managerRoleId,
+                Permission = BookingPermissionNames.ApprovalsRead,
+                CreatedUtc = DateTime.UtcNow
+            },
+            new DomainRolePermissionEntity
+            {
+                Id = Guid.NewGuid(),
+                RoleId = adminRoleId,
+                Permission = BookingPermissionNames.ApprovalsReview,
+                CreatedUtc = DateTime.UtcNow
+            });
+        await db.SaveChangesAsync();
+
+        var store = new SqlDomainUserContextStore(db);
+        var context = await store.GetContextAsync(
+            new DomainUserIdentity(
+                "user-1",
+                "alex@afh.co.uk",
+                "Alex Example",
+                ["BookingAdmin"],
+                []),
+            CancellationToken.None);
+
+        Assert.Equal("user-1", context.UserId);
+        Assert.Equal("alex@afh.co.uk", context.Email);
+        Assert.Equal("Alex Example", context.DisplayName);
+        Assert.Contains("Manager", context.Roles);
+        Assert.Contains("Admin", context.Roles);
+        Assert.Contains(BookingPermissionNames.ApprovalsRead, context.Permissions);
+        Assert.Contains(BookingPermissionNames.ApprovalsReview, context.Permissions);
     }
 
     private static AdviserDirectoryDbContext CreateDb()

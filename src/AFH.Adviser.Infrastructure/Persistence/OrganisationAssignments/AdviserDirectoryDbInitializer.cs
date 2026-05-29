@@ -147,15 +147,33 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
         var roles = await db.DomainRoles.ToDictionaryAsync(x => x.Role, x => x.Id, StringComparer.OrdinalIgnoreCase, ct);
         var permissionsByRole = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
-            ["LeadTech"] = [OrganisationAssignmentPermissions.Read],
-            ["Manager"] = [OrganisationAssignmentPermissions.Read],
+            ["LeadTech"] =
+            [
+                OrganisationAssignmentPermissions.Read,
+                BookingPermissionNames.ApprovalsRead,
+                BookingPermissionNames.CancelAsLeadTech,
+                BookingPermissionNames.RearrangeAsLeadTech,
+                BookingPermissionNames.RearrangementOptionsRead
+            ],
+            ["Manager"] =
+            [
+                OrganisationAssignmentPermissions.Read,
+                BookingPermissionNames.ApprovalsRead,
+                BookingPermissionNames.ApprovalsReview
+            ],
             ["Operations"] =
             [
                 OrganisationAssignmentPermissions.Read,
                 OrganisationAssignmentPermissions.Create,
                 OrganisationAssignmentPermissions.Update,
                 OrganisationAssignmentPermissions.Disable,
-                OrganisationAssignmentPermissions.Delete
+                OrganisationAssignmentPermissions.Delete,
+                BookingPermissionNames.ApprovalsRead,
+                BookingPermissionNames.ApprovalsReview,
+                BookingPermissionNames.CancelAsLeadTech,
+                BookingPermissionNames.RearrangeAsLeadTech,
+                BookingPermissionNames.RearrangementOptionsRead,
+                BookingPermissionNames.AdminRead
             ],
             ["Admin"] =
             [
@@ -163,7 +181,13 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
                 OrganisationAssignmentPermissions.Create,
                 OrganisationAssignmentPermissions.Update,
                 OrganisationAssignmentPermissions.Disable,
-                OrganisationAssignmentPermissions.Delete
+                OrganisationAssignmentPermissions.Delete,
+                BookingPermissionNames.ApprovalsRead,
+                BookingPermissionNames.ApprovalsReview,
+                BookingPermissionNames.CancelAsLeadTech,
+                BookingPermissionNames.RearrangeAsLeadTech,
+                BookingPermissionNames.RearrangementOptionsRead,
+                BookingPermissionNames.AdminRead
             ]
         };
 

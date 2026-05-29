@@ -50,6 +50,26 @@ public sealed class DomainUserAuthorizationService : IDomainUserAuthorizationSer
             : await req.WriteFailureAsync(HttpStatusCode.Forbidden, new { code = "FORBIDDEN", message = $"Permission '{permission}' is required." }, ct);
     }
 
+    public async Task<(DomainUserIdentity? Identity, HttpResponseData? Failure)> AuthenticateAsync(
+        HttpRequestData req,
+        CancellationToken ct)
+    {
+        if (!_domainOptions.Enabled)
+        {
+            var failure = await req.WriteFailureAsync(HttpStatusCode.Forbidden, new { code = "AUTH_DISABLED", message = "DomainUserAuth is not enabled." }, ct);
+            return (null, failure);
+        }
+
+        var identityResult = TryReadIdentity(GetAuthorizationHeader(req));
+        if (identityResult.Identity is null)
+        {
+            var failure = await req.WriteFailureAsync(identityResult.StatusCode, new { code = "AUTH_ERROR", message = identityResult.Message }, ct);
+            return (null, failure);
+        }
+
+        return (identityResult.Identity, null);
+    }
+
     private (DomainUserIdentity? Identity, HttpStatusCode StatusCode, string Message) TryReadIdentity(string? authorization)
     {
         if (string.IsNullOrWhiteSpace(authorization))
@@ -96,7 +116,10 @@ public sealed class DomainUserAuthorizationService : IDomainUserAuthorizationSer
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return (new DomainUserIdentity(email.Trim(), roles, groups), HttpStatusCode.OK, string.Empty);
+        var userId = FirstClaim(jwt, "oid", "sub") ?? email.Trim();
+        var displayName = FirstClaim(jwt, "name") ?? email.Trim();
+
+        return (new DomainUserIdentity(userId, email.Trim(), displayName, roles, groups), HttpStatusCode.OK, string.Empty);
     }
 
     private bool IsAllowedAudience(JwtSecurityToken jwt)

@@ -44,15 +44,16 @@
   - `Authorization: Bearer <shared internal token>` via `CalendarService:InternalToken`
 
 ## Required Local Config (Location)
-- Copy `src/AFH.Location.Service.Functions/local.settings.template.json` to `src/AFH.Location.Service.Functions/local.settings.json`.
+- Copy `src/AFH.Location.Function/local.settings.template.json` to `src/AFH.Location.Function/local.settings.json`.
 - Fill in the required values:
-  `AzureAD:*`, `SharePoint:Advisers:SiteId`, `SharePoint:Advisers:ListId`, `CalendarService:BaseUrl`, `CalendarService:FunctionKey`, `CalendarService:InternalToken`, and `InternalApiAuth:Token`.
+  `DomainUserAuth:*`, `ConnectionStrings:AdviserDirectoryDb`, `SharePoint:Advisers:SiteId`, `SharePoint:Advisers:ListId`, `CalendarService:BaseUrl`, `CalendarService:FunctionKey`, `CalendarService:InternalToken`, and `InternalApiAuth:Token`.
 - The template now also includes the active SharePoint field-name mapping keys used by the current `SharePointAdviserRepository` implementation, so local list-field overrides do not have to be discovered by source inspection.
 - Keep `Maps:Google:Enabled=false`. The Google provider path is intentionally disabled until routing and geocoding are fully implemented.
 
 ## Local Settings Conventions
 - Internal bearer auth uses `InternalApiAuth:Token`.
 - Calendar downstream auth uses `CalendarService:BaseUrl`, `CalendarService:FunctionKey`, and `CalendarService:InternalToken`.
+- Adviser-backed user RBAC for `/api/v1/me` uses `DomainUserAuth:*` for bearer-token validation and `ConnectionStrings:AdviserDirectoryDb` for role and permission lookup.
 - SharePoint config stays under `SharePoint:Advisers:*` because those keys map directly to the active infrastructure options and SharePointUtils consumption path.
 
 ## API Docs
