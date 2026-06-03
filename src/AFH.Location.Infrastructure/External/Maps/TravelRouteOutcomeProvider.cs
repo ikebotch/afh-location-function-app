@@ -2,6 +2,7 @@ using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Application.Abstractions.Travel;
 using AFH.Location.Application.Models.Travel;
+using AFH.Location.Application.Services.Travel;
 using AFH.Location.Domain.Travel;
 
 namespace AFH.Location.Infrastructure.External.Maps;
@@ -47,6 +48,18 @@ public sealed class TravelRouteOutcomeProvider : ITravelRouteOutcomeProvider
 
             foreach (var route in routes)
             {
+                if (IsSyntheticFallback(route.Value) &&
+                    batch.TryGetValue(route.Key, out var destination) &&
+                    ProximateRouteFallback.TryEstimate(request.Source, destination, out var fallback))
+                {
+                    results[route.Key] = new TravelRouteOutcome(
+                        fallback.TravelTimeMinutes,
+                        fallback.DistanceMiles,
+                        fallback.Confidence,
+                        TravelRouteResolutionSource.Unknown);
+                    continue;
+                }
+
                 // Use >= 0 so that a genuine provider result of 0 min / 0 miles
                 // (e.g. same-coordinate or sub-60s route) is preserved as usable.
                 // Only a negative value (sentinel for unavailable) becomes null.
@@ -60,6 +73,11 @@ public sealed class TravelRouteOutcomeProvider : ITravelRouteOutcomeProvider
 
         return results;
     }
+
+    private static bool IsSyntheticFallback(RouteResult result)
+        => result.EtaMinutes == 0
+           && result.DistanceMiles == 0d
+           && string.Equals(result.Confidence, "Low", StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<IReadOnlyDictionary<string, LocationCoordinates>> Batch(
         IReadOnlyDictionary<string, LocationCoordinates> input,

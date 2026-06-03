@@ -322,6 +322,85 @@ public sealed class TravelCoverageServiceTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_ProximatePostcodes_UsesFallback_WhenProviderReturnsSyntheticNoRoute()
+    {
+        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["AB1 1AA"] = new(53.381100, -1.470100),
+            ["AB1 1AB"] = new(53.381300, -1.470100)
+        });
+
+        var matrix = new StubRouteMatrixService(
+            new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["adv-1"] = new(0, 0d, "Low", TravelRouteResolutionSource.AzureMaps)
+            });
+        var provider = new TravelRouteOutcomeProvider(matrix, new StubRouteMatrixPolicyProvider());
+        var sut = new TravelCoverageService(resolver, provider, NullLogger<TravelCoverageService>.Instance);
+
+        var request = new TravelCoverageRequest
+        {
+            SourcePostcode = "AB1 1AA",
+            Destinations =
+            [
+                new TravelCoverageDestinationRequest
+                {
+                    CorrelationId = "adv-1",
+                    Postcode = "AB1 1AB",
+                    MaxTravelTimeMinutes = 30,
+                    MaxDistanceMiles = 10.0
+                }
+            ]
+        };
+
+        var result = await sut.EvaluateAsync(request, CancellationToken.None);
+
+        var outcome = Assert.Single(result.Destinations);
+        Assert.Equal(TravelCoverageStatus.Succeeded, outcome.Status);
+        Assert.NotNull(outcome.Route);
+        Assert.Equal(1, outcome.Route!.TravelTimeMinutes);
+        Assert.True(outcome.Route.DistanceMiles is > 0 and <= 0.1);
+        Assert.Equal("High", outcome.Route.Confidence);
+        Assert.NotNull(outcome.Coverage);
+        Assert.True(outcome.Coverage!.IsWithinCoverage);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_UnresolvedDestinationPostcode_DoesNotUseProximateFallback()
+    {
+        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["AB1 1AA"] = new(53.381100, -1.470100)
+        });
+
+        var provider = new RecordingRouteOutcomeProvider();
+        var sut = new TravelCoverageService(resolver, provider, NullLogger<TravelCoverageService>.Instance);
+
+        var request = new TravelCoverageRequest
+        {
+            SourcePostcode = "AB1 1AA",
+            Destinations =
+            [
+                new TravelCoverageDestinationRequest
+                {
+                    CorrelationId = "adv-1",
+                    Postcode = "NOT A POSTCODE",
+                    MaxTravelTimeMinutes = 30,
+                    MaxDistanceMiles = 10.0
+                }
+            ]
+        };
+
+        var result = await sut.EvaluateAsync(request, CancellationToken.None);
+
+        var outcome = Assert.Single(result.Destinations);
+        Assert.Equal(TravelCoverageStatus.DestinationPostcodeUnresolved, outcome.Status);
+        Assert.Null(outcome.Route);
+        Assert.Null(outcome.Coverage);
+        Assert.Equal(0, provider.CallCount);
+    }
+
+    [Fact]
     public async Task EvaluateAsync_SamePostcode_ShortCircuitsToZeroWithoutCallingProvider()
     {
         var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)

@@ -39,7 +39,7 @@ public sealed class RouteTimeService : IRouteTimeService
 
             started.Stop();
 
-            if (!routes.TryGetValue(DestinationKey, out var route) || IsUnavailable(route))
+            if (!routes.TryGetValue(DestinationKey, out var route))
             {
                 _logger.LogWarning(
                     "Location route-time unavailable. CorrelationId={CorrelationId} DepartAt={DepartAt} DurationMs={DurationMs}",
@@ -47,15 +47,43 @@ public sealed class RouteTimeService : IRouteTimeService
                     request.DepartAt,
                     started.ElapsedMilliseconds);
 
-                return new RouteTimeResult
+                return RouteUnavailable(request.CorrelationId);
+            }
+
+            if (IsUnavailable(route))
+            {
+                if (ProximateRouteFallback.TryEstimate(request.Source, request.Destination, out var fallback))
                 {
-                    CorrelationId = request.CorrelationId,
-                    Status = RouteTimeStatus.RouteUnavailable,
-                    Warnings =
-                    [
-                        new TravelCoverageWarning("ROUTE_UNAVAILABLE", "No route-time result was available for the requested coordinate pair.")
-                    ]
-                };
+                    _logger.LogInformation(
+                        "Location route-time resolved using proximate fallback. CorrelationId={CorrelationId} DepartAt={DepartAt} TravelTimeMinutes={TravelTimeMinutes} TravelDistanceMiles={TravelDistanceMiles} DurationMs={DurationMs}",
+                        request.CorrelationId,
+                        request.DepartAt,
+                        fallback.TravelTimeMinutes,
+                        fallback.DistanceMiles,
+                        started.ElapsedMilliseconds);
+
+                    return new RouteTimeResult
+                    {
+                        CorrelationId = request.CorrelationId,
+                        TravelTimeMinutes = fallback.TravelTimeMinutes,
+                        TravelDistanceMiles = fallback.DistanceMiles,
+                        Status = RouteTimeStatus.Succeeded,
+                        Warnings =
+                        [
+                            new TravelCoverageWarning(
+                                "PROXIMATE_ROUTE_FALLBACK",
+                                "Route provider returned no route, but the coordinate pair is within the local proximity fallback threshold.")
+                        ]
+                    };
+                }
+
+                _logger.LogWarning(
+                    "Location route-time unavailable. CorrelationId={CorrelationId} DepartAt={DepartAt} DurationMs={DurationMs}",
+                    request.CorrelationId,
+                    request.DepartAt,
+                    started.ElapsedMilliseconds);
+
+                return RouteUnavailable(request.CorrelationId);
             }
 
             _logger.LogInformation(
@@ -101,4 +129,15 @@ public sealed class RouteTimeService : IRouteTimeService
         => route.EtaMinutes <= 0
            && route.DistanceMiles <= 0d
            && string.Equals(route.Confidence, "Low", StringComparison.OrdinalIgnoreCase);
+
+    private static RouteTimeResult RouteUnavailable(string? correlationId)
+        => new()
+        {
+            CorrelationId = correlationId,
+            Status = RouteTimeStatus.RouteUnavailable,
+            Warnings =
+            [
+                new TravelCoverageWarning("ROUTE_UNAVAILABLE", "No route-time result was available for the requested coordinate pair.")
+            ]
+        };
 }
