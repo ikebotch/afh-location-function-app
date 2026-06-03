@@ -9,11 +9,22 @@ using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AFH.Location.Function.Middleware;
 
 public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+        Converters =
+        {
+            new JsonStringEnumConverter()
+        }
+    };
+
     private readonly ErrorRecordBuilder _errorRecordBuilder = new();
     private readonly ApplicationLoggingOptions _loggingOptions;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
@@ -75,7 +86,10 @@ public sealed class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         CancellationToken ct)
     {
         var response = request.CreateResponse((System.Net.HttpStatusCode)mapping.StatusCode);
-        await response.WriteAsJsonAsync(_errorResponseBuilder.Build(mapping), ct);
+        response.Headers.Remove("Content-Type");
+        response.Headers.Add("Content-Type", "application/json; charset=utf-8");
+
+        await JsonSerializer.SerializeAsync(response.Body, _errorResponseBuilder.Build(mapping), JsonOptions, ct);
         return response;
     }
 

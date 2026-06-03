@@ -5,13 +5,17 @@ using System.Text;
 using System.Text.Json;
 using AFH.Common.Errors.AzureFunctions.Builders;
 using AFH.Common.Errors.AzureFunctions.DependencyInjection;
+using AFH.Common.Errors.Builders;
 using AFH.Common.Errors.Models;
 using AFH.Location.Domain.Errors;
 using AFH.Location.Function.Middleware;
+using AFH.Location.Infrastructure.Logging;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Core.FunctionMetadata;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace AFH.Location.Tests;
 
@@ -65,6 +69,40 @@ public sealed class LocationExceptionHandlingMiddlewareTests
         Assert.Contains("\"correlationId\":\"ctx-correlation\"", payload);
     }
 
+    [Fact]
+    public async Task ExceptionHandlingMiddleware_ErrorResponse_ReplacesExistingContentTypeHeader()
+    {
+        var services = new ServiceCollection();
+        services.AddAfhCommonErrorsAzureFunctions();
+        await using var provider = services.BuildServiceProvider();
+
+        var mapper = new LocationExceptionMapper();
+        var mapping = mapper.TryMap(new JsonException("Bad JSON"));
+        var request = TestHttpRequestData.Create(prepopulateResponseContentType: true);
+        var sut = new ExceptionHandlingMiddleware(
+            Options.Create(new ApplicationLoggingOptions()),
+            NullLogger<ExceptionHandlingMiddleware>.Instance,
+            mapper,
+            provider.GetRequiredService<ErrorResponseBuilder>());
+
+        var method = typeof(ExceptionHandlingMiddleware).GetMethod(
+            "BuildErrorResponseAsync",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var task = (Task<HttpResponseData>)method!.Invoke(
+            sut,
+            [request, mapping.MappingResult, CancellationToken.None])!;
+        var response = await task;
+        var payload = await ReadBodyAsync(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.True(response.Headers.TryGetValues("Content-Type", out var contentTypes));
+        Assert.Equal("application/json; charset=utf-8", Assert.Single(contentTypes!));
+        Assert.Contains("\"code\":\"VALIDATION_ERROR\"", payload);
+    }
+
     private static async Task<string> ReadBodyAsync(HttpResponseData response)
     {
         response.Body.Position = 0;
@@ -114,19 +152,38 @@ internal sealed class TestFunctionDefinition : FunctionDefinition
 
 internal sealed class TestHttpRequestData(FunctionContext functionContext, Uri? url = null, string method = "POST") : HttpRequestData(functionContext)
 {
+    private readonly bool _prepopulateResponseContentType;
+
+    public TestHttpRequestData(
+        FunctionContext functionContext,
+        Uri? url = null,
+        string method = "POST",
+        bool prepopulateResponseContentType = false)
+        : this(functionContext, url, method)
+    {
+        _prepopulateResponseContentType = prepopulateResponseContentType;
+    }
+
     public override Stream Body { get; } = new MemoryStream();
     public override HttpHeadersCollection Headers { get; } = [];
     public override IReadOnlyCollection<IHttpCookie> Cookies { get; } = [];
     public override Uri Url { get; } = url ?? new Uri("https://localhost/api/v1/location/travel-coverage");
     public override IEnumerable<ClaimsIdentity> Identities { get; } = [];
     public override string Method { get; } = method;
-    public override HttpResponseData CreateResponse() => new TestHttpResponseData(FunctionContext);
+    public override HttpResponseData CreateResponse()
+    {
+        var response = new TestHttpResponseData(FunctionContext);
+        if (_prepopulateResponseContentType)
+            response.Headers.Add("Content-Type", "text/plain");
 
-    public static TestHttpRequestData Create()
+        return response;
+    }
+
+    public static TestHttpRequestData Create(bool prepopulateResponseContentType = false)
     {
         var context = new TestFunctionContext();
         context.Items[CorrelationIdMiddleware.ItemKey] = "ctx-correlation";
-        return new TestHttpRequestData(context);
+        return new TestHttpRequestData(context, prepopulateResponseContentType: prepopulateResponseContentType);
     }
 }
 
