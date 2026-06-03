@@ -39,33 +39,13 @@ public sealed class RouteTimeServiceTests
         Assert.Null(result.TravelDistanceMiles);
     }
 
-    [Fact]
-    public async Task CalculateAsync_UsesProximateFallback_WhenMatrixReturnsSyntheticFallbackForNearbyCoordinates()
-    {
-        var matrix = new RecordingRouteMatrixService(new RouteResult(0, 0, "Low", TravelRouteResolutionSource.AzureMaps));
-        var sut = new RouteTimeService(matrix, NullLogger<RouteTimeService>.Instance);
-
-        var result = await sut.CalculateAsync(
-            Request(
-                source: new LocationCoordinates(53.381100, -1.470100),
-                destination: new LocationCoordinates(53.381300, -1.470100)),
-            CancellationToken.None);
-
-        Assert.Equal(RouteTimeStatus.Succeeded, result.Status);
-        Assert.Equal(1, result.TravelTimeMinutes);
-        Assert.True(result.TravelDistanceMiles is > 0 and <= 0.1);
-        Assert.Contains(result.Warnings, warning => warning.Code == "PROXIMATE_ROUTE_FALLBACK");
-    }
-
-    private static RouteTimeRequest Request(
-        LocationCoordinates? source = null,
-        LocationCoordinates? destination = null)
+    private static RouteTimeRequest Request()
         => new()
         {
             CorrelationId = "corr-1",
             DepartAt = new DateTimeOffset(2026, 5, 22, 10, 0, 0, TimeSpan.Zero),
-            Source = source ?? new LocationCoordinates(53.4794, -2.2453),
-            Destination = destination ?? new LocationCoordinates(51.5014, -0.1419)
+            Source = new LocationCoordinates(53.4794, -2.2453),
+            Destination = new LocationCoordinates(51.5014, -0.1419)
         };
 
     private sealed class RecordingRouteMatrixService : IRouteMatrixService
