@@ -2,11 +2,16 @@ using AFH.Location.Application.Abstractions.Geo;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http.Json;
 using System.Text.Encodings.Web;
+using System.Text.RegularExpressions;
 
 namespace AFH.Location.Infrastructure.External.Maps.Azure;
 
 public sealed class AzureMapsGeocodingService : IGeocodingService
 {
+    private static readonly Regex UkPostcodeRegex = new(
+        @"\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private readonly HttpClient _http;
     private readonly IConfiguration _cfg;
 
@@ -25,7 +30,9 @@ public sealed class AzureMapsGeocodingService : IGeocodingService
         if (string.IsNullOrWhiteSpace(key))
             throw new InvalidOperationException("Maps:Azure:Key is missing.");
 
-        var encoded = UrlEncoder.Default.Encode(address.Trim());
+        var trimmedAddress = address.Trim();
+        var requestedPostcode = TryExtractUkPostcode(trimmedAddress);
+        var encoded = UrlEncoder.Default.Encode(trimmedAddress);
 
         // Azure Maps Search Address (GET)
         // Key constraints:
@@ -39,7 +46,7 @@ public sealed class AzureMapsGeocodingService : IGeocodingService
             $"https://atlas.microsoft.com/search/address/json" +
             $"?api-version=1.0" +
             $"&query={encoded}" +
-            $"&limit=1" +
+            $"&limit=5" +
             $"&countrySet=GB" +
             $"&typeahead=false" +
             $"&subscription-key={key}";
@@ -55,8 +62,10 @@ public sealed class AzureMapsGeocodingService : IGeocodingService
             return (0d, 0d);
         }
 
-        var pos = doc?.Results?.FirstOrDefault()?.Position;
-        if (pos is null) return (0d, 0d);
+        var result = SelectResult(doc?.Results, requestedPostcode);
+        var pos = result?.Position;
+        if (pos is null)
+            return (0d, 0d);
 
         // Sanity guard: reject results outside rough UK bounds
         if (!LooksLikeUk(pos.Lat, pos.Lon))
@@ -64,6 +73,35 @@ public sealed class AzureMapsGeocodingService : IGeocodingService
 
         return (pos.Lat, pos.Lon);
     }
+
+    private static AzureMapsSearchResponse.Result? SelectResult(
+        IReadOnlyList<AzureMapsSearchResponse.Result>? results,
+        string? requestedPostcode)
+    {
+        if (results is null || results.Count == 0)
+            return null;
+
+        if (requestedPostcode is null)
+            return results.FirstOrDefault();
+
+        return results.FirstOrDefault(result =>
+            string.Equals(
+                NormalisePostcode(result.Address?.PostalCode),
+                requestedPostcode,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? TryExtractUkPostcode(string address)
+    {
+        var match = UkPostcodeRegex.Match(address);
+        return match.Success ? NormalisePostcode(match.Groups[1].Value) : null;
+    }
+
+    private static string NormalisePostcode(string? postcode)
+        => string.Concat(
+            (postcode ?? string.Empty)
+                .Where(char.IsLetterOrDigit))
+            .ToUpperInvariant();
 
     private static bool LooksLikeUk(double lat, double lon)
     {
@@ -80,12 +118,18 @@ public sealed class AzureMapsGeocodingService : IGeocodingService
         public sealed class Result
         {
             public Position? Position { get; set; }
+            public Address? Address { get; set; }
         }
 
         public sealed class Position
         {
             public double Lat { get; set; }
             public double Lon { get; set; }
+        }
+
+        public sealed class Address
+        {
+            public string? PostalCode { get; set; }
         }
     }
 }

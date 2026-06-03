@@ -293,7 +293,7 @@ public sealed class TravelCoverageServiceTests
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                    "{\"results\":[{\"position\":{\"lat\":51.731,\"lon\":0.468}}]}",
+                    "{\"results\":[{\"address\":{\"postalCode\":\"CM1 2FG\"},\"position\":{\"lat\":51.731,\"lon\":0.468}}]}",
                     Encoding.UTF8,
                     "application/json")
             };
@@ -314,6 +314,74 @@ public sealed class TravelCoverageServiceTests
         Assert.DoesNotContain("idxSet=", uriString);
         Assert.Equal(51.731, result.Lat);
         Assert.Equal(0.468, result.Lng);
+    }
+
+    [Fact]
+    public async Task AzureMapsGeocodingService_GeocodeAsync_SelectsMatchingPostcode_WhenFirstResultIsWrong()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """
+                {
+                  "results": [
+                    {
+                      "address": { "postalCode": "HP22 5AA" },
+                      "position": { "lat": 51.8348511, "lon": -0.8514898 }
+                    },
+                    {
+                      "address": { "postalCode": "S1 1AB" },
+                      "position": { "lat": 53.3806626, "lon": -1.4702278 }
+                    }
+                  ]
+                }
+                """,
+                Encoding.UTF8,
+                "application/json")
+        });
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Maps:Azure:Key"] = "test-key" })
+            .Build();
+
+        var sut = new AzureMapsGeocodingService(new StubHttpClientFactory(new HttpClient(handler)), configuration);
+
+        var result = await sut.GeocodeAsync("S1 1AB, United Kingdom", CancellationToken.None);
+
+        Assert.Equal(53.3806626, result.Lat);
+        Assert.Equal(-1.4702278, result.Lng);
+    }
+
+    [Fact]
+    public async Task AzureMapsGeocodingService_GeocodeAsync_RejectsPostcode_WhenNoReturnedPostalCodeMatches()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                """
+                {
+                  "results": [
+                    {
+                      "address": { "postalCode": "HP22 5AA" },
+                      "position": { "lat": 51.8348511, "lon": -0.8514898 }
+                    }
+                  ]
+                }
+                """,
+                Encoding.UTF8,
+                "application/json")
+        });
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Maps:Azure:Key"] = "test-key" })
+            .Build();
+
+        var sut = new AzureMapsGeocodingService(new StubHttpClientFactory(new HttpClient(handler)), configuration);
+
+        var result = await sut.GeocodeAsync("S1 1AB, United Kingdom", CancellationToken.None);
+
+        Assert.Equal(0d, result.Lat);
+        Assert.Equal(0d, result.Lng);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
