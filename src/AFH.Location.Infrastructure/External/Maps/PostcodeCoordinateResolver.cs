@@ -150,7 +150,7 @@ public sealed class PostcodeCoordinateResolver : IPostcodeCoordinateResolver
             await semaphore.WaitAsync(ct);
             try
             {
-                var coordinates = await _geocoding.GeocodeAsync($"{postcode}, United Kingdom", ct);
+                var coordinates = await _geocoding.GeocodeAsync($"{postcode}", ct);
                 return (Postcode: postcode, Coordinates: coordinates);
             }
             finally

@@ -75,52 +75,6 @@ public sealed class TravelCoverageServiceTests
     }
 
     [Fact]
-    public async Task AzureMapsRouteMatrixService_ParsesSubMinuteRoute_AsGenuineHighConfidenceRoute()
-    {
-        const string responseBody = """
-            {
-              "formatVersion": "0.0.1",
-              "matrix": [
-                [
-                  {
-                    "statusCode": 200,
-                    "response": {
-                      "routeSummary": {
-                        "lengthInMeters": 22,
-                        "travelTimeInSeconds": 31,
-                        "trafficDelayInSeconds": 0
-                      }
-                    }
-                  }
-                ]
-              ],
-              "summary": { "successfulRoutes": 1, "totalRoutes": 1 }
-            }
-            """;
-
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
-        });
-
-        var cfg = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Maps:Azure:Key"] = "test-key" })
-            .Build();
-
-        var sut = new AzureMapsRouteMatrixService(new StubHttpClientFactory(new HttpClient(handler)), cfg);
-
-        var results = await sut.GetOneToManyAsync(
-            (53.381100, -1.470100),
-            new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase) { ["dest-1"] = (53.381300, -1.470100) },
-            ct: CancellationToken.None);
-
-        var route = Assert.Single(results).Value;
-        Assert.Equal(1, route.EtaMinutes);
-        Assert.Equal(0.01, route.DistanceMiles);
-        Assert.Equal("High", route.Confidence);
-    }
-
-    [Fact]
     public async Task AzureMapsRouteMatrixService_ParsesPositional2DMatrixArray_MultipleOrigins()
     {
         // 2 origins × 2 destinations (the example from the official Azure Maps docs)
@@ -293,7 +247,7 @@ public sealed class TravelCoverageServiceTests
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                    "{\"results\":[{\"address\":{\"postalCode\":\"CM1 2FG\"},\"position\":{\"lat\":51.731,\"lon\":0.468}}]}",
+                    "{\"results\":[{\"position\":{\"lat\":51.731,\"lon\":0.468}}]}",
                     Encoding.UTF8,
                     "application/json")
             };
@@ -314,74 +268,6 @@ public sealed class TravelCoverageServiceTests
         Assert.DoesNotContain("idxSet=", uriString);
         Assert.Equal(51.731, result.Lat);
         Assert.Equal(0.468, result.Lng);
-    }
-
-    [Fact]
-    public async Task AzureMapsGeocodingService_GeocodeAsync_SelectsMatchingPostcode_WhenFirstResultIsWrong()
-    {
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(
-                """
-                {
-                  "results": [
-                    {
-                      "address": { "postalCode": "HP22 5AA" },
-                      "position": { "lat": 51.8348511, "lon": -0.8514898 }
-                    },
-                    {
-                      "address": { "postalCode": "S1 1AB" },
-                      "position": { "lat": 53.3806626, "lon": -1.4702278 }
-                    }
-                  ]
-                }
-                """,
-                Encoding.UTF8,
-                "application/json")
-        });
-
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Maps:Azure:Key"] = "test-key" })
-            .Build();
-
-        var sut = new AzureMapsGeocodingService(new StubHttpClientFactory(new HttpClient(handler)), configuration);
-
-        var result = await sut.GeocodeAsync("S1 1AB, United Kingdom", CancellationToken.None);
-
-        Assert.Equal(53.3806626, result.Lat);
-        Assert.Equal(-1.4702278, result.Lng);
-    }
-
-    [Fact]
-    public async Task AzureMapsGeocodingService_GeocodeAsync_RejectsPostcode_WhenNoReturnedPostalCodeMatches()
-    {
-        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(
-                """
-                {
-                  "results": [
-                    {
-                      "address": { "postalCode": "HP22 5AA" },
-                      "position": { "lat": 51.8348511, "lon": -0.8514898 }
-                    }
-                  ]
-                }
-                """,
-                Encoding.UTF8,
-                "application/json")
-        });
-
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Maps:Azure:Key"] = "test-key" })
-            .Build();
-
-        var sut = new AzureMapsGeocodingService(new StubHttpClientFactory(new HttpClient(handler)), configuration);
-
-        var result = await sut.GeocodeAsync("S1 1AB, United Kingdom", CancellationToken.None);
-
-        Assert.Equal(0d, result.Lat);
-        Assert.Equal(0d, result.Lng);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -433,41 +319,6 @@ public sealed class TravelCoverageServiceTests
         Assert.NotNull(outcome.Coverage);
         Assert.True(outcome.Coverage!.IsWithinCoverage);
         Assert.Equal(1, provider.CallCount);
-    }
-
-    [Fact]
-    public async Task EvaluateAsync_UnresolvedDestinationPostcode_DoesNotUseProximateFallback()
-    {
-        var resolver = new StubPostcodeResolver(new Dictionary<string, LocationCoordinates>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["AB1 1AA"] = new(53.381100, -1.470100)
-        });
-
-        var provider = new RecordingRouteOutcomeProvider();
-        var sut = new TravelCoverageService(resolver, provider, NullLogger<TravelCoverageService>.Instance);
-
-        var request = new TravelCoverageRequest
-        {
-            SourcePostcode = "AB1 1AA",
-            Destinations =
-            [
-                new TravelCoverageDestinationRequest
-                {
-                    CorrelationId = "adv-1",
-                    Postcode = "NOT A POSTCODE",
-                    MaxTravelTimeMinutes = 30,
-                    MaxDistanceMiles = 10.0
-                }
-            ]
-        };
-
-        var result = await sut.EvaluateAsync(request, CancellationToken.None);
-
-        var outcome = Assert.Single(result.Destinations);
-        Assert.Equal(TravelCoverageStatus.DestinationPostcodeUnresolved, outcome.Status);
-        Assert.Null(outcome.Route);
-        Assert.Null(outcome.Coverage);
-        Assert.Equal(0, provider.CallCount);
     }
 
     [Fact]

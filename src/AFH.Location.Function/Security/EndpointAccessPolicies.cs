@@ -18,6 +18,7 @@ public static class EndpointAccessPolicies
             ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly,
             ["Adviser_CurrentUserContextV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsListV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserOrganisationAssignmentsResolveV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsDisableV1"] = EndpointAccessPolicy.UserAuthenticated,

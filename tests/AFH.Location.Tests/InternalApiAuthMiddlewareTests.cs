@@ -20,6 +20,7 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("SyncAdviserCacheV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("TravelCoverageV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("OrganisationAssignmentsListV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserOrganisationAssignmentsResolveV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsCreateV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsUpdateV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsDisableV1", EndpointAccessPolicy.UserAuthenticated)]

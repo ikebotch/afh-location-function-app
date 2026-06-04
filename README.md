@@ -32,6 +32,14 @@
 - `POST /api/v1/admin/advisers/cache/sync` refreshes the adviser reference cache from the configured live adviser source.
 - Search reads `IAdviserRepository`, which now resolves from cache first and only falls back to the live source when the cache is empty.
 
+## Organisation Assignment Resolution
+- `GET /api/v1/admin/organisation-assignments` remains the admin/config list endpoint. When no adviser, organisation, or region scope is supplied it can return all matching assignment rows for the requested context and assignment types.
+- `GET /api/v1/admin/advisers/{adviserId}/organisation-assignments?context=Booking&assignmentTypes=ContactCentre,OperationsManager,ReportingManager,Fallback` resolves the assignments that apply to one adviser.
+- The adviser-scoped resolver loads the adviser from the cached adviser reference model, derives the organisation scope from the adviser cache `BaseOfficeId` and the region from `Region`, then returns only enabled assignments matching the adviser, organisation+region, organisation-wide, region-only, or fallback scopes.
+- Scoped responses include match metadata: `matchLevel`, `matchedOrganisationId`, `matchedRegion`, `matchedAdviserId`, and `priority`.
+- `Fallback` assignments are returned only when requested and no more specific assignment matches.
+- Booking should call the adviser-scoped resolver when it needs assignment recipients; Notification should only deliver to recipients already resolved by Booking.
+
 ## Integration Contract (Location -> Calendar Service)
 - Endpoint: `POST /api/v1/calendar/users/schedule/batch`
 - Body:
@@ -44,16 +52,15 @@
   - `Authorization: Bearer <shared internal token>` via `CalendarService:InternalToken`
 
 ## Required Local Config (Location)
-- Copy `src/AFH.Location.Function/local.settings.template.json` to `src/AFH.Location.Function/local.settings.json`.
+- Copy `src/AFH.Location.Service.Functions/local.settings.template.json` to `src/AFH.Location.Service.Functions/local.settings.json`.
 - Fill in the required values:
-  `DomainUserAuth:*`, `ConnectionStrings:AdviserDirectoryDb`, `SharePoint:Advisers:SiteId`, `SharePoint:Advisers:ListId`, `CalendarService:BaseUrl`, `CalendarService:FunctionKey`, `CalendarService:InternalToken`, and `InternalApiAuth:Token`.
+  `AzureAD:*`, `SharePoint:Advisers:SiteId`, `SharePoint:Advisers:ListId`, `CalendarService:BaseUrl`, `CalendarService:FunctionKey`, `CalendarService:InternalToken`, and `InternalApiAuth:Token`.
 - The template now also includes the active SharePoint field-name mapping keys used by the current `SharePointAdviserRepository` implementation, so local list-field overrides do not have to be discovered by source inspection.
 - Keep `Maps:Google:Enabled=false`. The Google provider path is intentionally disabled until routing and geocoding are fully implemented.
 
 ## Local Settings Conventions
 - Internal bearer auth uses `InternalApiAuth:Token`.
 - Calendar downstream auth uses `CalendarService:BaseUrl`, `CalendarService:FunctionKey`, and `CalendarService:InternalToken`.
-- Adviser-backed user RBAC for `/api/v1/me` uses `DomainUserAuth:*` for bearer-token validation and `ConnectionStrings:AdviserDirectoryDb` for role and permission lookup.
 - SharePoint config stays under `SharePoint:Advisers:*` because those keys map directly to the active infrastructure options and SharePointUtils consumption path.
 
 ## API Docs

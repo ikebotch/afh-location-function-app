@@ -3,6 +3,7 @@ using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
 using AFH.Adviser.Application.Models.OrganisationAssignments;
 using AFH.Adviser.Application.Models.Auth;
 using AFH.Adviser.Contract.V1.OrganisationAssignments;
+using AFH.Location.Function.Docs.V1;
 using AFH.Location.Function.Functions.Common;
 using AFH.Location.Function.Security;
 using Microsoft.AspNetCore.WebUtilities;
@@ -14,13 +15,16 @@ namespace AFH.Location.Function.Functions.V1.Admin;
 public sealed class OrganisationAssignmentsFunctionV1
 {
     private readonly IOrganisationAssignmentDirectory _directory;
+    private readonly IAdviserScopedOrganisationAssignmentResolver _scopedResolver;
     private readonly IDomainUserAuthorizationService _auth;
 
     public OrganisationAssignmentsFunctionV1(
         IOrganisationAssignmentDirectory directory,
+        IAdviserScopedOrganisationAssignmentResolver scopedResolver,
         IDomainUserAuthorizationService auth)
     {
         _directory = directory;
+        _scopedResolver = scopedResolver;
         _auth = auth;
     }
 
@@ -38,6 +42,42 @@ public sealed class OrganisationAssignmentsFunctionV1
         var assignments = await _directory.SearchAsync(search, ct);
         var response = new OrganisationAssignmentsResponseV1(assignments.Select(ToDto).ToArray());
         return await req.WriteSuccessAsync(response, ct, ApiEnvelopeExtensions.SinglePage(response.Assignments.Count));
+    }
+
+    [Function("AdviserOrganisationAssignmentsResolveV1")]
+    [LocationOpenApiOperation("Admin", "Resolve adviser-scoped organisation assignments",
+        ResponseType = typeof(AdviserScopedOrganisationAssignmentsResponseV1))]
+    [LocationOpenApiQueryParameter("context", "string", IsRequired = true)]
+    [LocationOpenApiQueryParameter("assignmentTypes", "string", IsRequired = true)]
+    public async Task<HttpResponseData> ResolveForAdviserAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/admin/advisers/{adviserId}/organisation-assignments")]
+        HttpRequestData req,
+        string adviserId,
+        CancellationToken ct)
+    {
+        var authFailure = await _auth.AuthorizeAsync(req, OrganisationAssignmentPermissions.Read, allowInternal: true, ct);
+        if (authFailure is not null)
+            return authFailure;
+
+        var query = QueryHelpers.ParseQuery(req.Url.Query);
+        var context = Get(query, "context");
+        var assignmentTypes = GetAssignmentTypes(query);
+        var result = await _scopedResolver.ResolveAsync(
+            new AdviserScopedOrganisationAssignmentQuery(adviserId, context ?? string.Empty, assignmentTypes),
+            ct);
+
+        return result.Status switch
+        {
+            AdviserScopedOrganisationAssignmentResolutionStatus.Succeeded => await WriteScopedSuccessAsync(req, adviserId, result, ct),
+            AdviserScopedOrganisationAssignmentResolutionStatus.AdviserNotFound => await req.WriteFailureAsync(
+                HttpStatusCode.NotFound,
+                new { code = result.ErrorCode, message = result.ErrorMessage },
+                ct),
+            _ => await req.WriteFailureAsync(
+                HttpStatusCode.BadRequest,
+                new { code = result.ErrorCode, message = result.ErrorMessage },
+                ct)
+        };
     }
 
     [Function("OrganisationAssignmentsCreateV1")]
@@ -118,9 +158,7 @@ public sealed class OrganisationAssignmentsFunctionV1
     private static OrganisationAssignmentSearch ToSearch(string queryString)
     {
         var query = QueryHelpers.ParseQuery(queryString);
-        var roles = query.TryGetValue("assignmentTypes", out var roleValues)
-            ? roleValues.SelectMany(x => (x ?? string.Empty).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)).ToArray()
-            : [];
+        var roles = GetAssignmentTypes(query);
         var includeDisabled = query.TryGetValue("includeDisabled", out var includeDisabledValues)
             && bool.TryParse(includeDisabledValues.FirstOrDefault(), out var includeDisabledValue)
             && includeDisabledValue;
@@ -137,6 +175,11 @@ public sealed class OrganisationAssignmentsFunctionV1
 
     private static string? Get(Dictionary<string, Microsoft.Extensions.Primitives.StringValues> query, string key)
         => query.TryGetValue(key, out var value) ? value.FirstOrDefault() : null;
+
+    private static IReadOnlyList<string> GetAssignmentTypes(Dictionary<string, Microsoft.Extensions.Primitives.StringValues> query)
+        => query.TryGetValue("assignmentTypes", out var roleValues)
+            ? roleValues.SelectMany(x => (x ?? string.Empty).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)).ToArray()
+            : [];
 
     private static string? Validate(OrganisationAssignmentUpsertRequestV1? request)
     {
@@ -183,4 +226,37 @@ public sealed class OrganisationAssignmentsFunctionV1
             assignment.AdviserId,
             assignment.IsEnabled,
             assignment.Priority);
+
+    private static async Task<HttpResponseData> WriteScopedSuccessAsync(
+        HttpRequestData req,
+        string adviserId,
+        AdviserScopedOrganisationAssignmentResolution result,
+        CancellationToken ct)
+    {
+        var response = new AdviserScopedOrganisationAssignmentsResponseV1(
+            adviserId,
+            result.Assignments.Select(ToScopedDto).ToArray());
+
+        return await req.WriteSuccessAsync(response, ct, ApiEnvelopeExtensions.SinglePage(response.Assignments.Count));
+    }
+
+    private static AdviserScopedOrganisationAssignmentDto ToScopedDto(AdviserScopedOrganisationAssignment assignment)
+        => new(
+            assignment.Id,
+            assignment.Context,
+            assignment.AssignmentType,
+            assignment.OrganisationId,
+            assignment.ClientId,
+            assignment.Region,
+            assignment.AdviserId,
+            assignment.DisplayName,
+            assignment.Email,
+            assignment.MobileNumber,
+            assignment.Channels,
+            assignment.IsEnabled,
+            assignment.Priority,
+            assignment.MatchLevel,
+            assignment.MatchedOrganisationId,
+            assignment.MatchedRegion,
+            assignment.MatchedAdviserId);
 }

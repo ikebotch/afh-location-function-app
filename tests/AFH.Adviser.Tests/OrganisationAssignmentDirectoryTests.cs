@@ -104,6 +104,51 @@ public sealed class OrganisationAssignmentDirectoryTests
     }
 
     [Fact]
+    public async Task SearchAsync_WithoutScope_ReturnsAllMatchingAdminRows()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await directory.CreateAsync(new OrganisationAssignmentUpsert(
+            "Booking",
+            "ContactCentre",
+            "org-1",
+            null,
+            "Region A",
+            null,
+            "Region A Contact Centre",
+            "region-a@example.com",
+            null,
+            ["Email"],
+            IsEnabled: true,
+            Priority: 10), CancellationToken.None);
+        await directory.CreateAsync(new OrganisationAssignmentUpsert(
+            "Booking",
+            "ContactCentre",
+            "org-1",
+            null,
+            "Region B",
+            null,
+            "Region B Contact Centre",
+            "region-b@example.com",
+            null,
+            ["Email"],
+            IsEnabled: true,
+            Priority: 20), CancellationToken.None);
+
+        var assignments = await directory.SearchAsync(new OrganisationAssignmentSearch(
+            "Booking",
+            ["ContactCentre"],
+            OrganisationId: null,
+            ClientId: null,
+            Region: null,
+            AdviserId: null), CancellationToken.None);
+
+        Assert.Collection(assignments,
+            first => Assert.Equal("Region A Contact Centre", first.DisplayName),
+            second => Assert.Equal("Region B Contact Centre", second.DisplayName));
+    }
+
+    [Fact]
     public async Task UserContextStore_ReturnsAllRolesAndPermissionsForMappedUser()
     {
         await using var db = CreateDb();
