@@ -10,6 +10,7 @@ using AFH.Adviser.Infrastructure.Persistence.Auth;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
 using AFH.Common.SharePointUtils.Extensions;
+using AFH.Location.Infrastructure.Composition;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,6 +57,7 @@ public static class AdviserInfrastructureDependencyInjection
         }
 
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
+        services.AddLocationPolicyDbContext(configuration);
 
         var useAdviserFeed = configuration.GetValue<bool>("AdviserFeed:Enabled");
         if (useAdviserFeed)

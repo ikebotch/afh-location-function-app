@@ -72,6 +72,39 @@ public static class DependencyInjection
         return services;
     }
 
+    public static IServiceCollection AddLocationPolicyDbContext(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var policyDbConnectionString = ResolveLocationPolicyDbConnectionString(configuration);
+        if (string.IsNullOrWhiteSpace(policyDbConnectionString))
+        {
+            throw new InvalidOperationException(
+                "Missing SQL connection string for LocationPolicyDbContext. " +
+                "Set ConnectionStrings:LocationPolicyDb (or LocationSearch:PolicyStore:ConnectionString).");
+        }
+
+        var hasDbContextRegistration = services.Any(descriptor => descriptor.ServiceType == typeof(LocationPolicyDbContext));
+        var hasDbContextFactoryRegistration = services.Any(descriptor => descriptor.ServiceType == typeof(IDbContextFactory<LocationPolicyDbContext>));
+        if (hasDbContextRegistration && hasDbContextFactoryRegistration)
+            return services;
+
+        if (hasDbContextRegistration || hasDbContextFactoryRegistration)
+        {
+            throw new InvalidOperationException(
+                "LocationPolicyDbContext is partially registered. " +
+                "Both LocationPolicyDbContext and IDbContextFactory<LocationPolicyDbContext> are required.");
+        }
+
+        services.AddDbContext<LocationPolicyDbContext>(options => options.UseSqlServer(policyDbConnectionString));
+        services.AddDbContextFactory<LocationPolicyDbContext>(
+            options => options.UseSqlServer(policyDbConnectionString),
+            ServiceLifetime.Scoped);
+        services.AddAfhCommonErrorsEntityFramework<LocationPolicyDbContext>();
+
+        return services;
+    }
+
     internal static string? ResolveLocationPolicyDbConnectionString(IConfiguration configuration) =>
         configuration.GetConnectionString("LocationPolicyDb")
         ?? configuration["ConnectionStrings:LocationPolicyDb"]
