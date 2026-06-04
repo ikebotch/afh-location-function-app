@@ -208,11 +208,96 @@ public sealed class OrganisationAssignmentDirectoryTests
     }
 
     [Fact]
+    public async Task ResolveScopedAsync_GlobalAssignmentAppliesWhenNoSpecificMatchExists()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Global Contact Centre", "ContactCentre");
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region A"), CancellationToken.None);
+
+        var match = Assert.Single(matches);
+        Assert.Equal("Global Contact Centre", match.Assignment.DisplayName);
+        Assert.Equal(OrganisationAssignmentMatchLevels.Global, match.MatchLevel);
+        Assert.Null(match.MatchedOrganisationId);
+        Assert.Null(match.MatchedRegion);
+        Assert.Null(match.MatchedAdviserId);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_GlobalAssignmentDoesNotOverrideAdviserSpecificMatch()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Global Contact Centre", "ContactCentre", priority: 1);
+        await AddAssignmentAsync(directory, "Adviser Contact Centre", "ContactCentre", adviserId: "adv-1", priority: 100);
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region A"), CancellationToken.None);
+
+        var match = Assert.Single(matches);
+        Assert.Equal("Adviser Contact Centre", match.Assignment.DisplayName);
+        Assert.Equal(OrganisationAssignmentMatchLevels.Adviser, match.MatchLevel);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_GlobalAssignmentDoesNotOverrideOrganisationRegionMatch()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Global Contact Centre", "ContactCentre", priority: 1);
+        await AddAssignmentAsync(directory, "Regional Contact Centre", "ContactCentre", organisationId: "org-1", region: "Region A", priority: 100);
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region A"), CancellationToken.None);
+
+        var match = Assert.Single(matches);
+        Assert.Equal("Regional Contact Centre", match.Assignment.DisplayName);
+        Assert.Equal(OrganisationAssignmentMatchLevels.OrganisationRegion, match.MatchLevel);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_GlobalAssignmentResolvesIndependentlyPerAssignmentType()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Regional Contact Centre", "ContactCentre", organisationId: "org-1", region: "Region A");
+        await AddAssignmentAsync(directory, "Global Operations Manager", "OperationsManager");
+
+        var matches = await directory.ResolveScopedAsync(
+            ScopedSearch("adv-1", "org-1", "Region A", ["ContactCentre", "OperationsManager"]),
+            CancellationToken.None);
+
+        Assert.Collection(
+            matches,
+            first =>
+            {
+                Assert.Equal("Regional Contact Centre", first.Assignment.DisplayName);
+                Assert.Equal(OrganisationAssignmentMatchLevels.OrganisationRegion, first.MatchLevel);
+            },
+            second =>
+            {
+                Assert.Equal("Global Operations Manager", second.Assignment.DisplayName);
+                Assert.Equal(OrganisationAssignmentMatchLevels.Global, second.MatchLevel);
+            });
+    }
+
+    [Fact]
     public async Task ResolveScopedAsync_ExcludesDisabledAssignments()
     {
         await using var db = CreateDb();
         var directory = new SqlOrganisationAssignmentDirectory(db);
         await AddAssignmentAsync(directory, "Disabled Contact Centre", "ContactCentre", organisationId: "org-1", region: "Region A", isEnabled: false);
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region A"), CancellationToken.None);
+
+        Assert.Empty(matches);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_ExcludesDisabledGlobalAssignments()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Disabled Global Contact Centre", "ContactCentre", isEnabled: false);
 
         var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region A"), CancellationToken.None);
 

@@ -25,5 +25,6 @@ public static class OrganisationAssignmentMatchLevels
     public const string OrganisationRegion = "OrganisationRegion";
     public const string Organisation = "Organisation";
     public const string Region = "Region";
+    public const string Global = "Global";
     public const string Fallback = "Fallback";
 }

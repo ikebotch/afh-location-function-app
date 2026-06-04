@@ -286,6 +286,20 @@ public sealed class AdviserScopedOrganisationAssignmentResolverTests
                 Rank: 4);
         }
 
+        if (!string.Equals(assignment.AssignmentType, "Fallback", StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(assignment.AdviserId) &&
+            string.IsNullOrWhiteSpace(assignment.OrganisationId) &&
+            string.IsNullOrWhiteSpace(assignment.Region))
+        {
+            return new OrganisationAssignmentScopedMatch(
+                assignment,
+                OrganisationAssignmentMatchLevels.Global,
+                MatchedOrganisationId: null,
+                MatchedRegion: null,
+                MatchedAdviserId: null,
+                Rank: 5);
+        }
+
         if (search.IncludeFallback &&
             string.Equals(assignment.AssignmentType, "Fallback", StringComparison.OrdinalIgnoreCase))
         {
@@ -295,7 +309,7 @@ public sealed class AdviserScopedOrganisationAssignmentResolverTests
                 MatchedOrganisationId: null,
                 MatchedRegion: null,
                 MatchedAdviserId: null,
-                Rank: 5);
+                Rank: 6);
         }
 
         return null;

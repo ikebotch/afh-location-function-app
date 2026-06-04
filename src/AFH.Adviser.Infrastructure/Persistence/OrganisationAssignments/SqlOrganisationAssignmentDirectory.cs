@@ -271,6 +271,20 @@ public sealed class SqlOrganisationAssignmentDirectory : IOrganisationAssignment
                 Rank: 4);
         }
 
+        if (!string.Equals(assignment.AssignmentType, FallbackAssignmentType, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(assignment.AdviserId) &&
+            string.IsNullOrWhiteSpace(assignment.OrganisationId) &&
+            string.IsNullOrWhiteSpace(assignment.Region))
+        {
+            return new OrganisationAssignmentScopedMatch(
+                assignment,
+                OrganisationAssignmentMatchLevels.Global,
+                MatchedOrganisationId: null,
+                MatchedRegion: null,
+                MatchedAdviserId: null,
+                Rank: 5);
+        }
+
         if (search.IncludeFallback &&
             string.Equals(assignment.AssignmentType, FallbackAssignmentType, StringComparison.OrdinalIgnoreCase))
         {
@@ -280,7 +294,7 @@ public sealed class SqlOrganisationAssignmentDirectory : IOrganisationAssignment
                 MatchedOrganisationId: null,
                 MatchedRegion: null,
                 MatchedAdviserId: null,
-                Rank: 5);
+                Rank: 6);
         }
 
         return null;
