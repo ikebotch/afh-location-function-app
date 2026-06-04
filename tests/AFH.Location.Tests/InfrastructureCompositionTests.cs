@@ -8,6 +8,7 @@ using AFH.Location.Application.Abstractions.Geo;
 using AFH.Location.Infrastructure.Composition;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;
+using AFH.Location.Function.Functions.V1.Admin;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,14 +46,48 @@ public sealed class InfrastructureCompositionTests
         Assert.IsType<SqlAdviserReferenceCacheRepository>(scopedProvider.GetRequiredService<IAdviserReferenceCacheRepository>());
         Assert.IsType<SqlEffectiveCoveragePolicyResolver>(scopedProvider.GetRequiredService<IEffectiveCoveragePolicyResolver>());
         Assert.IsType<SqlOrganisationAssignmentDirectory>(scopedProvider.GetRequiredService<IOrganisationAssignmentDirectory>());
+        Assert.NotNull(scopedProvider.GetRequiredService<IOrganisationAssignmentAdminService>());
         Assert.NotNull(scopedProvider.GetRequiredService<IAdviserScopedOrganisationAssignmentResolver>());
     }
 
-    private static IConfiguration CreateFunctionStyleConfiguration()
-        => new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+    [Fact]
+    public void AdviserInfrastructureWithoutLocationPolicyDbContext_FailsWhenSqlAdviserCacheIsResolved()
+    {
+        var configuration = CreateFunctionStyleConfiguration(includeLocationPolicyDb: false);
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<IHostEnvironment>(new FakeHostEnvironment());
+        services.AddLogging();
+
+        services.AddAdviserInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions
             {
-                ["ConnectionStrings:LocationPolicyDb"] = "Server=(localdb)\\mssqllocaldb;Database=AFHLocationCompositionTests;Trusted_Connection=True;TrustServerCertificate=True",
+                ValidateScopes = true
+            });
+
+        using var scope = provider.CreateScope();
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => scope.ServiceProvider.GetRequiredService<IAdviserReferenceCacheRepository>());
+
+        Assert.Contains(nameof(LocationPolicyDbContext), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OrganisationAssignmentsFunction_UsesAdminServiceInsteadOfDirectory()
+    {
+        var constructor = Assert.Single(typeof(OrganisationAssignmentsFunctionV1).GetConstructors());
+        var parameterTypes = constructor.GetParameters().Select(x => x.ParameterType).ToArray();
+
+        Assert.Contains(typeof(IOrganisationAssignmentAdminService), parameterTypes);
+        Assert.DoesNotContain(typeof(IOrganisationAssignmentDirectory), parameterTypes);
+    }
+
+    private static IConfiguration CreateFunctionStyleConfiguration(bool includeLocationPolicyDb = true)
+    {
+        var values = new Dictionary<string, string?>
+        {
                 ["ConnectionStrings:AdviserDirectoryDb"] = "Server=(localdb)\\mssqllocaldb;Database=AFHAdviserCompositionTests;Trusted_Connection=True;TrustServerCertificate=True",
                 ["ApplicationLogging:Provider"] = "Both",
                 ["ApplicationLogging:MaxPayloadLength"] = "2048",
@@ -74,8 +109,18 @@ public sealed class InfrastructureCompositionTests
                 ["AzureAD:ClientSecret"] = "client-secret",
                 ["AzureAD:AuthorityHost"] = "https://login.microsoftonline.com/",
                 ["AzureAD:Scopes:0"] = "https://graph.microsoft.com/.default"
-            })
+        };
+
+        if (includeLocationPolicyDb)
+        {
+            values["ConnectionStrings:LocationPolicyDb"] =
+                "Server=(localdb)\\mssqllocaldb;Database=AFHLocationCompositionTests;Trusted_Connection=True;TrustServerCertificate=True";
+        }
+
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
             .Build();
+    }
 
     private sealed class FakeHostEnvironment : IHostEnvironment
     {

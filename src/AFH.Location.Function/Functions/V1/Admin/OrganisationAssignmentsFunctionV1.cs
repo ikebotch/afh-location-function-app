@@ -14,16 +14,16 @@ namespace AFH.Location.Function.Functions.V1.Admin;
 
 public sealed class OrganisationAssignmentsFunctionV1
 {
-    private readonly IOrganisationAssignmentDirectory _directory;
+    private readonly IOrganisationAssignmentAdminService _admin;
     private readonly IAdviserScopedOrganisationAssignmentResolver _scopedResolver;
     private readonly IDomainUserAuthorizationService _auth;
 
     public OrganisationAssignmentsFunctionV1(
-        IOrganisationAssignmentDirectory directory,
+        IOrganisationAssignmentAdminService admin,
         IAdviserScopedOrganisationAssignmentResolver scopedResolver,
         IDomainUserAuthorizationService auth)
     {
-        _directory = directory;
+        _admin = admin;
         _scopedResolver = scopedResolver;
         _auth = auth;
     }
@@ -39,7 +39,7 @@ public sealed class OrganisationAssignmentsFunctionV1
             return authFailure;
 
         var search = ToSearch(req.Url.Query);
-        var assignments = await _directory.SearchAsync(search, ct);
+        var assignments = await _admin.SearchAsync(search, ct);
         var response = new OrganisationAssignmentsResponseV1(assignments.Select(ToDto).ToArray());
         return await req.WriteSuccessAsync(response, ct, ApiEnvelopeExtensions.SinglePage(response.Assignments.Count));
     }
@@ -95,7 +95,7 @@ public sealed class OrganisationAssignmentsFunctionV1
         if (validation is not null)
             return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_ASSIGNMENT", message = validation }, ct);
 
-        var created = await _directory.CreateAsync(ToUpsert(body!), ct);
+        var created = await _admin.CreateAsync(ToUpsert(body!), ct);
         return await req.WriteSuccessAsync(ToDto(created), ct, statusCode: HttpStatusCode.Created);
     }
 
@@ -115,7 +115,7 @@ public sealed class OrganisationAssignmentsFunctionV1
         if (validation is not null)
             return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_ASSIGNMENT", message = validation }, ct);
 
-        var updated = await _directory.UpdateAsync(id, ToUpsert(body!), ct);
+        var updated = await _admin.UpdateAsync(id, ToUpsert(body!), ct);
         return updated is null
             ? await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "ASSIGNMENT_NOT_FOUND", message = "Organisation assignment was not found." }, ct)
             : await req.WriteSuccessAsync(ToDto(updated), ct);
@@ -132,7 +132,7 @@ public sealed class OrganisationAssignmentsFunctionV1
         if (authFailure is not null)
             return authFailure;
 
-        var disabled = await _directory.DisableAsync(id, ct);
+        var disabled = await _admin.DisableAsync(id, ct);
         return disabled
             ? await req.WriteSuccessAsync(new { id, disabled = true }, ct)
             : await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "ASSIGNMENT_NOT_FOUND", message = "Organisation assignment was not found." }, ct);
@@ -149,7 +149,7 @@ public sealed class OrganisationAssignmentsFunctionV1
         if (authFailure is not null)
             return authFailure;
 
-        var deleted = await _directory.DeleteAsync(id, ct);
+        var deleted = await _admin.DeleteAsync(id, ct);
         return deleted
             ? await req.WriteSuccessAsync(new { id, deleted = true }, ct)
             : await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "ASSIGNMENT_NOT_FOUND", message = "Organisation assignment was not found." }, ct);

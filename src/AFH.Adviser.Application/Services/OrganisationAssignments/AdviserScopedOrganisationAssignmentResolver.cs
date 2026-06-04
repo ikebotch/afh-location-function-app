@@ -40,28 +40,30 @@ public sealed class AdviserScopedOrganisationAssignmentResolver : IAdviserScoped
             return AdviserScopedOrganisationAssignmentResolution.AdviserNotFound(adviserId);
 
         var assignmentTypes = NormaliseAssignmentTypes(query.AssignmentTypes);
-        var candidates = await _assignments.SearchAsync(new OrganisationAssignmentSearch(
-            query.Context.Trim(),
-            assignmentTypes,
-            OrganisationId: null,
-            ClientId: null,
-            Region: null,
-            AdviserId: null,
-            IncludeDisabled: false), ct);
+        var organisationId = ResolveOrganisationId(adviser);
+        var region = TrimToNull(adviser.Region);
 
-        var scoped = ResolveMatches(adviser, candidates, assignmentTypes);
-
-        if (string.IsNullOrWhiteSpace(ResolveOrganisationId(adviser)) ||
-            string.IsNullOrWhiteSpace(adviser.Region))
+        if (string.IsNullOrWhiteSpace(organisationId) ||
+            string.IsNullOrWhiteSpace(region))
         {
             _logger.LogWarning(
                 "Adviser organisation assignment scope is incomplete for AdviserId={AdviserId}. HasOrganisationId={HasOrganisationId}, HasRegion={HasRegion}.",
                 adviser.AdviserId,
-                !string.IsNullOrWhiteSpace(ResolveOrganisationId(adviser)),
-                !string.IsNullOrWhiteSpace(adviser.Region));
+                !string.IsNullOrWhiteSpace(organisationId),
+                !string.IsNullOrWhiteSpace(region));
         }
 
-        return AdviserScopedOrganisationAssignmentResolution.Ok(scoped);
+        var matches = await _assignments.ResolveScopedAsync(new OrganisationAssignmentScopedSearch(
+            query.Context.Trim(),
+            assignmentTypes,
+            adviserId,
+            organisationId,
+            region,
+            ClientId: null,
+            IncludeDisabled: false,
+            IncludeFallback: assignmentTypes.Contains(FallbackAssignmentType, StringComparer.OrdinalIgnoreCase)), ct);
+
+        return AdviserScopedOrganisationAssignmentResolution.Ok(matches.Select(ToScoped).ToArray());
     }
 
     private static string? Validate(AdviserScopedOrganisationAssignmentQuery query)
@@ -78,127 +80,11 @@ public sealed class AdviserScopedOrganisationAssignmentResolver : IAdviserScoped
         return null;
     }
 
-    private static IReadOnlyList<AdviserScopedOrganisationAssignment> ResolveMatches(
-        Entities.Adviser adviser,
-        IReadOnlyList<OrganisationAssignment> candidates,
-        IReadOnlyList<string> requestedTypes)
-    {
-        var requestedTypeSet = requestedTypes.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var matches = candidates
-            .Where(x => requestedTypeSet.Contains(x.AssignmentType))
-            .Select(x => TryMatch(adviser, x))
-            .Where(x => x is not null)
-            .Select(x => x!.Value)
-            .ToArray();
-
-        var specificMatches = matches
-            .Where(x => !string.Equals(x.Assignment.AssignmentType, FallbackAssignmentType, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-
-        if (specificMatches.Length > 0)
-        {
-            return specificMatches
-                .GroupBy(x => x.Assignment.AssignmentType, StringComparer.OrdinalIgnoreCase)
-                .SelectMany(group =>
-                {
-                    var bestRank = group.Min(x => x.Rank);
-                    return group.Where(x => x.Rank == bestRank);
-                })
-                .OrderBy(x => x.Rank)
-                .ThenBy(x => x.Assignment.Priority)
-                .ThenBy(x => x.Assignment.DisplayName, StringComparer.OrdinalIgnoreCase)
-                .Select(x => ToScoped(x.Assignment, x))
-                .ToArray();
-        }
-
-        if (!requestedTypeSet.Contains(FallbackAssignmentType))
-            return [];
-
-        return matches
-            .Where(x => string.Equals(x.Assignment.AssignmentType, FallbackAssignmentType, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(x => x.Rank)
-            .ThenBy(x => x.Assignment.Priority)
-            .ThenBy(x => x.Assignment.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .Select(x => ToScoped(x.Assignment, x))
-            .ToArray();
-    }
-
-    private static MatchCandidate? TryMatch(Entities.Adviser adviser, OrganisationAssignment assignment)
-    {
-        var adviserId = TrimToNull(adviser.AdviserId);
-        var organisationId = ResolveOrganisationId(adviser);
-        var region = TrimToNull(adviser.Region);
-
-        if (!string.IsNullOrWhiteSpace(assignment.AdviserId) &&
-            string.Equals(assignment.AdviserId, adviserId, StringComparison.OrdinalIgnoreCase))
-        {
-            return new MatchCandidate(
-                assignment,
-                Rank: 1,
-                MatchLevel: OrganisationAssignmentMatchLevels.Adviser,
-                MatchedOrganisationId: null,
-                MatchedRegion: null,
-                MatchedAdviserId: adviserId);
-        }
-
-        if (!string.IsNullOrWhiteSpace(organisationId) &&
-            !string.IsNullOrWhiteSpace(region) &&
-            string.Equals(assignment.OrganisationId, organisationId, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(assignment.Region, region, StringComparison.OrdinalIgnoreCase))
-        {
-            return new MatchCandidate(
-                assignment,
-                Rank: 2,
-                MatchLevel: OrganisationAssignmentMatchLevels.OrganisationRegion,
-                MatchedOrganisationId: organisationId,
-                MatchedRegion: region,
-                MatchedAdviserId: null);
-        }
-
-        if (!string.IsNullOrWhiteSpace(organisationId) &&
-            string.Equals(assignment.OrganisationId, organisationId, StringComparison.OrdinalIgnoreCase) &&
-            string.IsNullOrWhiteSpace(assignment.Region))
-        {
-            return new MatchCandidate(
-                assignment,
-                Rank: 3,
-                MatchLevel: OrganisationAssignmentMatchLevels.Organisation,
-                MatchedOrganisationId: organisationId,
-                MatchedRegion: null,
-                MatchedAdviserId: null);
-        }
-
-        if (!string.IsNullOrWhiteSpace(region) &&
-            string.IsNullOrWhiteSpace(assignment.OrganisationId) &&
-            string.Equals(assignment.Region, region, StringComparison.OrdinalIgnoreCase))
-        {
-            return new MatchCandidate(
-                assignment,
-                Rank: 4,
-                MatchLevel: OrganisationAssignmentMatchLevels.Region,
-                MatchedOrganisationId: null,
-                MatchedRegion: region,
-                MatchedAdviserId: null);
-        }
-
-        if (string.Equals(assignment.AssignmentType, FallbackAssignmentType, StringComparison.OrdinalIgnoreCase))
-        {
-            return new MatchCandidate(
-                assignment,
-                Rank: 5,
-                MatchLevel: OrganisationAssignmentMatchLevels.Fallback,
-                MatchedOrganisationId: null,
-                MatchedRegion: null,
-                MatchedAdviserId: null);
-        }
-
-        return null;
-    }
-
     private static AdviserScopedOrganisationAssignment ToScoped(
-        OrganisationAssignment assignment,
-        MatchCandidate match)
-        => new(
+        OrganisationAssignmentScopedMatch match)
+    {
+        var assignment = match.Assignment;
+        return new AdviserScopedOrganisationAssignment(
             assignment.Id,
             assignment.Context,
             assignment.AssignmentType,
@@ -216,6 +102,7 @@ public sealed class AdviserScopedOrganisationAssignmentResolver : IAdviserScoped
             match.MatchedOrganisationId,
             match.MatchedRegion,
             match.MatchedAdviserId);
+    }
 
     private static IReadOnlyList<string> NormaliseAssignmentTypes(IEnumerable<string> assignmentTypes)
         => assignmentTypes
@@ -231,12 +118,4 @@ public sealed class AdviserScopedOrganisationAssignmentResolver : IAdviserScoped
 
     private static string? TrimToNull(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private readonly record struct MatchCandidate(
-        OrganisationAssignment Assignment,
-        int Rank,
-        string MatchLevel,
-        string? MatchedOrganisationId,
-        string? MatchedRegion,
-        string? MatchedAdviserId);
 }

@@ -149,6 +149,101 @@ public sealed class OrganisationAssignmentDirectoryTests
     }
 
     [Fact]
+    public async Task ResolveScopedAsync_AdviserMatchWins()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Regional Contact Centre", "ContactCentre", organisationId: "org-1", region: "Region A", priority: 1);
+        await AddAssignmentAsync(directory, "Adviser Contact Centre", "ContactCentre", adviserId: "adv-1", priority: 100);
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region A"), CancellationToken.None);
+
+        var match = Assert.Single(matches);
+        Assert.Equal("Adviser Contact Centre", match.Assignment.DisplayName);
+        Assert.Equal(OrganisationAssignmentMatchLevels.Adviser, match.MatchLevel);
+        Assert.Equal("adv-1", match.MatchedAdviserId);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_OrganisationRegionBeatsOrganisationOnly()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Org Contact Centre", "ContactCentre", organisationId: "org-1", priority: 1);
+        await AddAssignmentAsync(directory, "Regional Contact Centre", "ContactCentre", organisationId: "org-1", region: "Region A", priority: 100);
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region A"), CancellationToken.None);
+
+        var match = Assert.Single(matches);
+        Assert.Equal("Regional Contact Centre", match.Assignment.DisplayName);
+        Assert.Equal(OrganisationAssignmentMatchLevels.OrganisationRegion, match.MatchLevel);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_OrganisationOnlyAppliesAcrossRegions()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Org Contact Centre", "ContactCentre", organisationId: "org-1");
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region B"), CancellationToken.None);
+
+        var match = Assert.Single(matches);
+        Assert.Equal("Org Contact Centre", match.Assignment.DisplayName);
+        Assert.Equal(OrganisationAssignmentMatchLevels.Organisation, match.MatchLevel);
+        Assert.Equal("org-1", match.MatchedOrganisationId);
+        Assert.Null(match.MatchedRegion);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_RegionAAssignmentDoesNotMatchRegionBAdviser()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Region A Contact Centre", "ContactCentre", organisationId: "org-1", region: "Region A");
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region B"), CancellationToken.None);
+
+        Assert.Empty(matches);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_ExcludesDisabledAssignments()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Disabled Contact Centre", "ContactCentre", organisationId: "org-1", region: "Region A", isEnabled: false);
+
+        var matches = await directory.ResolveScopedAsync(ScopedSearch("adv-1", "org-1", "Region A"), CancellationToken.None);
+
+        Assert.Empty(matches);
+    }
+
+    [Fact]
+    public async Task ResolveScopedAsync_FallbackOnlyWhenNoSpecificMatchExists()
+    {
+        await using var db = CreateDb();
+        var directory = new SqlOrganisationAssignmentDirectory(db);
+        await AddAssignmentAsync(directory, "Regional Contact Centre", "ContactCentre", organisationId: "org-1", region: "Region A");
+        await AddAssignmentAsync(directory, "Fallback Team", "Fallback");
+
+        var specificMatches = await directory.ResolveScopedAsync(
+            ScopedSearch("adv-1", "org-1", "Region A", ["ContactCentre", "Fallback"], includeFallback: true),
+            CancellationToken.None);
+
+        var specificMatch = Assert.Single(specificMatches);
+        Assert.Equal("Regional Contact Centre", specificMatch.Assignment.DisplayName);
+
+        var fallbackMatches = await directory.ResolveScopedAsync(
+            ScopedSearch("adv-1", "org-2", "Region B", ["ContactCentre", "Fallback"], includeFallback: true),
+            CancellationToken.None);
+
+        var fallbackMatch = Assert.Single(fallbackMatches);
+        Assert.Equal("Fallback Team", fallbackMatch.Assignment.DisplayName);
+        Assert.Equal(OrganisationAssignmentMatchLevels.Fallback, fallbackMatch.MatchLevel);
+    }
+
+    [Fact]
     public async Task UserContextStore_ReturnsAllRolesAndPermissionsForMappedUser()
     {
         await using var db = CreateDb();
@@ -227,4 +322,43 @@ public sealed class OrganisationAssignmentDirectoryTests
             .Options;
         return new AdviserDirectoryDbContext(options);
     }
+
+    private static OrganisationAssignmentScopedSearch ScopedSearch(
+        string adviserId,
+        string? organisationId,
+        string? region,
+        IReadOnlyList<string>? assignmentTypes = null,
+        bool includeFallback = false)
+        => new(
+            "Booking",
+            assignmentTypes ?? ["ContactCentre"],
+            adviserId,
+            organisationId,
+            region,
+            ClientId: null,
+            IncludeDisabled: false,
+            IncludeFallback: includeFallback);
+
+    private static async Task AddAssignmentAsync(
+        SqlOrganisationAssignmentDirectory directory,
+        string displayName,
+        string assignmentType,
+        string? organisationId = null,
+        string? region = null,
+        string? adviserId = null,
+        bool isEnabled = true,
+        int priority = 100)
+        => await directory.CreateAsync(new OrganisationAssignmentUpsert(
+            "Booking",
+            assignmentType,
+            organisationId,
+            ClientId: null,
+            region,
+            adviserId,
+            displayName,
+            $"{displayName.Replace(" ", ".", StringComparison.OrdinalIgnoreCase).ToLowerInvariant()}@example.test",
+            MobileNumber: null,
+            ["Email"],
+            isEnabled,
+            priority), CancellationToken.None);
 }

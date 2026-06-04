@@ -10,7 +10,6 @@ using AFH.Adviser.Infrastructure.Persistence.Auth;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
 using AFH.Common.SharePointUtils.Extensions;
-using AFH.Location.Infrastructure.Composition;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,23 +40,20 @@ public static class AdviserInfrastructureDependencyInjection
         services.Configure<SharePointAdviserOptions>(configuration.GetSection(SharePointAdviserOptions.SectionName));
 
         var adviserDirectoryConnectionString = ResolveAdviserDirectoryDbConnectionString(configuration);
-        if (!string.IsNullOrWhiteSpace(adviserDirectoryConnectionString))
+        if (string.IsNullOrWhiteSpace(adviserDirectoryConnectionString))
         {
-            services.AddDbContext<AdviserDirectoryDbContext>(options => options.UseSqlServer(adviserDirectoryConnectionString));
-            services.AddScoped<IOrganisationAssignmentDirectory, SqlOrganisationAssignmentDirectory>();
-            services.AddScoped<IDomainUserPermissionStore, SqlDomainUserPermissionStore>();
-            services.AddScoped<IDomainUserContextStore, SqlDomainUserContextStore>();
-            services.AddHostedService<AdviserDirectoryDbInitializer>();
-        }
-        else
-        {
-            services.AddSingleton<IOrganisationAssignmentDirectory, InMemoryOrganisationAssignmentDirectory>();
-            services.AddSingleton<IDomainUserPermissionStore, InMemoryDomainUserPermissionStore>();
-            services.AddSingleton<IDomainUserContextStore, InMemoryDomainUserContextStore>();
+            throw new InvalidOperationException(
+                "Missing SQL connection string for AdviserDirectoryDbContext. " +
+                "Set ConnectionStrings:AdviserDirectoryDb or ConnectionStrings:LocationPolicyDb.");
         }
 
+        services.AddDbContext<AdviserDirectoryDbContext>(options => options.UseSqlServer(adviserDirectoryConnectionString));
+        services.AddScoped<IOrganisationAssignmentDirectory, SqlOrganisationAssignmentDirectory>();
+        services.AddScoped<IDomainUserPermissionStore, SqlDomainUserPermissionStore>();
+        services.AddScoped<IDomainUserContextStore, SqlDomainUserContextStore>();
+        services.AddHostedService<AdviserDirectoryDbInitializer>();
+
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
-        services.AddLocationPolicyDbContext(configuration);
 
         var useAdviserFeed = configuration.GetValue<bool>("AdviserFeed:Enabled");
         if (useAdviserFeed)
@@ -79,6 +75,7 @@ public static class AdviserInfrastructureDependencyInjection
         services.AddScoped<IEffectiveCoveragePolicyResolver, SqlEffectiveCoveragePolicyResolver>();
         services.AddScoped<AFH.Adviser.Application.Abstractions.Skills.IAdviserSkillCatalogService, AFH.Adviser.Application.Services.Skills.AdviserSkillCatalogService>();
         services.AddScoped<AFH.Adviser.Application.Abstractions.Feed.IAdviserFeedService, AFH.Adviser.Application.Services.Feed.AdviserFeedService>();
+        services.AddScoped<IOrganisationAssignmentAdminService, OrganisationAssignmentAdminService>();
         services.AddScoped<IAdviserScopedOrganisationAssignmentResolver, AdviserScopedOrganisationAssignmentResolver>();
 
         return services;

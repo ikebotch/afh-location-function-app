@@ -7,6 +7,8 @@ namespace AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 
 public sealed class SqlOrganisationAssignmentDirectory : IOrganisationAssignmentDirectory
 {
+    private const string FallbackAssignmentType = "Fallback";
+
     private readonly AdviserDirectoryDbContext _db;
 
     public SqlOrganisationAssignmentDirectory(AdviserDirectoryDbContext db)
@@ -53,6 +55,57 @@ public sealed class SqlOrganisationAssignmentDirectory : IOrganisationAssignment
             .ToArrayAsync(ct);
 
         return rows.Select(ToModel).ToArray();
+    }
+
+    public async Task<IReadOnlyList<OrganisationAssignmentScopedMatch>> ResolveScopedAsync(
+        OrganisationAssignmentScopedSearch search,
+        CancellationToken ct)
+    {
+        var assignmentTypes = NormaliseAssignmentTypes(search.AssignmentTypes);
+        var assignmentTypeSet = assignmentTypes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (search.IncludeFallback)
+            assignmentTypeSet.Add(FallbackAssignmentType);
+
+        if (assignmentTypeSet.Count == 0)
+            return [];
+
+        var context = search.Context.Trim();
+        var query = _db.OrganisationAssignments.AsNoTracking()
+            .Where(x => x.Context == context)
+            .Where(x => assignmentTypeSet.Contains(x.AssignmentType));
+
+        if (!search.IncludeDisabled)
+            query = query.Where(x => x.IsEnabled);
+
+        var rows = await query
+            .OrderBy(x => x.Priority)
+            .ThenBy(x => x.AssignmentType)
+            .ThenBy(x => x.DisplayName)
+            .ToArrayAsync(ct);
+
+        var matches = rows
+            .Select(ToModel)
+            .Select(x => TryMatch(search, x))
+            .Where(x => x is not null)
+            .Select(x => x!)
+            .ToArray();
+
+        var specificMatches = matches
+            .Where(x => !string.Equals(x.Assignment.AssignmentType, FallbackAssignmentType, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (specificMatches.Length > 0)
+            return BestRankPerAssignmentType(specificMatches);
+
+        if (!search.IncludeFallback)
+            return [];
+
+        return matches
+            .Where(x => string.Equals(x.Assignment.AssignmentType, FallbackAssignmentType, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(x => x.Rank)
+            .ThenBy(x => x.Assignment.Priority)
+            .ThenBy(x => x.Assignment.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     public async Task<OrganisationAssignment?> GetAsync(Guid id, CancellationToken ct)
@@ -144,6 +197,95 @@ public sealed class SqlOrganisationAssignmentDirectory : IOrganisationAssignment
             row.CreatedUtc,
             row.UpdatedUtc);
 
+    private static IReadOnlyList<OrganisationAssignmentScopedMatch> BestRankPerAssignmentType(
+        IReadOnlyList<OrganisationAssignmentScopedMatch> matches)
+        => matches
+            .GroupBy(x => x.Assignment.AssignmentType, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(group =>
+            {
+                var bestRank = group.Min(x => x.Rank);
+                return group.Where(x => x.Rank == bestRank);
+            })
+            .OrderBy(x => x.Rank)
+            .ThenBy(x => x.Assignment.Priority)
+            .ThenBy(x => x.Assignment.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static OrganisationAssignmentScopedMatch? TryMatch(
+        OrganisationAssignmentScopedSearch search,
+        OrganisationAssignment assignment)
+    {
+        var adviserId = TrimToNull(search.AdviserId);
+        var organisationId = TrimToNull(search.OrganisationId);
+        var region = TrimToNull(search.Region);
+
+        if (!string.IsNullOrWhiteSpace(assignment.AdviserId) &&
+            string.Equals(assignment.AdviserId, adviserId, StringComparison.OrdinalIgnoreCase))
+        {
+            return new OrganisationAssignmentScopedMatch(
+                assignment,
+                OrganisationAssignmentMatchLevels.Adviser,
+                MatchedOrganisationId: null,
+                MatchedRegion: null,
+                MatchedAdviserId: adviserId,
+                Rank: 1);
+        }
+
+        if (!string.IsNullOrWhiteSpace(organisationId) &&
+            !string.IsNullOrWhiteSpace(region) &&
+            string.Equals(assignment.OrganisationId, organisationId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(assignment.Region, region, StringComparison.OrdinalIgnoreCase))
+        {
+            return new OrganisationAssignmentScopedMatch(
+                assignment,
+                OrganisationAssignmentMatchLevels.OrganisationRegion,
+                MatchedOrganisationId: organisationId,
+                MatchedRegion: region,
+                MatchedAdviserId: null,
+                Rank: 2);
+        }
+
+        if (!string.IsNullOrWhiteSpace(organisationId) &&
+            string.Equals(assignment.OrganisationId, organisationId, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(assignment.Region))
+        {
+            return new OrganisationAssignmentScopedMatch(
+                assignment,
+                OrganisationAssignmentMatchLevels.Organisation,
+                MatchedOrganisationId: organisationId,
+                MatchedRegion: null,
+                MatchedAdviserId: null,
+                Rank: 3);
+        }
+
+        if (!string.IsNullOrWhiteSpace(region) &&
+            string.IsNullOrWhiteSpace(assignment.OrganisationId) &&
+            string.Equals(assignment.Region, region, StringComparison.OrdinalIgnoreCase))
+        {
+            return new OrganisationAssignmentScopedMatch(
+                assignment,
+                OrganisationAssignmentMatchLevels.Region,
+                MatchedOrganisationId: null,
+                MatchedRegion: region,
+                MatchedAdviserId: null,
+                Rank: 4);
+        }
+
+        if (search.IncludeFallback &&
+            string.Equals(assignment.AssignmentType, FallbackAssignmentType, StringComparison.OrdinalIgnoreCase))
+        {
+            return new OrganisationAssignmentScopedMatch(
+                assignment,
+                OrganisationAssignmentMatchLevels.Fallback,
+                MatchedOrganisationId: null,
+                MatchedRegion: null,
+                MatchedAdviserId: null,
+                Rank: 5);
+        }
+
+        return null;
+    }
+
     private static string Require(string? value, string field)
         => !string.IsNullOrWhiteSpace(value)
             ? value.Trim()
@@ -169,5 +311,11 @@ public sealed class SqlOrganisationAssignmentDirectory : IOrganisationAssignment
 
         return values.Length == 0 ? ["Email"] : values;
     }
-}
 
+    private static IReadOnlyList<string> NormaliseAssignmentTypes(IEnumerable<string> assignmentTypes)
+        => assignmentTypes
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+}
