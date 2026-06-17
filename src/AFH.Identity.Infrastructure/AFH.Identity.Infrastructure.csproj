@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.5" />
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.17.0" />
+		<ProjectReference Include="..\AFH.Adviser.Application\AFH.Adviser.Application.csproj" />
+		<ProjectReference Include="..\AFH.Identity.Application\AFH.Identity.Application.csproj" />
+		<ProjectReference Include="..\AFH.Identity.Domain\AFH.Identity.Domain.csproj" />
+		<ProjectReference Include="..\AFH.Location.Infrastructure\AFH.Location.Infrastructure.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\AFH.Adviser.Infrastructure\AFH.Adviser.Infrastructure.csproj" />
+	</ItemGroup>
+</Project>

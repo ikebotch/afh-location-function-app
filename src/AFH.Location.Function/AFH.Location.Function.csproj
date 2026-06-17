@@ -41,6 +41,9 @@
 	  <ProjectReference Include="..\AFH.Adviser.Application\AFH.Adviser.Application.csproj" />
 	  <ProjectReference Include="..\AFH.Adviser.Contract\AFH.Adviser.Contract.csproj" />
 	  <ProjectReference Include="..\AFH.Adviser.Infrastructure\AFH.Adviser.Infrastructure.csproj" />
+	  <ProjectReference Include="..\AFH.Identity.Application\AFH.Identity.Application.csproj" />
+	  <ProjectReference Include="..\AFH.Identity.Contracts\AFH.Identity.Contracts.csproj" />
+	  <ProjectReference Include="..\AFH.Identity.Infrastructure\AFH.Identity.Infrastructure.csproj" />
 	</ItemGroup>
 
 
