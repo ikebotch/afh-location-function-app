@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\AFH.Adviser.Contract\AFH.Adviser.Contract.csproj" />
     <ProjectReference Include="..\..\src\AFH.Adviser.Infrastructure\AFH.Adviser.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\AFH.Adviser.Domain\AFH.Adviser.Domain.csproj" />
+    <ProjectReference Include="..\..\src\AFH.Identity.Infrastructure\AFH.Identity.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

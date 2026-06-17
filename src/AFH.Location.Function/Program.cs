@@ -29,7 +29,7 @@ var host = new HostBuilder()
         services.AddLocationInfrastructure(ctx.Configuration);
         services.AddAdviserInfrastructure(ctx.Configuration);
         services.AddIdentityApplication();
-        services.AddIdentityInfrastructure();
+        services.AddIdentityInfrastructure(ctx.Configuration);
         services.AddScoped<IDomainUserAuthorizationService, DomainUserAuthorizationService>();
         ConfigureWorkerSerialization(services, caseInsensitivePropertyNames: true);
     })

@@ -1,7 +1,7 @@
 using AFH.Adviser.Application.Models.Auth;
 using AFH.Adviser.Application.Models.OrganisationAssignments;
-using AFH.Adviser.Infrastructure.Persistence.Auth;
-using AFH.Adviser.Infrastructure.Persistence.Auth.Entities;
+using AFH.Identity.Infrastructure.Persistence;
+using AFH.Identity.Infrastructure.Persistence.Entities;
 using AFH.Adviser.Contract.V1.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using Microsoft.EntityFrameworkCore;
@@ -331,7 +331,7 @@ public sealed class OrganisationAssignmentDirectoryTests
     [Fact]
     public async Task UserContextStore_ReturnsAllRolesAndPermissionsForMappedUser()
     {
-        await using var db = CreateDb();
+        await using var db = CreateIdentityDb();
         var managerRoleId = Guid.NewGuid();
         var adminRoleId = Guid.NewGuid();
         var profileId = Guid.NewGuid();
@@ -432,7 +432,7 @@ public sealed class OrganisationAssignmentDirectoryTests
     [Fact]
     public async Task UserPermissionStore_AllowsRolePermissionThroughDomainProfile()
     {
-        await using var db = CreateDb();
+        await using var db = CreateIdentityDb();
         var roleId = Guid.NewGuid();
         var profileId = Guid.NewGuid();
         var permissionId = Guid.NewGuid();
@@ -500,6 +500,14 @@ public sealed class OrganisationAssignmentDirectoryTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         return new AdviserDirectoryDbContext(options);
+    }
+
+    private static IdentityDbContext CreateIdentityDb()
+    {
+        var options = new DbContextOptionsBuilder<IdentityDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        return new IdentityDbContext(options);
     }
 
     private static OrganisationAssignmentScopedSearch ScopedSearch(

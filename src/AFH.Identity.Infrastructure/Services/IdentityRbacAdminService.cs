@@ -1,5 +1,5 @@
-using AFH.Adviser.Infrastructure.Persistence.Auth.Entities;
-using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
+using AFH.Identity.Infrastructure.Persistence.Entities;
+using AFH.Identity.Infrastructure.Persistence;
 using AFH.Identity.Application.Abstractions;
 using AFH.Identity.Application.Models;
 using Microsoft.EntityFrameworkCore;
@@ -8,9 +8,9 @@ namespace AFH.Identity.Infrastructure.Services;
 
 public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
 {
-    private readonly AdviserDirectoryDbContext _db;
+    private readonly IdentityDbContext _db;
 
-    public IdentityRbacAdminService(AdviserDirectoryDbContext db)
+    public IdentityRbacAdminService(IdentityDbContext db)
     {
         _db = db;
     }

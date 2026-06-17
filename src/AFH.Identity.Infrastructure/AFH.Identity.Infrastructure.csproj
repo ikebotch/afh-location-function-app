@@ -5,14 +5,20 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 	</PropertyGroup>
 	<ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.5" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.5" />
 		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.17.0" />
 		<ProjectReference Include="..\AFH.Adviser.Application\AFH.Adviser.Application.csproj" />
 		<ProjectReference Include="..\AFH.Identity.Application\AFH.Identity.Application.csproj" />
 		<ProjectReference Include="..\AFH.Identity.Domain\AFH.Identity.Domain.csproj" />
 		<ProjectReference Include="..\AFH.Location.Infrastructure\AFH.Location.Infrastructure.csproj" />
-	</ItemGroup>
-	<ItemGroup>
-	  <ProjectReference Include="..\AFH.Adviser.Infrastructure\AFH.Adviser.Infrastructure.csproj" />
 	</ItemGroup>
 </Project>

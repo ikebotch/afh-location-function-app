@@ -1,15 +1,15 @@
 using AFH.Adviser.Application.Abstractions.Auth;
 using AFH.Adviser.Application.Models.Auth;
-using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
+using AFH.Identity.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace AFH.Adviser.Infrastructure.Persistence.Auth;
+namespace AFH.Identity.Infrastructure.Persistence;
 
 public sealed class SqlDomainUserPermissionStore : IDomainUserPermissionStore
 {
-    private readonly AdviserDirectoryDbContext _db;
+    private readonly IdentityDbContext _db;
 
-    public SqlDomainUserPermissionStore(AdviserDirectoryDbContext db)
+    public SqlDomainUserPermissionStore(IdentityDbContext db)
     {
         _db = db;
     }

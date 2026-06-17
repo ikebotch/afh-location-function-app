@@ -4,6 +4,7 @@ using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AFH.Adviser.Infrastructure.Migrations
 {
     [DbContext(typeof(AdviserDirectoryDbContext))]
-    partial class AdviserDirectoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260617143231_StopManagingDomainIdentityTables")]
+    partial class StopManagingDomainIdentityTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

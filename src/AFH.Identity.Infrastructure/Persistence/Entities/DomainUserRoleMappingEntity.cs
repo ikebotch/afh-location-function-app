@@ -1,4 +1,4 @@
-namespace AFH.Adviser.Infrastructure.Persistence.Auth.Entities;
+namespace AFH.Identity.Infrastructure.Persistence.Entities;
 
 public sealed class DomainUserRoleMappingEntity
 {
