@@ -8,8 +8,10 @@ public sealed class InMemoryDomainUserContextStore : IDomainUserContextStore
     public Task<DomainUserContext> GetContextAsync(DomainUserIdentity identity, CancellationToken ct)
         => Task.FromResult(new DomainUserContext(
             identity.UserId,
+            identity.UserId,
             identity.Email,
             identity.DisplayName,
+            null,
             [],
             []));
 }

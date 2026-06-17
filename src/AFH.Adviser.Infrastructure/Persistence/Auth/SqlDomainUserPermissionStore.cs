@@ -23,37 +23,27 @@ public sealed class SqlDomainUserPermissionStore : IDomainUserPermissionStore
             return false;
 
         var email = identity.Email.Trim();
+        var externalSubject = identity.UserId.Trim();
         var appRoles = identity.AppRoles.Select(x => x.Trim()).Where(x => x.Length > 0).ToArray();
         var groups = identity.Groups.Select(x => x.Trim()).Where(x => x.Length > 0).ToArray();
+
+        var profile = await _db.DomainUserProfiles
+            .AsNoTracking()
+            .Where(x => x.ExternalSubject == externalSubject || x.Email == email)
+            .OrderByDescending(x => x.ExternalSubject == externalSubject)
+            .FirstOrDefaultAsync(ct);
 
         var roleIds = await _db.DomainUserRoleMappings
             .AsNoTracking()
             .Where(x => x.IsEnabled)
             .Where(x =>
-                (x.Email != null && x.Email == email)
+                (profile != null && x.UserProfileId != null && x.UserProfileId == profile.Id)
+                || (x.Email != null && x.Email == email)
                 || (x.ExternalRole != null && appRoles.Contains(x.ExternalRole))
                 || (x.ExternalGroupId != null && groups.Contains(x.ExternalGroupId)))
             .Select(x => x.RoleId)
             .Distinct()
             .ToArrayAsync(ct);
-
-        var hasDirectPermission = await _db.DomainUserPermissionMappings
-            .AsNoTracking()
-            .Where(x => x.IsEnabled)
-            .Where(x =>
-                (x.Email != null && x.Email == email)
-                || (x.ExternalRole != null && appRoles.Contains(x.ExternalRole))
-                || (x.ExternalGroupId != null && groups.Contains(x.ExternalGroupId)))
-            .Join(
-                _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled && x.Permission == permission),
-                userPermission => userPermission.PermissionId,
-                permissionEntity => permissionEntity.Id,
-                (_, _) => true)
-            .AnyAsync(
-                ct);
-
-        if (hasDirectPermission)
-            return true;
 
         if (roleIds.Length == 0)
             return false;

@@ -334,9 +334,20 @@ public sealed class OrganisationAssignmentDirectoryTests
         await using var db = CreateDb();
         var managerRoleId = Guid.NewGuid();
         var adminRoleId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
         var approvalsReadPermissionId = Guid.NewGuid();
         var approvalsReviewPermissionId = Guid.NewGuid();
         var approvalRequestsCreatePermissionId = Guid.NewGuid();
+        db.DomainUserProfiles.Add(new DomainUserProfileEntity
+        {
+            Id = profileId,
+            ExternalSubject = "user-1",
+            Email = "alex@afh.co.uk",
+            DisplayName = "Alex Example",
+            AdviserId = "adv-1",
+            Status = "Active",
+            CreatedUtc = DateTime.UtcNow
+        });
         db.DomainRoles.AddRange(
             new DomainRoleEntity
             {
@@ -358,6 +369,7 @@ public sealed class OrganisationAssignmentDirectoryTests
             new DomainUserRoleMappingEntity
             {
                 Id = Guid.NewGuid(),
+                UserProfileId = profileId,
                 RoleId = managerRoleId,
                 Email = "alex@afh.co.uk",
                 IsEnabled = true,
@@ -385,15 +397,14 @@ public sealed class OrganisationAssignmentDirectoryTests
                 RoleId = adminRoleId,
                 PermissionId = approvalsReviewPermissionId,
                 CreatedUtc = DateTime.UtcNow
+            },
+            new DomainRolePermissionEntity
+            {
+                Id = Guid.NewGuid(),
+                RoleId = managerRoleId,
+                PermissionId = approvalRequestsCreatePermissionId,
+                CreatedUtc = DateTime.UtcNow
             });
-        db.DomainUserPermissionMappings.Add(new DomainUserPermissionMappingEntity
-        {
-            Id = Guid.NewGuid(),
-            Email = "alex@afh.co.uk",
-            PermissionId = approvalRequestsCreatePermissionId,
-            IsEnabled = true,
-            CreatedUtc = DateTime.UtcNow
-        });
         await db.SaveChangesAsync();
 
         var store = new SqlDomainUserContextStore(db);
@@ -406,9 +417,11 @@ public sealed class OrganisationAssignmentDirectoryTests
                 []),
             CancellationToken.None);
 
-        Assert.Equal("user-1", context.UserId);
+        Assert.Equal(profileId.ToString("D"), context.UserId);
+        Assert.Equal("user-1", context.ExternalSubject);
         Assert.Equal("alex@afh.co.uk", context.Email);
         Assert.Equal("Alex Example", context.DisplayName);
+        Assert.Equal("adv-1", context.AdviserId);
         Assert.Contains("Manager", context.Roles);
         Assert.Contains("Admin", context.Roles);
         Assert.Contains(BookingPermissionNames.ApprovalsRead, context.Permissions);
@@ -417,17 +430,42 @@ public sealed class OrganisationAssignmentDirectoryTests
     }
 
     [Fact]
-    public async Task UserPermissionStore_AllowsDirectUserPermissionWithoutRole()
+    public async Task UserPermissionStore_AllowsRolePermissionThroughDomainProfile()
     {
         await using var db = CreateDb();
+        var roleId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
         var permissionId = Guid.NewGuid();
+        db.DomainUserProfiles.Add(new DomainUserProfileEntity
+        {
+            Id = profileId,
+            ExternalSubject = "user-1",
+            Email = "alex@afh.co.uk",
+            DisplayName = "Alex Example",
+            AdviserId = "adv-1",
+            Status = "Active",
+            CreatedUtc = DateTime.UtcNow
+        });
+        db.DomainRoles.Add(new DomainRoleEntity
+        {
+            Id = roleId,
+            Role = "Adviser",
+            CreatedUtc = DateTime.UtcNow
+        });
         db.DomainPermissions.Add(Permission(permissionId, BookingPermissionNames.ApprovalRequestsCreate));
-        db.DomainUserPermissionMappings.Add(new DomainUserPermissionMappingEntity
+        db.DomainUserRoleMappings.Add(new DomainUserRoleMappingEntity
         {
             Id = Guid.NewGuid(),
-            Email = "alex@afh.co.uk",
-            PermissionId = permissionId,
+            UserProfileId = profileId,
+            RoleId = roleId,
             IsEnabled = true,
+            CreatedUtc = DateTime.UtcNow
+        });
+        db.DomainRolePermissions.Add(new DomainRolePermissionEntity
+        {
+            Id = Guid.NewGuid(),
+            RoleId = roleId,
+            PermissionId = permissionId,
             CreatedUtc = DateTime.UtcNow
         });
         await db.SaveChangesAsync();

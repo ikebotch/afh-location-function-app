@@ -3,6 +3,7 @@ namespace AFH.Identity.Contracts.V1.Responses;
 public sealed class IdentityUserRoleMappingResponse
 {
     public Guid MappingId { get; init; }
+    public Guid? UserProfileId { get; init; }
     public Guid RoleId { get; init; }
     public string Role { get; init; } = string.Empty;
     public string? Email { get; init; }

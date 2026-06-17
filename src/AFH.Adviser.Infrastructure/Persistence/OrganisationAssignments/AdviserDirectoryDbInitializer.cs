@@ -84,6 +84,7 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
             BEGIN
                 CREATE TABLE [dbo].[DomainUserRoleMappings] (
                     [Id] uniqueidentifier NOT NULL,
+                    [UserProfileId] uniqueidentifier NULL,
                     [RoleId] uniqueidentifier NOT NULL,
                     [Email] nvarchar(320) NULL,
                     [ExternalRole] nvarchar(100) NULL,
@@ -92,6 +93,25 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
                     [CreatedUtc] datetime2 NOT NULL,
                     [UpdatedUtc] datetime2 NULL,
                     CONSTRAINT [PK_DomainUserRoleMappings] PRIMARY KEY ([Id])
+                );
+            END
+            ELSE IF COL_LENGTH(N'[dbo].[DomainUserRoleMappings]', N'UserProfileId') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[DomainUserRoleMappings] ADD [UserProfileId] uniqueidentifier NULL;
+            END
+
+            IF OBJECT_ID(N'[dbo].[DomainUserProfiles]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[DomainUserProfiles] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [ExternalSubject] nvarchar(160) NOT NULL,
+                    [Email] nvarchar(320) NOT NULL,
+                    [DisplayName] nvarchar(200) NOT NULL,
+                    [AdviserId] nvarchar(100) NULL,
+                    [Status] nvarchar(40) NOT NULL,
+                    [CreatedUtc] datetime2 NOT NULL,
+                    [UpdatedUtc] datetime2 NULL,
+                    CONSTRAINT [PK_DomainUserProfiles] PRIMARY KEY ([Id])
                 );
             END
 
@@ -125,27 +145,17 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
                 ALTER TABLE [dbo].[DomainRolePermissions] ADD [PermissionId] uniqueidentifier NULL;
             END
 
-            IF OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]', N'U') IS NULL
-            BEGIN
-                CREATE TABLE [dbo].[DomainUserPermissionMappings] (
-                    [Id] uniqueidentifier NOT NULL,
-                    [PermissionId] uniqueidentifier NOT NULL,
-                    [Email] nvarchar(320) NULL,
-                    [ExternalRole] nvarchar(100) NULL,
-                    [ExternalGroupId] nvarchar(128) NULL,
-                    [IsEnabled] bit NOT NULL,
-                    [CreatedUtc] datetime2 NOT NULL,
-                    [UpdatedUtc] datetime2 NULL,
-                    CONSTRAINT [PK_DomainUserPermissionMappings] PRIMARY KEY ([Id])
-                );
-            END
-            ELSE IF COL_LENGTH(N'[dbo].[DomainUserPermissionMappings]', N'PermissionId') IS NULL
-            BEGIN
-                ALTER TABLE [dbo].[DomainUserPermissionMappings] ADD [PermissionId] uniqueidentifier NULL;
-            END
-
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainRoles_Role' AND [object_id] = OBJECT_ID(N'[dbo].[DomainRoles]'))
                 CREATE UNIQUE INDEX [IX_DomainRoles_Role] ON [dbo].[DomainRoles] ([Role]);
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserProfiles_ExternalSubject' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserProfiles]'))
+                CREATE UNIQUE INDEX [IX_DomainUserProfiles_ExternalSubject] ON [dbo].[DomainUserProfiles] ([ExternalSubject]);
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserProfiles_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserProfiles]'))
+                CREATE INDEX [IX_DomainUserProfiles_Email] ON [dbo].[DomainUserProfiles] ([Email]);
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserProfiles_AdviserId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserProfiles]'))
+                CREATE INDEX [IX_DomainUserProfiles_AdviserId] ON [dbo].[DomainUserProfiles] ([AdviserId]);
 
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainPermissions_Permission' AND [object_id] = OBJECT_ID(N'[dbo].[DomainPermissions]'))
                 CREATE UNIQUE INDEX [IX_DomainPermissions_Permission] ON [dbo].[DomainPermissions] ([Permission]);
@@ -165,20 +175,11 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_RoleId_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
                 CREATE INDEX [IX_DomainUserRoleMappings_RoleId_IsEnabled] ON [dbo].[DomainUserRoleMappings] ([RoleId], [IsEnabled]);
 
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_UserProfileId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
+                CREATE INDEX [IX_DomainUserRoleMappings_UserProfileId] ON [dbo].[DomainUserRoleMappings] ([UserProfileId]);
+
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainRolePermissions_RoleId_PermissionId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainRolePermissions]'))
                 CREATE UNIQUE INDEX [IX_DomainRolePermissions_RoleId_PermissionId] ON [dbo].[DomainRolePermissions] ([RoleId], [PermissionId]) WHERE [PermissionId] IS NOT NULL;
-
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
-                CREATE INDEX [IX_DomainUserPermissionMappings_Email] ON [dbo].[DomainUserPermissionMappings] ([Email]);
-
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_ExternalRole' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
-                CREATE INDEX [IX_DomainUserPermissionMappings_ExternalRole] ON [dbo].[DomainUserPermissionMappings] ([ExternalRole]);
-
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_ExternalGroupId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
-                CREATE INDEX [IX_DomainUserPermissionMappings_ExternalGroupId] ON [dbo].[DomainUserPermissionMappings] ([ExternalGroupId]);
-
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_PermissionId_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
-                CREATE INDEX [IX_DomainUserPermissionMappings_PermissionId_IsEnabled] ON [dbo].[DomainUserPermissionMappings] ([PermissionId], [IsEnabled]);
 
             IF COL_LENGTH(N'[dbo].[DomainRolePermissions]', N'Permission') IS NOT NULL
             BEGIN
@@ -214,39 +215,6 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
                     WHERE rp.[PermissionId] IS NULL;';
             END
 
-            IF COL_LENGTH(N'[dbo].[DomainUserPermissionMappings]', N'Permission') IS NOT NULL
-            BEGIN
-                EXEC sp_executesql N'
-                    INSERT INTO [dbo].[DomainPermissions]
-                        ([Id], [Permission], [DisplayName], [Description], [Category], [IsEnabled], [CreatedUtc], [UpdatedUtc])
-                    SELECT NEWID(),
-                           legacy.[Permission],
-                           REPLACE(legacy.[Permission], ''.'', '' ''),
-                           NULL,
-                           CASE
-                               WHEN CHARINDEX(''.'', legacy.[Permission]) > 1 THEN LEFT(legacy.[Permission], CHARINDEX(''.'', legacy.[Permission]) - 1)
-                               ELSE ''General''
-                           END,
-                           1,
-                           SYSUTCDATETIME(),
-                           NULL
-                    FROM (
-                        SELECT DISTINCT [Permission]
-                        FROM [dbo].[DomainUserPermissionMappings]
-                        WHERE [Permission] IS NOT NULL AND LTRIM(RTRIM([Permission])) <> ''''
-                    ) legacy
-                    WHERE NOT EXISTS (
-                        SELECT 1
-                        FROM [dbo].[DomainPermissions] existing
-                        WHERE existing.[Permission] = legacy.[Permission]
-                    );
-
-                    UPDATE up
-                    SET [PermissionId] = p.[Id]
-                    FROM [dbo].[DomainUserPermissionMappings] up
-                    JOIN [dbo].[DomainPermissions] p ON p.[Permission] = up.[Permission]
-                    WHERE up.[PermissionId] IS NULL;';
-            END
             """, ct);
 
     private static async Task SeedDomainRbacAsync(AdviserDirectoryDbContext db, CancellationToken ct)

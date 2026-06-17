@@ -45,10 +45,12 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         var normalizedEmail = NormalizeOptional(assignment.Email);
         var normalizedExternalRole = NormalizeOptional(assignment.ExternalRole);
         var normalizedExternalGroupId = NormalizeOptional(assignment.ExternalGroupId);
+        var userProfileId = await ResolveUserProfileIdAsync(assignment.UserProfileId, normalizedEmail, ct);
 
         var mapping = await _db.DomainUserRoleMappings
             .SingleOrDefaultAsync(x =>
                 x.RoleId == role.Id
+                && x.UserProfileId == userProfileId
                 && x.Email == normalizedEmail
                 && x.ExternalRole == normalizedExternalRole
                 && x.ExternalGroupId == normalizedExternalGroupId,
@@ -61,6 +63,7 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
             {
                 Id = Guid.NewGuid(),
                 RoleId = role.Id,
+                UserProfileId = userProfileId,
                 Email = normalizedEmail,
                 ExternalRole = normalizedExternalRole,
                 ExternalGroupId = normalizedExternalGroupId,
@@ -80,6 +83,7 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         return new IdentityUserRoleMappingResult
         {
             MappingId = mapping.Id,
+            UserProfileId = mapping.UserProfileId,
             RoleId = role.Id,
             Role = role.Role,
             Email = mapping.Email,
@@ -89,56 +93,72 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         };
     }
 
-    public async Task<IdentityUserPermissionMappingResult> AssignUserPermissionAsync(
-        IdentityUserPermissionAssignment assignment,
+    public async Task<IdentityUserProfileResult> UpsertUserProfileAsync(
+        IdentityUserProfileUpsert upsert,
         CancellationToken ct)
     {
-        var normalizedPermission = NormalizeRequired(assignment.Permission);
-        var permission = await GetOrCreatePermissionAsync(normalizedPermission, ct);
-        var normalizedEmail = NormalizeOptional(assignment.Email);
-        var normalizedExternalRole = NormalizeOptional(assignment.ExternalRole);
-        var normalizedExternalGroupId = NormalizeOptional(assignment.ExternalGroupId);
+        var normalizedEmail = NormalizeRequired(upsert.Email);
+        var normalizedExternalSubject = NormalizeOptional(upsert.ExternalSubject) ?? normalizedEmail;
+        var normalizedDisplayName = NormalizeOptional(upsert.DisplayName) ?? normalizedEmail;
+        var normalizedAdviserId = NormalizeOptional(upsert.AdviserId);
+        var normalizedStatus = NormalizeOptional(upsert.Status) ?? "Active";
 
-        var mapping = await _db.DomainUserPermissionMappings
-            .SingleOrDefaultAsync(x =>
-                x.PermissionId == permission.Id
-                && x.Email == normalizedEmail
-                && x.ExternalRole == normalizedExternalRole
-                && x.ExternalGroupId == normalizedExternalGroupId,
-                ct);
+        var profile = await _db.DomainUserProfiles
+            .SingleOrDefaultAsync(x => x.ExternalSubject == normalizedExternalSubject, ct);
+
+        if (profile is null)
+        {
+            profile = await _db.DomainUserProfiles.SingleOrDefaultAsync(x => x.Email == normalizedEmail, ct);
+        }
 
         var now = DateTime.UtcNow;
-        if (mapping is null)
+        if (profile is null)
         {
-            mapping = new DomainUserPermissionMappingEntity
+            profile = new DomainUserProfileEntity
             {
                 Id = Guid.NewGuid(),
-                PermissionId = permission.Id,
+                ExternalSubject = normalizedExternalSubject,
                 Email = normalizedEmail,
-                ExternalRole = normalizedExternalRole,
-                ExternalGroupId = normalizedExternalGroupId,
-                IsEnabled = assignment.IsEnabled,
+                DisplayName = normalizedDisplayName,
+                AdviserId = normalizedAdviserId,
+                Status = normalizedStatus,
                 CreatedUtc = now
             };
-            _db.DomainUserPermissionMappings.Add(mapping);
+            _db.DomainUserProfiles.Add(profile);
         }
         else
         {
-            mapping.IsEnabled = assignment.IsEnabled;
-            mapping.UpdatedUtc = now;
+            profile.ExternalSubject = normalizedExternalSubject;
+            profile.Email = normalizedEmail;
+            profile.DisplayName = normalizedDisplayName;
+            profile.AdviserId = normalizedAdviserId;
+            profile.Status = normalizedStatus;
+            profile.UpdatedUtc = now;
         }
 
         await _db.SaveChangesAsync(ct);
+        return ToUserProfileResult(profile);
+    }
 
-        return new IdentityUserPermissionMappingResult
+    private async Task<Guid?> ResolveUserProfileIdAsync(Guid? userProfileId, string? email, CancellationToken ct)
+    {
+        if (userProfileId is not null)
         {
-            MappingId = mapping.Id,
-            Permission = permission.Permission,
-            Email = mapping.Email,
-            ExternalRole = mapping.ExternalRole,
-            ExternalGroupId = mapping.ExternalGroupId,
-            IsEnabled = mapping.IsEnabled
-        };
+            var exists = await _db.DomainUserProfiles.AnyAsync(x => x.Id == userProfileId.Value, ct);
+            if (!exists)
+                throw new InvalidOperationException($"User profile '{userProfileId}' was not found.");
+
+            return userProfileId.Value;
+        }
+
+        if (string.IsNullOrWhiteSpace(email))
+            return null;
+
+        return await _db.DomainUserProfiles
+            .AsNoTracking()
+            .Where(x => x.Email == email)
+            .Select(x => (Guid?)x.Id)
+            .SingleOrDefaultAsync(ct);
     }
 
     private async Task<DomainRoleEntity> GetOrCreateRoleAsync(string role, CancellationToken ct)
@@ -244,4 +264,15 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
 
     private static string ToDisplayName(string permission) =>
         permission.Replace(".", " ", StringComparison.Ordinal);
+
+    private static IdentityUserProfileResult ToUserProfileResult(DomainUserProfileEntity profile) =>
+        new()
+        {
+            UserProfileId = profile.Id,
+            ExternalSubject = profile.ExternalSubject,
+            Email = profile.Email,
+            DisplayName = profile.DisplayName,
+            AdviserId = profile.AdviserId,
+            Status = profile.Status
+        };
 }

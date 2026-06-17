@@ -49,8 +49,10 @@ public sealed class GetIdentityCurrentUserFunction
         return await req.WriteSuccessAsync(new IdentityCurrentUserResponse
         {
             UserId = result.User.UserId,
+            ExternalSubject = result.User.ExternalSubject,
             Email = result.User.Email,
             DisplayName = result.User.DisplayName,
+            AdviserId = result.User.AdviserId,
             TenantId = result.User.TenantId,
             Roles = result.User.Roles,
             Permissions = result.User.Permissions

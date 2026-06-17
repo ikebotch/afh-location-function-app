@@ -12,19 +12,19 @@ public sealed class AdviserDirectoryDbContext : DbContext
     }
 
     public DbSet<OrganisationAssignmentEntity> OrganisationAssignments => Set<OrganisationAssignmentEntity>();
+    public DbSet<DomainUserProfileEntity> DomainUserProfiles => Set<DomainUserProfileEntity>();
     public DbSet<DomainRoleEntity> DomainRoles => Set<DomainRoleEntity>();
     public DbSet<DomainPermissionEntity> DomainPermissions => Set<DomainPermissionEntity>();
     public DbSet<DomainUserRoleMappingEntity> DomainUserRoleMappings => Set<DomainUserRoleMappingEntity>();
-    public DbSet<DomainUserPermissionMappingEntity> DomainUserPermissionMappings => Set<DomainUserPermissionMappingEntity>();
     public DbSet<DomainRolePermissionEntity> DomainRolePermissions => Set<DomainRolePermissionEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<OrganisationAssignmentEntity>(ConfigureOrganisationAssignment);
+        modelBuilder.Entity<DomainUserProfileEntity>(ConfigureDomainUserProfile);
         modelBuilder.Entity<DomainRoleEntity>(ConfigureDomainRole);
         modelBuilder.Entity<DomainPermissionEntity>(ConfigureDomainPermission);
         modelBuilder.Entity<DomainUserRoleMappingEntity>(ConfigureDomainUserRoleMapping);
-        modelBuilder.Entity<DomainUserPermissionMappingEntity>(ConfigureDomainUserPermissionMapping);
         modelBuilder.Entity<DomainRolePermissionEntity>(ConfigureDomainRolePermission);
     }
 
@@ -57,6 +57,20 @@ public sealed class AdviserDirectoryDbContext : DbContext
         entity.HasIndex(x => x.Role).IsUnique();
     }
 
+    internal static void ConfigureDomainUserProfile(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserProfileEntity> entity)
+    {
+        entity.ToTable("DomainUserProfiles");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.ExternalSubject).HasMaxLength(160).IsRequired();
+        entity.Property(x => x.Email).HasMaxLength(320).IsRequired();
+        entity.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
+        entity.Property(x => x.AdviserId).HasMaxLength(100);
+        entity.Property(x => x.Status).HasMaxLength(40).IsRequired();
+        entity.HasIndex(x => x.ExternalSubject).IsUnique();
+        entity.HasIndex(x => x.Email);
+        entity.HasIndex(x => x.AdviserId);
+    }
+
     internal static void ConfigureDomainPermission(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainPermissionEntity> entity)
     {
         entity.ToTable("DomainPermissions");
@@ -73,26 +87,15 @@ public sealed class AdviserDirectoryDbContext : DbContext
     {
         entity.ToTable("DomainUserRoleMappings");
         entity.HasKey(x => x.Id);
+        entity.Property(x => x.UserProfileId);
         entity.Property(x => x.Email).HasMaxLength(320);
         entity.Property(x => x.ExternalRole).HasMaxLength(100);
         entity.Property(x => x.ExternalGroupId).HasMaxLength(128);
+        entity.HasIndex(x => x.UserProfileId);
         entity.HasIndex(x => x.Email);
         entity.HasIndex(x => x.ExternalRole);
         entity.HasIndex(x => x.ExternalGroupId);
         entity.HasIndex(x => new { x.RoleId, x.IsEnabled });
-    }
-
-    internal static void ConfigureDomainUserPermissionMapping(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserPermissionMappingEntity> entity)
-    {
-        entity.ToTable("DomainUserPermissionMappings");
-        entity.HasKey(x => x.Id);
-        entity.Property(x => x.Email).HasMaxLength(320);
-        entity.Property(x => x.ExternalRole).HasMaxLength(100);
-        entity.Property(x => x.ExternalGroupId).HasMaxLength(128);
-        entity.HasIndex(x => x.Email);
-        entity.HasIndex(x => x.ExternalRole);
-        entity.HasIndex(x => x.ExternalGroupId);
-        entity.HasIndex(x => new { x.PermissionId, x.IsEnabled });
     }
 
     internal static void ConfigureDomainRolePermission(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainRolePermissionEntity> entity)

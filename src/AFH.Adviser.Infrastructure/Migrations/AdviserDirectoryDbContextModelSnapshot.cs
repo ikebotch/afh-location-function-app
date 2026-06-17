@@ -111,47 +111,52 @@ namespace AFH.Adviser.Infrastructure.Migrations
                     b.ToTable("DomainRolePermissions", (string)null);
                 });
 
-            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Auth.Entities.DomainUserPermissionMappingEntity", b =>
+            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Auth.Entities.DomainUserProfileEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(320)
-                        .HasColumnType("nvarchar(320)");
-
-                    b.Property<string>("ExternalGroupId")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("ExternalRole")
+                    b.Property<string>("AdviserId")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("bit");
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
 
-                    b.Property<Guid>("PermissionId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("ExternalSubject")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<DateTime?>("UpdatedUtc")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AdviserId");
+
                     b.HasIndex("Email");
 
-                    b.HasIndex("ExternalGroupId");
+                    b.HasIndex("ExternalSubject")
+                        .IsUnique();
 
-                    b.HasIndex("ExternalRole");
-
-                    b.HasIndex("PermissionId", "IsEnabled");
-
-                    b.ToTable("DomainUserPermissionMappings", (string)null);
+                    b.ToTable("DomainUserProfiles", (string)null);
                 });
 
             modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Auth.Entities.DomainUserRoleMappingEntity", b =>
@@ -184,6 +189,9 @@ namespace AFH.Adviser.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("UserProfileId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Email");
@@ -191,6 +199,8 @@ namespace AFH.Adviser.Infrastructure.Migrations
                     b.HasIndex("ExternalGroupId");
 
                     b.HasIndex("ExternalRole");
+
+                    b.HasIndex("UserProfileId");
 
                     b.HasIndex("RoleId", "IsEnabled");
 

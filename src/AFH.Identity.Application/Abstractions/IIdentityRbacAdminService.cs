@@ -4,6 +4,10 @@ namespace AFH.Identity.Application.Abstractions;
 
 public interface IIdentityRbacAdminService
 {
+    Task<IdentityUserProfileResult> UpsertUserProfileAsync(
+        IdentityUserProfileUpsert upsert,
+        CancellationToken ct);
+
     Task<IdentityRoleAdminResult> UpsertRoleAsync(
         string role,
         IReadOnlyList<string> permissions,
@@ -16,9 +20,5 @@ public interface IIdentityRbacAdminService
 
     Task<IdentityUserRoleMappingResult> AssignUserRoleAsync(
         IdentityUserRoleAssignment assignment,
-        CancellationToken ct);
-
-    Task<IdentityUserPermissionMappingResult> AssignUserPermissionAsync(
-        IdentityUserPermissionAssignment assignment,
         CancellationToken ct);
 }

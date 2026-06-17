@@ -2,6 +2,16 @@ SET NOCOUNT ON;
 
 DECLARE @now datetime2 = SYSUTCDATETIME();
 
+IF OBJECT_ID(N'[dbo].[DomainRoles]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DomainRoles] (
+        [Id] uniqueidentifier NOT NULL,
+        [Role] nvarchar(100) NOT NULL,
+        [CreatedUtc] datetime2 NOT NULL,
+        CONSTRAINT [PK_DomainRoles] PRIMARY KEY ([Id])
+    );
+END
+
 IF OBJECT_ID(N'[dbo].[DomainPermissions]', N'U') IS NULL
 BEGIN
     CREATE TABLE [dbo].[DomainPermissions] (
@@ -17,26 +27,56 @@ BEGIN
     );
 END
 
-IF OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]', N'U') IS NULL
+IF OBJECT_ID(N'[dbo].[DomainRolePermissions]', N'U') IS NULL
 BEGIN
-    CREATE TABLE [dbo].[DomainUserPermissionMappings] (
+    CREATE TABLE [dbo].[DomainRolePermissions] (
         [Id] uniqueidentifier NOT NULL,
+        [RoleId] uniqueidentifier NOT NULL,
         [PermissionId] uniqueidentifier NOT NULL,
+        [CreatedUtc] datetime2 NOT NULL,
+        CONSTRAINT [PK_DomainRolePermissions] PRIMARY KEY ([Id])
+    );
+END
+
+IF OBJECT_ID(N'[dbo].[DomainUserProfiles]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DomainUserProfiles] (
+        [Id] uniqueidentifier NOT NULL,
+        [ExternalSubject] nvarchar(160) NOT NULL,
+        [Email] nvarchar(320) NOT NULL,
+        [DisplayName] nvarchar(200) NOT NULL,
+        [AdviserId] nvarchar(100) NULL,
+        [Status] nvarchar(40) NOT NULL,
+        [CreatedUtc] datetime2 NOT NULL,
+        [UpdatedUtc] datetime2 NULL,
+        CONSTRAINT [PK_DomainUserProfiles] PRIMARY KEY ([Id])
+    );
+END
+
+IF OBJECT_ID(N'[dbo].[DomainUserRoleMappings]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DomainUserRoleMappings] (
+        [Id] uniqueidentifier NOT NULL,
+        [UserProfileId] uniqueidentifier NULL,
+        [RoleId] uniqueidentifier NOT NULL,
         [Email] nvarchar(320) NULL,
         [ExternalRole] nvarchar(100) NULL,
         [ExternalGroupId] nvarchar(128) NULL,
         [IsEnabled] bit NOT NULL,
         [CreatedUtc] datetime2 NOT NULL,
         [UpdatedUtc] datetime2 NULL,
-        CONSTRAINT [PK_DomainUserPermissionMappings] PRIMARY KEY ([Id])
+        CONSTRAINT [PK_DomainUserRoleMappings] PRIMARY KEY ([Id])
     );
 END
 
-IF COL_LENGTH(N'[dbo].[DomainUserPermissionMappings]', N'PermissionId') IS NULL
-    ALTER TABLE [dbo].[DomainUserPermissionMappings] ADD [PermissionId] uniqueidentifier NULL;
+IF COL_LENGTH(N'[dbo].[DomainUserRoleMappings]', N'UserProfileId') IS NULL
+    ALTER TABLE [dbo].[DomainUserRoleMappings] ADD [UserProfileId] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'[dbo].[DomainRolePermissions]', N'PermissionId') IS NULL
     ALTER TABLE [dbo].[DomainRolePermissions] ADD [PermissionId] uniqueidentifier NULL;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainRoles_Role' AND [object_id] = OBJECT_ID(N'[dbo].[DomainRoles]'))
+    CREATE UNIQUE INDEX [IX_DomainRoles_Role] ON [dbo].[DomainRoles] ([Role]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainPermissions_Permission' AND [object_id] = OBJECT_ID(N'[dbo].[DomainPermissions]'))
     CREATE UNIQUE INDEX [IX_DomainPermissions_Permission] ON [dbo].[DomainPermissions] ([Permission]);
@@ -44,20 +84,32 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainPermissions_P
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainPermissions_Category_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainPermissions]'))
     CREATE INDEX [IX_DomainPermissions_Category_IsEnabled] ON [dbo].[DomainPermissions] ([Category], [IsEnabled]);
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
-    CREATE INDEX [IX_DomainUserPermissionMappings_Email] ON [dbo].[DomainUserPermissionMappings] ([Email]);
-
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_ExternalRole' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
-    CREATE INDEX [IX_DomainUserPermissionMappings_ExternalRole] ON [dbo].[DomainUserPermissionMappings] ([ExternalRole]);
-
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_ExternalGroupId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
-    CREATE INDEX [IX_DomainUserPermissionMappings_ExternalGroupId] ON [dbo].[DomainUserPermissionMappings] ([ExternalGroupId]);
-
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_PermissionId_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
-    CREATE INDEX [IX_DomainUserPermissionMappings_PermissionId_IsEnabled] ON [dbo].[DomainUserPermissionMappings] ([PermissionId], [IsEnabled]);
-
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainRolePermissions_RoleId_PermissionId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainRolePermissions]'))
     CREATE UNIQUE INDEX [IX_DomainRolePermissions_RoleId_PermissionId] ON [dbo].[DomainRolePermissions] ([RoleId], [PermissionId]) WHERE [PermissionId] IS NOT NULL;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserProfiles_ExternalSubject' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserProfiles]'))
+    CREATE UNIQUE INDEX [IX_DomainUserProfiles_ExternalSubject] ON [dbo].[DomainUserProfiles] ([ExternalSubject]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserProfiles_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserProfiles]'))
+    CREATE INDEX [IX_DomainUserProfiles_Email] ON [dbo].[DomainUserProfiles] ([Email]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserProfiles_AdviserId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserProfiles]'))
+    CREATE INDEX [IX_DomainUserProfiles_AdviserId] ON [dbo].[DomainUserProfiles] ([AdviserId]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
+    CREATE INDEX [IX_DomainUserRoleMappings_Email] ON [dbo].[DomainUserRoleMappings] ([Email]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_ExternalRole' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
+    CREATE INDEX [IX_DomainUserRoleMappings_ExternalRole] ON [dbo].[DomainUserRoleMappings] ([ExternalRole]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_ExternalGroupId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
+    CREATE INDEX [IX_DomainUserRoleMappings_ExternalGroupId] ON [dbo].[DomainUserRoleMappings] ([ExternalGroupId]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_RoleId_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
+    CREATE INDEX [IX_DomainUserRoleMappings_RoleId_IsEnabled] ON [dbo].[DomainUserRoleMappings] ([RoleId], [IsEnabled]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_UserProfileId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
+    CREATE INDEX [IX_DomainUserRoleMappings_UserProfileId] ON [dbo].[DomainUserRoleMappings] ([UserProfileId]);
 
 MERGE [dbo].[DomainRoles] AS target
 USING (VALUES
@@ -187,8 +239,8 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO [dbo].[DomainUserRoleMappings]
-    ([Id], [RoleId], [Email], [ExternalRole], [ExternalGroupId], [IsEnabled], [CreatedUtc], [UpdatedUtc])
-SELECT NEWID(), r.[Id], NULL, r.[Role], NULL, 1, @now, NULL
+    ([Id], [UserProfileId], [RoleId], [Email], [ExternalRole], [ExternalGroupId], [IsEnabled], [CreatedUtc], [UpdatedUtc])
+SELECT NEWID(), NULL, r.[Id], NULL, r.[Role], NULL, 1, @now, NULL
 FROM [dbo].[DomainRoles] r
 WHERE NOT EXISTS (
     SELECT 1
@@ -197,51 +249,71 @@ WHERE NOT EXISTS (
       AND m.[ExternalRole] = r.[Role]
 );
 
--- Replace with your actual email for local/admin testing.
-DECLARE @AdminEmail nvarchar(256) = 'your.email@afh.co.uk';
+-- Replace these values for local/admin testing.
+DECLARE @AdminEmail nvarchar(320) = 'your.email@afh.co.uk';
+DECLARE @AdminDisplayName nvarchar(200) = 'Local Admin';
+
+MERGE [dbo].[DomainUserProfiles] AS target
+USING (SELECT @AdminEmail AS [Email], @AdminDisplayName AS [DisplayName]) AS source
+ON target.[Email] = source.[Email]
+WHEN MATCHED THEN
+    UPDATE SET
+        [DisplayName] = source.[DisplayName],
+        [Status] = 'Active',
+        [UpdatedUtc] = @now
+WHEN NOT MATCHED THEN
+    INSERT ([Id], [ExternalSubject], [Email], [DisplayName], [AdviserId], [Status], [CreatedUtc], [UpdatedUtc])
+    VALUES (NEWID(), source.[Email], source.[Email], source.[DisplayName], NULL, 'Active', @now, NULL);
 
 INSERT INTO [dbo].[DomainUserRoleMappings]
-    ([Id], [RoleId], [Email], [ExternalRole], [ExternalGroupId], [IsEnabled], [CreatedUtc], [UpdatedUtc])
-SELECT NEWID(), r.[Id], @AdminEmail, NULL, NULL, 1, @now, NULL
-FROM [dbo].[DomainRoles] r
-WHERE r.[Role] = 'Admin'
+    ([Id], [UserProfileId], [RoleId], [Email], [ExternalRole], [ExternalGroupId], [IsEnabled], [CreatedUtc], [UpdatedUtc])
+SELECT NEWID(), p.[Id], r.[Id], p.[Email], NULL, NULL, 1, @now, NULL
+FROM [dbo].[DomainUserProfiles] p
+JOIN [dbo].[DomainRoles] r ON r.[Role] = 'Admin'
+WHERE p.[Email] = @AdminEmail
 AND NOT EXISTS (
     SELECT 1
     FROM [dbo].[DomainUserRoleMappings] m
-    WHERE m.[Email] = @AdminEmail
+    WHERE m.[UserProfileId] = p.[Id]
       AND m.[RoleId] = r.[Id]
 );
 
-DECLARE @UserPermissionMappings TABLE (
+DECLARE @AdviserProfiles TABLE (
     [Email] nvarchar(320),
-    [Permission] nvarchar(128)
+    [DisplayName] nvarchar(200),
+    [AdviserId] nvarchar(100),
+    [Role] nvarchar(100)
 );
 
--- Optional direct per-user permission grants.
--- INSERT INTO @UserPermissionMappings ([Email], [Permission])
+-- Optional adviser profile mappings. AdviserId must match the adviser id used by Booking.
+-- INSERT INTO @AdviserProfiles ([Email], [DisplayName], [AdviserId], [Role])
 -- VALUES
--- ('adviser@example.com', 'Bookings.ApprovalRequests.Create');
+-- ('adviser@example.com', 'Ava Adviser', 'adv-123', 'Adviser');
 
-IF COL_LENGTH(N'[dbo].[DomainUserPermissionMappings]', N'Permission') IS NOT NULL
-BEGIN
-    EXEC sp_executesql N'
-        UPDATE up
-        SET [PermissionId] = p.[Id]
-        FROM [dbo].[DomainUserPermissionMappings] up
-        JOIN [dbo].[DomainPermissions] p ON p.[Permission] = up.[Permission]
-        WHERE up.[PermissionId] IS NULL;';
-END
+MERGE [dbo].[DomainUserProfiles] AS target
+USING @AdviserProfiles AS source
+ON target.[Email] = source.[Email]
+WHEN MATCHED THEN
+    UPDATE SET
+        [DisplayName] = source.[DisplayName],
+        [AdviserId] = source.[AdviserId],
+        [Status] = 'Active',
+        [UpdatedUtc] = @now
+WHEN NOT MATCHED THEN
+    INSERT ([Id], [ExternalSubject], [Email], [DisplayName], [AdviserId], [Status], [CreatedUtc], [UpdatedUtc])
+    VALUES (NEWID(), source.[Email], source.[Email], source.[DisplayName], source.[AdviserId], 'Active', @now, NULL);
 
-INSERT INTO [dbo].[DomainUserPermissionMappings]
-    ([Id], [PermissionId], [Email], [ExternalRole], [ExternalGroupId], [IsEnabled], [CreatedUtc], [UpdatedUtc])
-SELECT NEWID(), p.[Id], up.[Email], NULL, NULL, 1, @now, NULL
-FROM @UserPermissionMappings up
-JOIN [dbo].[DomainPermissions] p ON p.[Permission] = up.[Permission]
+INSERT INTO [dbo].[DomainUserRoleMappings]
+    ([Id], [UserProfileId], [RoleId], [Email], [ExternalRole], [ExternalGroupId], [IsEnabled], [CreatedUtc], [UpdatedUtc])
+SELECT NEWID(), p.[Id], r.[Id], p.[Email], NULL, NULL, 1, @now, NULL
+FROM @AdviserProfiles ap
+JOIN [dbo].[DomainUserProfiles] p ON p.[Email] = ap.[Email]
+JOIN [dbo].[DomainRoles] r ON r.[Role] = ap.[Role]
 WHERE NOT EXISTS (
     SELECT 1
-    FROM [dbo].[DomainUserPermissionMappings] m
-    WHERE m.[Email] = up.[Email]
-      AND m.[PermissionId] = p.[Id]
+    FROM [dbo].[DomainUserRoleMappings] m
+    WHERE m.[UserProfileId] = p.[Id]
+      AND m.[RoleId] = r.[Id]
 );
 
 SELECT [Permission], [DisplayName], [Category], [IsEnabled]
@@ -254,12 +326,8 @@ JOIN [dbo].[DomainRoles] r ON r.[Id] = rp.[RoleId]
 JOIN [dbo].[DomainPermissions] p ON p.[Id] = rp.[PermissionId]
 ORDER BY r.[Role], p.[Permission];
 
-SELECT r.[Role], m.[Email], m.[ExternalRole], m.[IsEnabled]
+SELECT up.[Email], up.[DisplayName], up.[AdviserId], up.[Status], r.[Role], m.[ExternalRole], m.[IsEnabled]
 FROM [dbo].[DomainUserRoleMappings] m
 JOIN [dbo].[DomainRoles] r ON r.[Id] = m.[RoleId]
-ORDER BY r.[Role], m.[Email], m.[ExternalRole];
-
-SELECT m.[Email], m.[ExternalRole], m.[ExternalGroupId], p.[Permission], m.[IsEnabled]
-FROM [dbo].[DomainUserPermissionMappings] m
-JOIN [dbo].[DomainPermissions] p ON p.[Id] = m.[PermissionId]
-ORDER BY m.[Email], m.[ExternalRole], m.[ExternalGroupId], p.[Permission];
+LEFT JOIN [dbo].[DomainUserProfiles] up ON up.[Id] = m.[UserProfileId]
+ORDER BY up.[Email], r.[Role], m.[ExternalRole];

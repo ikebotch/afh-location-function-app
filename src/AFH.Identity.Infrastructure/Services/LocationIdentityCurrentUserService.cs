@@ -39,8 +39,10 @@ public sealed class LocationIdentityCurrentUserService : IIdentityCurrentUserSer
         return IdentityCurrentUserResult.Success(new IdentityCurrentUser
         {
             UserId = context.UserId,
+            ExternalSubject = context.ExternalSubject,
             Email = context.Email,
             DisplayName = context.DisplayName,
+            AdviserId = context.AdviserId,
             TenantId = identityResult.TenantId,
             Roles = context.Roles,
             Permissions = context.Permissions
