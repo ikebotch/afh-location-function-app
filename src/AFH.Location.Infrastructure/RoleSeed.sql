@@ -5,6 +5,7 @@ DECLARE @now datetime2 = SYSUTCDATETIME();
 MERGE [dbo].[DomainRoles] AS target
 USING (VALUES
     ('Adviser'),
+    ('Approver'),
     ('LeadTech'),
     ('Manager'),
     ('Operations'),
@@ -22,6 +23,13 @@ DECLARE @RolePermissions TABLE (
 
 INSERT INTO @RolePermissions ([Role], [Permission])
 VALUES
+('Adviser', 'Bookings.ApprovalRequests.Create'),
+('Adviser', 'Bookings.ApprovalRequests.ReadOwn'),
+
+('Approver', 'OrganisationAssignments.Read'),
+('Approver', 'Bookings.Approvals.Read'),
+('Approver', 'Bookings.Approvals.Review'),
+
 ('LeadTech', 'OrganisationAssignments.Read'),
 ('LeadTech', 'Bookings.Approvals.Read'),
 ('LeadTech', 'Bookings.Cancel.AsLeadTech'),
@@ -31,6 +39,8 @@ VALUES
 ('Manager', 'OrganisationAssignments.Read'),
 ('Manager', 'Bookings.Approvals.Read'),
 ('Manager', 'Bookings.Approvals.Review'),
+('Manager', 'Bookings.Cancel.Direct'),
+('Manager', 'Bookings.Rearrange.Direct'),
 
 ('Operations', 'OrganisationAssignments.Read'),
 ('Operations', 'OrganisationAssignments.Create'),
@@ -39,8 +49,12 @@ VALUES
 ('Operations', 'OrganisationAssignments.Delete'),
 ('Operations', 'Bookings.Approvals.Read'),
 ('Operations', 'Bookings.Approvals.Review'),
+('Operations', 'Bookings.ApprovalRequests.Create'),
+('Operations', 'Bookings.ApprovalRequests.ReadOwn'),
 ('Operations', 'Bookings.Cancel.AsLeadTech'),
+('Operations', 'Bookings.Cancel.Direct'),
 ('Operations', 'Bookings.Rearrange.AsLeadTech'),
+('Operations', 'Bookings.Rearrange.Direct'),
 ('Operations', 'Bookings.RearrangementOptions.Read'),
 ('Operations', 'Bookings.Admin.Read'),
 
@@ -51,8 +65,12 @@ VALUES
 ('Admin', 'OrganisationAssignments.Delete'),
 ('Admin', 'Bookings.Approvals.Read'),
 ('Admin', 'Bookings.Approvals.Review'),
+('Admin', 'Bookings.ApprovalRequests.Create'),
+('Admin', 'Bookings.ApprovalRequests.ReadOwn'),
 ('Admin', 'Bookings.Cancel.AsLeadTech'),
+('Admin', 'Bookings.Cancel.Direct'),
 ('Admin', 'Bookings.Rearrange.AsLeadTech'),
+('Admin', 'Bookings.Rearrange.Direct'),
 ('Admin', 'Bookings.RearrangementOptions.Read'),
 ('Admin', 'Bookings.Admin.Read');
 

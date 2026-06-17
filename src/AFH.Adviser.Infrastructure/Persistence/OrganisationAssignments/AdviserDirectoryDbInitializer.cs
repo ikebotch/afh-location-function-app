@@ -128,7 +128,7 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
     private static async Task SeedDomainRbacAsync(AdviserDirectoryDbContext db, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var roleNames = new[] { "Adviser", "LeadTech", "Manager", "Operations", "Admin" };
+        var roleNames = new[] { "Adviser", "Approver", "LeadTech", "Manager", "Operations", "Admin" };
         foreach (var roleName in roleNames)
         {
             if (!await db.DomainRoles.AnyAsync(x => x.Role == roleName, ct))
@@ -147,6 +147,17 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
         var roles = await db.DomainRoles.ToDictionaryAsync(x => x.Role, x => x.Id, StringComparer.OrdinalIgnoreCase, ct);
         var permissionsByRole = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
+            ["Adviser"] =
+            [
+                BookingPermissionNames.ApprovalRequestsCreate,
+                BookingPermissionNames.ApprovalRequestsReadOwn
+            ],
+            ["Approver"] =
+            [
+                OrganisationAssignmentPermissions.Read,
+                BookingPermissionNames.ApprovalsRead,
+                BookingPermissionNames.ApprovalsReview
+            ],
             ["LeadTech"] =
             [
                 OrganisationAssignmentPermissions.Read,
@@ -159,7 +170,9 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
             [
                 OrganisationAssignmentPermissions.Read,
                 BookingPermissionNames.ApprovalsRead,
-                BookingPermissionNames.ApprovalsReview
+                BookingPermissionNames.ApprovalsReview,
+                BookingPermissionNames.CancelDirect,
+                BookingPermissionNames.RearrangeDirect
             ],
             ["Operations"] =
             [
@@ -170,8 +183,12 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
                 OrganisationAssignmentPermissions.Delete,
                 BookingPermissionNames.ApprovalsRead,
                 BookingPermissionNames.ApprovalsReview,
+                BookingPermissionNames.ApprovalRequestsCreate,
+                BookingPermissionNames.ApprovalRequestsReadOwn,
                 BookingPermissionNames.CancelAsLeadTech,
+                BookingPermissionNames.CancelDirect,
                 BookingPermissionNames.RearrangeAsLeadTech,
+                BookingPermissionNames.RearrangeDirect,
                 BookingPermissionNames.RearrangementOptionsRead,
                 BookingPermissionNames.AdminRead
             ],
@@ -184,8 +201,12 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
                 OrganisationAssignmentPermissions.Delete,
                 BookingPermissionNames.ApprovalsRead,
                 BookingPermissionNames.ApprovalsReview,
+                BookingPermissionNames.ApprovalRequestsCreate,
+                BookingPermissionNames.ApprovalRequestsReadOwn,
                 BookingPermissionNames.CancelAsLeadTech,
+                BookingPermissionNames.CancelDirect,
                 BookingPermissionNames.RearrangeAsLeadTech,
+                BookingPermissionNames.RearrangeDirect,
                 BookingPermissionNames.RearrangementOptionsRead,
                 BookingPermissionNames.AdminRead
             ]
