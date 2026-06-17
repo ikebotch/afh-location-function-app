@@ -94,6 +94,42 @@ public sealed class IdentityRbacAdminFunction
         }, ct, statusCode: HttpStatusCode.Created);
     }
 
+    [Function("Identity_AssignUserPermissionV1")]
+    public async Task<HttpResponseData> AssignUserPermissionAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "internal/identity/v1/user-permission-mappings")]
+        HttpRequestData req,
+        CancellationToken ct)
+    {
+        var body = await req.ReadFromJsonAsync<IdentityUserPermissionMappingRequest>(ct);
+        var validation = Validate(body);
+        if (validation is not null)
+        {
+            return await req.WriteFailureAsync(
+                HttpStatusCode.BadRequest,
+                new { code = "INVALID_USER_PERMISSION_MAPPING", message = validation },
+                ct);
+        }
+
+        var result = await _admin.AssignUserPermissionAsync(new IdentityUserPermissionAssignment
+        {
+            Permission = body!.Permission!,
+            Email = body.Email,
+            ExternalRole = body.ExternalRole,
+            ExternalGroupId = body.ExternalGroupId,
+            IsEnabled = body.IsEnabled ?? true
+        }, ct);
+
+        return await req.WriteSuccessAsync(new IdentityUserPermissionMappingResponse
+        {
+            MappingId = result.MappingId,
+            Permission = result.Permission,
+            Email = result.Email,
+            ExternalRole = result.ExternalRole,
+            ExternalGroupId = result.ExternalGroupId,
+            IsEnabled = result.IsEnabled
+        }, ct, statusCode: HttpStatusCode.Created);
+    }
+
     private static string? Validate(IdentityUserRoleMappingRequest? request)
     {
         if (request is null)
@@ -101,6 +137,24 @@ public sealed class IdentityRbacAdminFunction
 
         if (string.IsNullOrWhiteSpace(request.Role))
             return "role is required.";
+
+        if (string.IsNullOrWhiteSpace(request.Email)
+            && string.IsNullOrWhiteSpace(request.ExternalRole)
+            && string.IsNullOrWhiteSpace(request.ExternalGroupId))
+        {
+            return "At least one of email, externalRole, or externalGroupId is required.";
+        }
+
+        return null;
+    }
+
+    private static string? Validate(IdentityUserPermissionMappingRequest? request)
+    {
+        if (request is null)
+            return "Request body is required.";
+
+        if (string.IsNullOrWhiteSpace(request.Permission))
+            return "permission is required.";
 
         if (string.IsNullOrWhiteSpace(request.Email)
             && string.IsNullOrWhiteSpace(request.ExternalRole)

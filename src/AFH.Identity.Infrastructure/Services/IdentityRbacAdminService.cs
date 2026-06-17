@@ -89,6 +89,58 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         };
     }
 
+    public async Task<IdentityUserPermissionMappingResult> AssignUserPermissionAsync(
+        IdentityUserPermissionAssignment assignment,
+        CancellationToken ct)
+    {
+        var normalizedPermission = NormalizeRequired(assignment.Permission);
+        var permission = await GetOrCreatePermissionAsync(normalizedPermission, ct);
+        var normalizedEmail = NormalizeOptional(assignment.Email);
+        var normalizedExternalRole = NormalizeOptional(assignment.ExternalRole);
+        var normalizedExternalGroupId = NormalizeOptional(assignment.ExternalGroupId);
+
+        var mapping = await _db.DomainUserPermissionMappings
+            .SingleOrDefaultAsync(x =>
+                x.PermissionId == permission.Id
+                && x.Email == normalizedEmail
+                && x.ExternalRole == normalizedExternalRole
+                && x.ExternalGroupId == normalizedExternalGroupId,
+                ct);
+
+        var now = DateTime.UtcNow;
+        if (mapping is null)
+        {
+            mapping = new DomainUserPermissionMappingEntity
+            {
+                Id = Guid.NewGuid(),
+                PermissionId = permission.Id,
+                Email = normalizedEmail,
+                ExternalRole = normalizedExternalRole,
+                ExternalGroupId = normalizedExternalGroupId,
+                IsEnabled = assignment.IsEnabled,
+                CreatedUtc = now
+            };
+            _db.DomainUserPermissionMappings.Add(mapping);
+        }
+        else
+        {
+            mapping.IsEnabled = assignment.IsEnabled;
+            mapping.UpdatedUtc = now;
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        return new IdentityUserPermissionMappingResult
+        {
+            MappingId = mapping.Id,
+            Permission = permission.Permission,
+            Email = mapping.Email,
+            ExternalRole = mapping.ExternalRole,
+            ExternalGroupId = mapping.ExternalGroupId,
+            IsEnabled = mapping.IsEnabled
+        };
+    }
+
     private async Task<DomainRoleEntity> GetOrCreateRoleAsync(string role, CancellationToken ct)
     {
         var normalized = NormalizeRequired(role);
@@ -106,6 +158,26 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         return entity;
     }
 
+    private async Task<DomainPermissionEntity> GetOrCreatePermissionAsync(string permission, CancellationToken ct)
+    {
+        var normalized = NormalizeRequired(permission);
+        var entity = await _db.DomainPermissions.SingleOrDefaultAsync(x => x.Permission == normalized, ct);
+        if (entity is not null)
+            return entity;
+
+        entity = new DomainPermissionEntity
+        {
+            Id = Guid.NewGuid(),
+            Permission = normalized,
+            DisplayName = ToDisplayName(normalized),
+            Category = ToCategory(normalized),
+            IsEnabled = true,
+            CreatedUtc = DateTime.UtcNow
+        };
+        _db.DomainPermissions.Add(entity);
+        return entity;
+    }
+
     private async Task UpsertPermissionsAsync(Guid roleId, IReadOnlyList<string> permissions, CancellationToken ct)
     {
         var normalizedPermissions = permissions
@@ -118,22 +190,17 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         if (normalizedPermissions.Length == 0)
             return;
 
-        var existing = await _db.DomainRolePermissions
-            .Where(x => x.RoleId == roleId && normalizedPermissions.Contains(x.Permission))
-            .Select(x => x.Permission)
-            .ToArrayAsync(ct);
-
-        var existingSet = existing.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var permission in normalizedPermissions)
         {
-            if (existingSet.Contains(permission))
+            var permissionEntity = await GetOrCreatePermissionAsync(permission, ct);
+            if (await _db.DomainRolePermissions.AnyAsync(x => x.RoleId == roleId && x.PermissionId == permissionEntity.Id, ct))
                 continue;
 
             _db.DomainRolePermissions.Add(new DomainRolePermissionEntity
             {
                 Id = Guid.NewGuid(),
                 RoleId = roleId,
-                Permission = permission,
+                PermissionId = permissionEntity.Id,
                 CreatedUtc = DateTime.UtcNow
             });
         }
@@ -145,7 +212,11 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         var permissions = await _db.DomainRolePermissions
             .AsNoTracking()
             .Where(x => x.RoleId == roleId)
-            .Select(x => x.Permission)
+            .Join(
+                _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled),
+                rolePermission => rolePermission.PermissionId,
+                permission => permission.Id,
+                (_, permission) => permission.Permission)
             .OrderBy(x => x)
             .ToArrayAsync(ct);
 
@@ -164,4 +235,13 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string ToCategory(string permission)
+    {
+        var separator = permission.IndexOf('.', StringComparison.Ordinal);
+        return separator > 0 ? permission[..separator] : "General";
+    }
+
+    private static string ToDisplayName(string permission) =>
+        permission.Replace(".", " ", StringComparison.Ordinal);
 }

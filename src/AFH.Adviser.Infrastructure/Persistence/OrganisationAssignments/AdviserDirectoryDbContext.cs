@@ -13,14 +13,18 @@ public sealed class AdviserDirectoryDbContext : DbContext
 
     public DbSet<OrganisationAssignmentEntity> OrganisationAssignments => Set<OrganisationAssignmentEntity>();
     public DbSet<DomainRoleEntity> DomainRoles => Set<DomainRoleEntity>();
+    public DbSet<DomainPermissionEntity> DomainPermissions => Set<DomainPermissionEntity>();
     public DbSet<DomainUserRoleMappingEntity> DomainUserRoleMappings => Set<DomainUserRoleMappingEntity>();
+    public DbSet<DomainUserPermissionMappingEntity> DomainUserPermissionMappings => Set<DomainUserPermissionMappingEntity>();
     public DbSet<DomainRolePermissionEntity> DomainRolePermissions => Set<DomainRolePermissionEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<OrganisationAssignmentEntity>(ConfigureOrganisationAssignment);
         modelBuilder.Entity<DomainRoleEntity>(ConfigureDomainRole);
+        modelBuilder.Entity<DomainPermissionEntity>(ConfigureDomainPermission);
         modelBuilder.Entity<DomainUserRoleMappingEntity>(ConfigureDomainUserRoleMapping);
+        modelBuilder.Entity<DomainUserPermissionMappingEntity>(ConfigureDomainUserPermissionMapping);
         modelBuilder.Entity<DomainRolePermissionEntity>(ConfigureDomainRolePermission);
     }
 
@@ -53,6 +57,18 @@ public sealed class AdviserDirectoryDbContext : DbContext
         entity.HasIndex(x => x.Role).IsUnique();
     }
 
+    internal static void ConfigureDomainPermission(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainPermissionEntity> entity)
+    {
+        entity.ToTable("DomainPermissions");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Permission).HasMaxLength(128).IsRequired();
+        entity.Property(x => x.DisplayName).HasMaxLength(160).IsRequired();
+        entity.Property(x => x.Description).HasMaxLength(500);
+        entity.Property(x => x.Category).HasMaxLength(100).IsRequired();
+        entity.HasIndex(x => x.Permission).IsUnique();
+        entity.HasIndex(x => new { x.Category, x.IsEnabled });
+    }
+
     internal static void ConfigureDomainUserRoleMapping(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserRoleMappingEntity> entity)
     {
         entity.ToTable("DomainUserRoleMappings");
@@ -66,11 +82,23 @@ public sealed class AdviserDirectoryDbContext : DbContext
         entity.HasIndex(x => new { x.RoleId, x.IsEnabled });
     }
 
+    internal static void ConfigureDomainUserPermissionMapping(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserPermissionMappingEntity> entity)
+    {
+        entity.ToTable("DomainUserPermissionMappings");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Email).HasMaxLength(320);
+        entity.Property(x => x.ExternalRole).HasMaxLength(100);
+        entity.Property(x => x.ExternalGroupId).HasMaxLength(128);
+        entity.HasIndex(x => x.Email);
+        entity.HasIndex(x => x.ExternalRole);
+        entity.HasIndex(x => x.ExternalGroupId);
+        entity.HasIndex(x => new { x.PermissionId, x.IsEnabled });
+    }
+
     internal static void ConfigureDomainRolePermission(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainRolePermissionEntity> entity)
     {
         entity.ToTable("DomainRolePermissions");
         entity.HasKey(x => x.Id);
-        entity.Property(x => x.Permission).HasMaxLength(128).IsRequired();
-        entity.HasIndex(x => new { x.RoleId, x.Permission }).IsUnique();
+        entity.HasIndex(x => new { x.RoleId, x.PermissionId }).IsUnique();
     }
 }

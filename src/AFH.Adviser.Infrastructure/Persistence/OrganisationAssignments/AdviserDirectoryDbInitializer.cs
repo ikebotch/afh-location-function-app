@@ -95,19 +95,63 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
                 );
             END
 
+            IF OBJECT_ID(N'[dbo].[DomainPermissions]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[DomainPermissions] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [Permission] nvarchar(128) NOT NULL,
+                    [DisplayName] nvarchar(160) NOT NULL,
+                    [Description] nvarchar(500) NULL,
+                    [Category] nvarchar(100) NOT NULL,
+                    [IsEnabled] bit NOT NULL,
+                    [CreatedUtc] datetime2 NOT NULL,
+                    [UpdatedUtc] datetime2 NULL,
+                    CONSTRAINT [PK_DomainPermissions] PRIMARY KEY ([Id])
+                );
+            END
+
             IF OBJECT_ID(N'[dbo].[DomainRolePermissions]', N'U') IS NULL
             BEGIN
                 CREATE TABLE [dbo].[DomainRolePermissions] (
                     [Id] uniqueidentifier NOT NULL,
                     [RoleId] uniqueidentifier NOT NULL,
-                    [Permission] nvarchar(128) NOT NULL,
+                    [PermissionId] uniqueidentifier NOT NULL,
                     [CreatedUtc] datetime2 NOT NULL,
                     CONSTRAINT [PK_DomainRolePermissions] PRIMARY KEY ([Id])
                 );
             END
+            ELSE IF COL_LENGTH(N'[dbo].[DomainRolePermissions]', N'PermissionId') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[DomainRolePermissions] ADD [PermissionId] uniqueidentifier NULL;
+            END
+
+            IF OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[DomainUserPermissionMappings] (
+                    [Id] uniqueidentifier NOT NULL,
+                    [PermissionId] uniqueidentifier NOT NULL,
+                    [Email] nvarchar(320) NULL,
+                    [ExternalRole] nvarchar(100) NULL,
+                    [ExternalGroupId] nvarchar(128) NULL,
+                    [IsEnabled] bit NOT NULL,
+                    [CreatedUtc] datetime2 NOT NULL,
+                    [UpdatedUtc] datetime2 NULL,
+                    CONSTRAINT [PK_DomainUserPermissionMappings] PRIMARY KEY ([Id])
+                );
+            END
+            ELSE IF COL_LENGTH(N'[dbo].[DomainUserPermissionMappings]', N'PermissionId') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[DomainUserPermissionMappings] ADD [PermissionId] uniqueidentifier NULL;
+            END
 
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainRoles_Role' AND [object_id] = OBJECT_ID(N'[dbo].[DomainRoles]'))
                 CREATE UNIQUE INDEX [IX_DomainRoles_Role] ON [dbo].[DomainRoles] ([Role]);
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainPermissions_Permission' AND [object_id] = OBJECT_ID(N'[dbo].[DomainPermissions]'))
+                CREATE UNIQUE INDEX [IX_DomainPermissions_Permission] ON [dbo].[DomainPermissions] ([Permission]);
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainPermissions_Category_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainPermissions]'))
+                CREATE INDEX [IX_DomainPermissions_Category_IsEnabled] ON [dbo].[DomainPermissions] ([Category], [IsEnabled]);
 
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
                 CREATE INDEX [IX_DomainUserRoleMappings_Email] ON [dbo].[DomainUserRoleMappings] ([Email]);
@@ -121,8 +165,88 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_RoleId_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
                 CREATE INDEX [IX_DomainUserRoleMappings_RoleId_IsEnabled] ON [dbo].[DomainUserRoleMappings] ([RoleId], [IsEnabled]);
 
-            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainRolePermissions_RoleId_Permission' AND [object_id] = OBJECT_ID(N'[dbo].[DomainRolePermissions]'))
-                CREATE UNIQUE INDEX [IX_DomainRolePermissions_RoleId_Permission] ON [dbo].[DomainRolePermissions] ([RoleId], [Permission]);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainRolePermissions_RoleId_PermissionId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainRolePermissions]'))
+                CREATE UNIQUE INDEX [IX_DomainRolePermissions_RoleId_PermissionId] ON [dbo].[DomainRolePermissions] ([RoleId], [PermissionId]) WHERE [PermissionId] IS NOT NULL;
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+                CREATE INDEX [IX_DomainUserPermissionMappings_Email] ON [dbo].[DomainUserPermissionMappings] ([Email]);
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_ExternalRole' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+                CREATE INDEX [IX_DomainUserPermissionMappings_ExternalRole] ON [dbo].[DomainUserPermissionMappings] ([ExternalRole]);
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_ExternalGroupId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+                CREATE INDEX [IX_DomainUserPermissionMappings_ExternalGroupId] ON [dbo].[DomainUserPermissionMappings] ([ExternalGroupId]);
+
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_PermissionId_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+                CREATE INDEX [IX_DomainUserPermissionMappings_PermissionId_IsEnabled] ON [dbo].[DomainUserPermissionMappings] ([PermissionId], [IsEnabled]);
+
+            IF COL_LENGTH(N'[dbo].[DomainRolePermissions]', N'Permission') IS NOT NULL
+            BEGIN
+                EXEC sp_executesql N'
+                    INSERT INTO [dbo].[DomainPermissions]
+                        ([Id], [Permission], [DisplayName], [Description], [Category], [IsEnabled], [CreatedUtc], [UpdatedUtc])
+                    SELECT NEWID(),
+                           legacy.[Permission],
+                           REPLACE(legacy.[Permission], ''.'', '' ''),
+                           NULL,
+                           CASE
+                               WHEN CHARINDEX(''.'', legacy.[Permission]) > 1 THEN LEFT(legacy.[Permission], CHARINDEX(''.'', legacy.[Permission]) - 1)
+                               ELSE ''General''
+                           END,
+                           1,
+                           SYSUTCDATETIME(),
+                           NULL
+                    FROM (
+                        SELECT DISTINCT [Permission]
+                        FROM [dbo].[DomainRolePermissions]
+                        WHERE [Permission] IS NOT NULL AND LTRIM(RTRIM([Permission])) <> ''''
+                    ) legacy
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM [dbo].[DomainPermissions] existing
+                        WHERE existing.[Permission] = legacy.[Permission]
+                    );
+
+                    UPDATE rp
+                    SET [PermissionId] = p.[Id]
+                    FROM [dbo].[DomainRolePermissions] rp
+                    JOIN [dbo].[DomainPermissions] p ON p.[Permission] = rp.[Permission]
+                    WHERE rp.[PermissionId] IS NULL;';
+            END
+
+            IF COL_LENGTH(N'[dbo].[DomainUserPermissionMappings]', N'Permission') IS NOT NULL
+            BEGIN
+                EXEC sp_executesql N'
+                    INSERT INTO [dbo].[DomainPermissions]
+                        ([Id], [Permission], [DisplayName], [Description], [Category], [IsEnabled], [CreatedUtc], [UpdatedUtc])
+                    SELECT NEWID(),
+                           legacy.[Permission],
+                           REPLACE(legacy.[Permission], ''.'', '' ''),
+                           NULL,
+                           CASE
+                               WHEN CHARINDEX(''.'', legacy.[Permission]) > 1 THEN LEFT(legacy.[Permission], CHARINDEX(''.'', legacy.[Permission]) - 1)
+                               ELSE ''General''
+                           END,
+                           1,
+                           SYSUTCDATETIME(),
+                           NULL
+                    FROM (
+                        SELECT DISTINCT [Permission]
+                        FROM [dbo].[DomainUserPermissionMappings]
+                        WHERE [Permission] IS NOT NULL AND LTRIM(RTRIM([Permission])) <> ''''
+                    ) legacy
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM [dbo].[DomainPermissions] existing
+                        WHERE existing.[Permission] = legacy.[Permission]
+                    );
+
+                    UPDATE up
+                    SET [PermissionId] = p.[Id]
+                    FROM [dbo].[DomainUserPermissionMappings] up
+                    JOIN [dbo].[DomainPermissions] p ON p.[Permission] = up.[Permission]
+                    WHERE up.[PermissionId] IS NULL;';
+            END
             """, ct);
 
     private static async Task SeedDomainRbacAsync(AdviserDirectoryDbContext db, CancellationToken ct)
@@ -144,7 +268,6 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
 
         await db.SaveChangesAsync(ct);
 
-        var roles = await db.DomainRoles.ToDictionaryAsync(x => x.Role, x => x.Id, StringComparer.OrdinalIgnoreCase, ct);
         var permissionsByRole = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
             ["Adviser"] =
@@ -212,6 +335,32 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
             ]
         };
 
+        var permissionNames = permissionsByRole.Values
+            .SelectMany(x => x)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        foreach (var permissionName in permissionNames)
+        {
+            if (!await db.DomainPermissions.AnyAsync(x => x.Permission == permissionName, ct))
+            {
+                db.DomainPermissions.Add(new DomainPermissionEntity
+                {
+                    Id = Guid.NewGuid(),
+                    Permission = permissionName,
+                    DisplayName = ToDisplayName(permissionName),
+                    Category = ToCategory(permissionName),
+                    IsEnabled = true,
+                    CreatedUtc = now
+                });
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var roles = await db.DomainRoles.ToDictionaryAsync(x => x.Role, x => x.Id, StringComparer.OrdinalIgnoreCase, ct);
+        var permissionIds = await db.DomainPermissions.ToDictionaryAsync(x => x.Permission, x => x.Id, StringComparer.OrdinalIgnoreCase, ct);
+
         foreach (var (role, permissions) in permissionsByRole)
         {
             if (!roles.TryGetValue(role, out var roleId))
@@ -219,13 +368,16 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
 
             foreach (var permission in permissions)
             {
-                if (!await db.DomainRolePermissions.AnyAsync(x => x.RoleId == roleId && x.Permission == permission, ct))
+                if (!permissionIds.TryGetValue(permission, out var permissionId))
+                    continue;
+
+                if (!await db.DomainRolePermissions.AnyAsync(x => x.RoleId == roleId && x.PermissionId == permissionId, ct))
                 {
                     db.DomainRolePermissions.Add(new DomainRolePermissionEntity
                     {
                         Id = Guid.NewGuid(),
                         RoleId = roleId,
-                        Permission = permission,
+                        PermissionId = permissionId,
                         CreatedUtc = now
                     });
                 }
@@ -250,4 +402,13 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
         if (db.ChangeTracker.HasChanges())
             await db.SaveChangesAsync(ct);
     }
+
+    private static string ToCategory(string permission)
+    {
+        var separator = permission.IndexOf('.', StringComparison.Ordinal);
+        return separator > 0 ? permission[..separator] : "General";
+    }
+
+    private static string ToDisplayName(string permission) =>
+        permission.Replace(".", " ", StringComparison.Ordinal);
 }

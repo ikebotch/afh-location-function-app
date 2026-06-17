@@ -31,12 +31,9 @@ public sealed class SqlDomainUserContextStore : IDomainUserContextStore
             .Distinct()
             .ToArrayAsync(ct);
 
-        if (matchedRoleIds.Length == 0)
-        {
-            return new DomainUserContext(identity.UserId, identity.Email, identity.DisplayName, [], []);
-        }
-
-        var roles = await _db.DomainRoles
+        var roles = matchedRoleIds.Length == 0
+            ? []
+            : await _db.DomainRoles
             .AsNoTracking()
             .Where(x => matchedRoleIds.Contains(x.Id))
             .Select(x => x.Role)
@@ -44,13 +41,39 @@ public sealed class SqlDomainUserContextStore : IDomainUserContextStore
             .OrderBy(x => x)
             .ToArrayAsync(ct);
 
-        var permissions = await _db.DomainRolePermissions
+        var rolePermissions = matchedRoleIds.Length == 0
+            ? []
+            : await _db.DomainRolePermissions
             .AsNoTracking()
             .Where(x => matchedRoleIds.Contains(x.RoleId))
-            .Select(x => x.Permission)
+            .Join(
+                _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled),
+                rolePermission => rolePermission.PermissionId,
+                permission => permission.Id,
+                (_, permission) => permission.Permission)
             .Distinct()
-            .OrderBy(x => x)
             .ToArrayAsync(ct);
+
+        var userPermissions = await _db.DomainUserPermissionMappings
+            .AsNoTracking()
+            .Where(x => x.IsEnabled)
+            .Where(x =>
+                (x.Email != null && x.Email == email)
+                || (x.ExternalRole != null && appRoles.Contains(x.ExternalRole))
+                || (x.ExternalGroupId != null && groups.Contains(x.ExternalGroupId)))
+            .Join(
+                _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled),
+                userPermission => userPermission.PermissionId,
+                permission => permission.Id,
+                (_, permission) => permission.Permission)
+            .Distinct()
+            .ToArrayAsync(ct);
+
+        var permissions = rolePermissions
+            .Concat(userPermissions)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToArray();
 
         return new DomainUserContext(identity.UserId, identity.Email, identity.DisplayName, roles, permissions);
     }

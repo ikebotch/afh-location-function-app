@@ -17,4 +17,8 @@ public interface IIdentityRbacAdminService
     Task<IdentityUserRoleMappingResult> AssignUserRoleAsync(
         IdentityUserRoleAssignment assignment,
         CancellationToken ct);
+
+    Task<IdentityUserPermissionMappingResult> AssignUserPermissionAsync(
+        IdentityUserPermissionAssignment assignment,
+        CancellationToken ct);
 }

@@ -37,11 +37,35 @@ public sealed class SqlDomainUserPermissionStore : IDomainUserPermissionStore
             .Distinct()
             .ToArrayAsync(ct);
 
+        var hasDirectPermission = await _db.DomainUserPermissionMappings
+            .AsNoTracking()
+            .Where(x => x.IsEnabled)
+            .Where(x =>
+                (x.Email != null && x.Email == email)
+                || (x.ExternalRole != null && appRoles.Contains(x.ExternalRole))
+                || (x.ExternalGroupId != null && groups.Contains(x.ExternalGroupId)))
+            .Join(
+                _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled && x.Permission == permission),
+                userPermission => userPermission.PermissionId,
+                permissionEntity => permissionEntity.Id,
+                (_, _) => true)
+            .AnyAsync(
+                ct);
+
+        if (hasDirectPermission)
+            return true;
+
         if (roleIds.Length == 0)
             return false;
 
         return await _db.DomainRolePermissions
             .AsNoTracking()
-            .AnyAsync(x => roleIds.Contains(x.RoleId) && x.Permission == permission, ct);
+            .Where(x => roleIds.Contains(x.RoleId))
+            .Join(
+                _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled && x.Permission == permission),
+                rolePermission => rolePermission.PermissionId,
+                permissionEntity => permissionEntity.Id,
+                (_, _) => true)
+            .AnyAsync(ct);
     }
 }
