@@ -53,6 +53,7 @@ public sealed class GetIdentityCurrentUserFunction
             Email = result.User.Email,
             DisplayName = result.User.DisplayName,
             AdviserId = result.User.AdviserId,
+            JobRole = result.User.JobRole,
             TenantId = result.User.TenantId,
             Roles = result.User.Roles,
             Permissions = result.User.Permissions

@@ -12,6 +12,7 @@ public sealed class InMemoryDomainUserContextStore : IDomainUserContextStore
             identity.Email,
             identity.DisplayName,
             null,
+            null,
             [],
             []));
 }

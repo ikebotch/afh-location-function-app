@@ -6,5 +6,6 @@ public sealed class IdentityUserProfileUpsertRequest
     public string? Email { get; init; }
     public string? DisplayName { get; init; }
     public string? AdviserId { get; init; }
+    public string? JobRole { get; init; }
     public string? Status { get; init; }
 }

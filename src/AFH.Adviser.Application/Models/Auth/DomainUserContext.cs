@@ -6,5 +6,6 @@ public sealed record DomainUserContext(
     string Email,
     string DisplayName,
     string? AdviserId,
+    string? JobRole,
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> Permissions);

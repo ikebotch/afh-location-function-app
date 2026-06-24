@@ -1,5 +1,6 @@
 using AFH.Adviser.Application.Abstractions.Auth;
 using AFH.Identity.Application.Abstractions;
+using AFH.Identity.Infrastructure.Options;
 using AFH.Identity.Infrastructure.Persistence;
 using AFH.Identity.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,7 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddDbContext<IdentityDbContext>(options => options.UseSqlServer(identityConnectionString));
+        services.Configure<IdentityRbacOptions>(configuration.GetSection("IdentityRbac"));
         services.AddHostedService<IdentityDbInitializer>();
         services.AddScoped<IDomainUserPermissionStore, SqlDomainUserPermissionStore>();
         services.AddScoped<IDomainUserContextStore, SqlDomainUserContextStore>();

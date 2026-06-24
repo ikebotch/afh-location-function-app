@@ -1,7 +1,7 @@
-using AFH.Identity.Infrastructure.Persistence.Entities;
-using AFH.Identity.Infrastructure.Persistence;
 using AFH.Identity.Application.Abstractions;
 using AFH.Identity.Application.Models;
+using AFH.Identity.Infrastructure.Persistence;
+using AFH.Identity.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace AFH.Identity.Infrastructure.Services;
@@ -15,13 +15,147 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         _db = db;
     }
 
+    public async Task<IReadOnlyList<IdentityUserProfileResult>> ListUserProfilesAsync(CancellationToken ct) =>
+        await _db.DomainUserProfiles
+            .AsNoTracking()
+            .OrderBy(x => x.Email)
+            .Select(x => ToUserProfileResult(x))
+            .ToArrayAsync(ct);
+
+    public async Task<IdentityUserProfileResult?> GetUserProfileAsync(Guid userProfileId, CancellationToken ct) =>
+        await _db.DomainUserProfiles
+            .AsNoTracking()
+            .Where(x => x.Id == userProfileId)
+            .Select(x => ToUserProfileResult(x))
+            .SingleOrDefaultAsync(ct);
+
+    public async Task<IdentityUserProfileResult> UpsertUserProfileAsync(
+        IdentityUserProfileUpsert upsert,
+        CancellationToken ct)
+    {
+        var normalizedEmail = NormalizeRequired(upsert.Email);
+        var normalizedExternalSubject = NormalizeOptional(upsert.ExternalSubject) ?? normalizedEmail;
+        var normalizedDisplayName = NormalizeOptional(upsert.DisplayName) ?? normalizedEmail;
+        var normalizedAdviserId = NormalizeOptional(upsert.AdviserId);
+        var normalizedJobRole = NormalizeOptional(upsert.JobRole);
+        var normalizedStatus = NormalizeOptional(upsert.Status) ?? "Active";
+
+        var profile = await _db.DomainUserProfiles
+            .SingleOrDefaultAsync(x => x.ExternalSubject == normalizedExternalSubject, ct)
+            ?? await _db.DomainUserProfiles.SingleOrDefaultAsync(x => x.Email == normalizedEmail, ct);
+
+        var now = DateTime.UtcNow;
+        if (profile is null)
+        {
+            profile = new DomainUserProfileEntity
+            {
+                Id = Guid.NewGuid(),
+                ExternalSubject = normalizedExternalSubject,
+                Email = normalizedEmail,
+                DisplayName = normalizedDisplayName,
+                AdviserId = normalizedAdviserId,
+                JobRole = normalizedJobRole,
+                Status = normalizedStatus,
+                CreatedUtc = now
+            };
+            _db.DomainUserProfiles.Add(profile);
+        }
+        else
+        {
+            profile.ExternalSubject = normalizedExternalSubject;
+            profile.Email = normalizedEmail;
+            profile.DisplayName = normalizedDisplayName;
+            profile.AdviserId = normalizedAdviserId;
+            profile.JobRole = normalizedJobRole;
+            profile.Status = normalizedStatus;
+            profile.UpdatedUtc = now;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return ToUserProfileResult(profile);
+    }
+
+    public async Task<bool> DeleteUserProfileAsync(Guid userProfileId, CancellationToken ct)
+    {
+        var profile = await _db.DomainUserProfiles.SingleOrDefaultAsync(x => x.Id == userProfileId, ct);
+        if (profile is null)
+            return false;
+
+        var roleMappings = await _db.DomainUserRoleMappings.Where(x => x.UserProfileId == userProfileId).ToArrayAsync(ct);
+        var permissionMappings = await _db.DomainUserPermissionMappings.Where(x => x.UserProfileId == userProfileId).ToArrayAsync(ct);
+        _db.DomainUserRoleMappings.RemoveRange(roleMappings);
+        _db.DomainUserPermissionMappings.RemoveRange(permissionMappings);
+        _db.DomainUserProfiles.Remove(profile);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<IdentityPermissionResult>> ListPermissionsAsync(CancellationToken ct) =>
+        await _db.DomainPermissions
+            .AsNoTracking()
+            .OrderBy(x => x.Category)
+            .ThenBy(x => x.Permission)
+            .Select(x => ToPermissionResult(x))
+            .ToArrayAsync(ct);
+
+    public async Task<IdentityPermissionResult> UpsertPermissionAsync(
+        IdentityPermissionUpsert upsert,
+        CancellationToken ct)
+    {
+        var permission = await GetOrCreatePermissionAsync(upsert.Permission, ct);
+        permission.DisplayName = NormalizeOptional(upsert.DisplayName) ?? ToDisplayName(permission.Permission);
+        permission.Description = NormalizeOptional(upsert.Description);
+        permission.Category = NormalizeOptional(upsert.Category) ?? ToCategory(permission.Permission);
+        permission.IsEnabled = upsert.IsEnabled;
+        permission.UpdatedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return ToPermissionResult(permission);
+    }
+
+    public async Task<bool> DeletePermissionAsync(Guid permissionId, CancellationToken ct)
+    {
+        var permission = await _db.DomainPermissions.SingleOrDefaultAsync(x => x.Id == permissionId, ct);
+        if (permission is null)
+            return false;
+
+        var roleMappings = await _db.DomainRolePermissions.Where(x => x.PermissionId == permissionId).ToArrayAsync(ct);
+        var userMappings = await _db.DomainUserPermissionMappings.Where(x => x.PermissionId == permissionId).ToArrayAsync(ct);
+        _db.DomainRolePermissions.RemoveRange(roleMappings);
+        _db.DomainUserPermissionMappings.RemoveRange(userMappings);
+        _db.DomainPermissions.Remove(permission);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<IdentityRoleAdminResult>> ListRolesAsync(CancellationToken ct)
+    {
+        var roleIds = await _db.DomainRoles
+            .AsNoTracking()
+            .OrderBy(x => x.Role)
+            .Select(x => x.Id)
+            .ToArrayAsync(ct);
+
+        var results = new List<IdentityRoleAdminResult>(roleIds.Length);
+        foreach (var roleId in roleIds)
+        {
+            results.Add(await GetRoleResultAsync(roleId, ct));
+        }
+
+        return results;
+    }
+
+    public async Task<IdentityRoleAdminResult?> GetRoleAsync(Guid roleId, CancellationToken ct) =>
+        await _db.DomainRoles.AsNoTracking().AnyAsync(x => x.Id == roleId, ct)
+            ? await GetRoleResultAsync(roleId, ct)
+            : null;
+
     public async Task<IdentityRoleAdminResult> UpsertRoleAsync(
         string role,
         IReadOnlyList<string> permissions,
         CancellationToken ct)
     {
         var entity = await GetOrCreateRoleAsync(role, ct);
-        await UpsertPermissionsAsync(entity.Id, permissions, ct);
+        await UpsertRolePermissionsAsync(entity.Id, permissions, ct);
         await _db.SaveChangesAsync(ct);
         return await GetRoleResultAsync(entity.Id, ct);
     }
@@ -32,10 +166,72 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         CancellationToken ct)
     {
         var entity = await GetOrCreateRoleAsync(role, ct);
-        await UpsertPermissionsAsync(entity.Id, [permission], ct);
+        await UpsertRolePermissionsAsync(entity.Id, [permission], ct);
         await _db.SaveChangesAsync(ct);
         return await GetRoleResultAsync(entity.Id, ct);
     }
+
+    public async Task<bool> RemoveRolePermissionAsync(string role, string permission, CancellationToken ct)
+    {
+        var normalizedRole = NormalizeRequired(role);
+        var normalizedPermission = NormalizeRequired(permission);
+        var mapping = await _db.DomainRolePermissions
+            .Join(
+                _db.DomainRoles.Where(x => x.Role == normalizedRole),
+                rolePermission => rolePermission.RoleId,
+                roleEntity => roleEntity.Id,
+                (rolePermission, _) => rolePermission)
+            .Join(
+                _db.DomainPermissions.Where(x => x.Permission == normalizedPermission),
+                rolePermission => rolePermission.PermissionId,
+                permissionEntity => permissionEntity.Id,
+                (rolePermission, _) => rolePermission)
+            .SingleOrDefaultAsync(ct);
+
+        if (mapping is null)
+            return false;
+
+        _db.DomainRolePermissions.Remove(mapping);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> DeleteRoleAsync(Guid roleId, CancellationToken ct)
+    {
+        var role = await _db.DomainRoles.SingleOrDefaultAsync(x => x.Id == roleId, ct);
+        if (role is null)
+            return false;
+
+        var permissions = await _db.DomainRolePermissions.Where(x => x.RoleId == roleId).ToArrayAsync(ct);
+        var userMappings = await _db.DomainUserRoleMappings.Where(x => x.RoleId == roleId).ToArrayAsync(ct);
+        _db.DomainRolePermissions.RemoveRange(permissions);
+        _db.DomainUserRoleMappings.RemoveRange(userMappings);
+        _db.DomainRoles.Remove(role);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<IdentityUserRoleMappingResult>> ListUserRoleMappingsAsync(CancellationToken ct) =>
+        await _db.DomainUserRoleMappings
+            .AsNoTracking()
+            .Join(
+                _db.DomainRoles.AsNoTracking(),
+                mapping => mapping.RoleId,
+                role => role.Id,
+                (mapping, role) => new IdentityUserRoleMappingResult
+                {
+                    MappingId = mapping.Id,
+                    UserProfileId = mapping.UserProfileId,
+                    RoleId = role.Id,
+                    Role = role.Role,
+                    Email = mapping.Email,
+                    ExternalRole = mapping.ExternalRole,
+                    ExternalGroupId = mapping.ExternalGroupId,
+                    IsEnabled = mapping.IsEnabled
+                })
+            .OrderBy(x => x.Role)
+            .ThenBy(x => x.Email)
+            .ToArrayAsync(ct);
 
     public async Task<IdentityUserRoleMappingResult> AssignUserRoleAsync(
         IdentityUserRoleAssignment assignment,
@@ -79,65 +275,87 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         }
 
         await _db.SaveChangesAsync(ct);
-
-        return new IdentityUserRoleMappingResult
-        {
-            MappingId = mapping.Id,
-            UserProfileId = mapping.UserProfileId,
-            RoleId = role.Id,
-            Role = role.Role,
-            Email = mapping.Email,
-            ExternalRole = mapping.ExternalRole,
-            ExternalGroupId = mapping.ExternalGroupId,
-            IsEnabled = mapping.IsEnabled
-        };
+        return ToUserRoleMappingResult(mapping, role);
     }
 
-    public async Task<IdentityUserProfileResult> UpsertUserProfileAsync(
-        IdentityUserProfileUpsert upsert,
+    public async Task<bool> DeleteUserRoleMappingAsync(Guid mappingId, CancellationToken ct)
+    {
+        var mapping = await _db.DomainUserRoleMappings.SingleOrDefaultAsync(x => x.Id == mappingId, ct);
+        if (mapping is null)
+            return false;
+
+        _db.DomainUserRoleMappings.Remove(mapping);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<IdentityUserPermissionMappingResult>> ListUserPermissionMappingsAsync(CancellationToken ct) =>
+        await _db.DomainUserPermissionMappings
+            .AsNoTracking()
+            .Join(
+                _db.DomainPermissions.AsNoTracking(),
+                mapping => mapping.PermissionId,
+                permission => permission.Id,
+                (mapping, permission) => ToUserPermissionMappingResult(mapping, permission))
+            .OrderBy(x => x.Permission)
+            .ThenBy(x => x.Email)
+            .ToArrayAsync(ct);
+
+    public async Task<IdentityUserPermissionMappingResult> AssignUserPermissionAsync(
+        IdentityUserPermissionAssignment assignment,
         CancellationToken ct)
     {
-        var normalizedEmail = NormalizeRequired(upsert.Email);
-        var normalizedExternalSubject = NormalizeOptional(upsert.ExternalSubject) ?? normalizedEmail;
-        var normalizedDisplayName = NormalizeOptional(upsert.DisplayName) ?? normalizedEmail;
-        var normalizedAdviserId = NormalizeOptional(upsert.AdviserId);
-        var normalizedStatus = NormalizeOptional(upsert.Status) ?? "Active";
+        var permission = await GetOrCreatePermissionAsync(assignment.Permission, ct);
+        var normalizedEmail = NormalizeOptional(assignment.Email);
+        var normalizedExternalSubject = NormalizeOptional(assignment.ExternalSubject);
+        var userProfileId = await ResolveUserProfileIdAsync(assignment.UserProfileId, normalizedEmail, ct);
 
-        var profile = await _db.DomainUserProfiles
-            .SingleOrDefaultAsync(x => x.ExternalSubject == normalizedExternalSubject, ct);
-
-        if (profile is null)
-        {
-            profile = await _db.DomainUserProfiles.SingleOrDefaultAsync(x => x.Email == normalizedEmail, ct);
-        }
+        var mapping = await _db.DomainUserPermissionMappings
+            .SingleOrDefaultAsync(x =>
+                x.PermissionId == permission.Id
+                && x.UserProfileId == userProfileId
+                && x.ExternalSubject == normalizedExternalSubject
+                && x.Email == normalizedEmail,
+                ct);
 
         var now = DateTime.UtcNow;
-        if (profile is null)
+        if (mapping is null)
         {
-            profile = new DomainUserProfileEntity
+            mapping = new DomainUserPermissionMappingEntity
             {
                 Id = Guid.NewGuid(),
+                PermissionId = permission.Id,
+                UserProfileId = userProfileId,
                 ExternalSubject = normalizedExternalSubject,
                 Email = normalizedEmail,
-                DisplayName = normalizedDisplayName,
-                AdviserId = normalizedAdviserId,
-                Status = normalizedStatus,
+                IsGranted = assignment.IsGranted,
+                IsEnabled = assignment.IsEnabled,
+                Reason = NormalizeOptional(assignment.Reason),
                 CreatedUtc = now
             };
-            _db.DomainUserProfiles.Add(profile);
+            _db.DomainUserPermissionMappings.Add(mapping);
         }
         else
         {
-            profile.ExternalSubject = normalizedExternalSubject;
-            profile.Email = normalizedEmail;
-            profile.DisplayName = normalizedDisplayName;
-            profile.AdviserId = normalizedAdviserId;
-            profile.Status = normalizedStatus;
-            profile.UpdatedUtc = now;
+            mapping.IsGranted = assignment.IsGranted;
+            mapping.IsEnabled = assignment.IsEnabled;
+            mapping.Reason = NormalizeOptional(assignment.Reason);
+            mapping.UpdatedUtc = now;
         }
 
         await _db.SaveChangesAsync(ct);
-        return ToUserProfileResult(profile);
+        return ToUserPermissionMappingResult(mapping, permission);
+    }
+
+    public async Task<bool> DeleteUserPermissionMappingAsync(Guid mappingId, CancellationToken ct)
+    {
+        var mapping = await _db.DomainUserPermissionMappings.SingleOrDefaultAsync(x => x.Id == mappingId, ct);
+        if (mapping is null)
+            return false;
+
+        _db.DomainUserPermissionMappings.Remove(mapping);
+        await _db.SaveChangesAsync(ct);
+        return true;
     }
 
     private async Task<Guid?> ResolveUserProfileIdAsync(Guid? userProfileId, string? email, CancellationToken ct)
@@ -198,7 +416,7 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         return entity;
     }
 
-    private async Task UpsertPermissionsAsync(Guid roleId, IReadOnlyList<string> permissions, CancellationToken ct)
+    private async Task UpsertRolePermissionsAsync(Guid roleId, IReadOnlyList<string> permissions, CancellationToken ct)
     {
         var normalizedPermissions = permissions
             .Select(NormalizeOptional)
@@ -206,9 +424,6 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
             .Select(x => x!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-
-        if (normalizedPermissions.Length == 0)
-            return;
 
         foreach (var permission in normalizedPermissions)
         {
@@ -273,6 +488,49 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
             Email = profile.Email,
             DisplayName = profile.DisplayName,
             AdviserId = profile.AdviserId,
+            JobRole = profile.JobRole,
             Status = profile.Status
+        };
+
+    private static IdentityPermissionResult ToPermissionResult(DomainPermissionEntity permission) =>
+        new()
+        {
+            PermissionId = permission.Id,
+            Permission = permission.Permission,
+            DisplayName = permission.DisplayName,
+            Description = permission.Description,
+            Category = permission.Category,
+            IsEnabled = permission.IsEnabled
+        };
+
+    private static IdentityUserRoleMappingResult ToUserRoleMappingResult(
+        DomainUserRoleMappingEntity mapping,
+        DomainRoleEntity role) =>
+        new()
+        {
+            MappingId = mapping.Id,
+            UserProfileId = mapping.UserProfileId,
+            RoleId = role.Id,
+            Role = role.Role,
+            Email = mapping.Email,
+            ExternalRole = mapping.ExternalRole,
+            ExternalGroupId = mapping.ExternalGroupId,
+            IsEnabled = mapping.IsEnabled
+        };
+
+    private static IdentityUserPermissionMappingResult ToUserPermissionMappingResult(
+        DomainUserPermissionMappingEntity mapping,
+        DomainPermissionEntity permission) =>
+        new()
+        {
+            MappingId = mapping.Id,
+            UserProfileId = mapping.UserProfileId,
+            PermissionId = permission.Id,
+            Permission = permission.Permission,
+            ExternalSubject = mapping.ExternalSubject,
+            Email = mapping.Email,
+            IsGranted = mapping.IsGranted,
+            IsEnabled = mapping.IsEnabled,
+            Reason = mapping.Reason
         };
 }

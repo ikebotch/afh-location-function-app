@@ -7,5 +7,6 @@ public sealed class IdentityUserProfileResult
     public string Email { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
     public string? AdviserId { get; init; }
+    public string? JobRole { get; init; }
     public string Status { get; init; } = string.Empty;
 }

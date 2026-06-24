@@ -17,6 +17,7 @@
     "DomainUserAuth:Audience": "api://<location-or-adviser-api-app-id>",
     "DomainUserAuth:AllowedTenantIds:0": "<entra-tenant-id>",
     "DomainUserAuth:AllowedEmailDomains:0": "example.com",
+    "IdentityRbac:PermissionMode": "Hybrid",
     "LocationSearch:PolicyStore:AutoCreate": "true",
     "LocationSearch:PolicyStore:SeedFromConfiguration": "true",
     "LocationSearch:Coverage:AverageTravelSpeedMph": "30",

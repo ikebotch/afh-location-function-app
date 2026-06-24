@@ -1,17 +1,22 @@
 using AFH.Adviser.Application.Abstractions.Auth;
 using AFH.Adviser.Application.Models.Auth;
-using AFH.Identity.Infrastructure.Persistence;
+using AFH.Identity.Infrastructure.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AFH.Identity.Infrastructure.Persistence;
 
 public sealed class SqlDomainUserPermissionStore : IDomainUserPermissionStore
 {
     private readonly IdentityDbContext _db;
+    private readonly IdentityRbacOptions _options;
 
-    public SqlDomainUserPermissionStore(IdentityDbContext db)
+    public SqlDomainUserPermissionStore(
+        IdentityDbContext db,
+        IOptions<IdentityRbacOptions> options)
     {
         _db = db;
+        _options = options.Value;
     }
 
     public async Task<bool> HasPermissionAsync(
@@ -33,6 +38,34 @@ public sealed class SqlDomainUserPermissionStore : IDomainUserPermissionStore
             .OrderByDescending(x => x.ExternalSubject == externalSubject)
             .FirstOrDefaultAsync(ct);
 
+        var directGranted = false;
+        if (profile is not null && _options.PermissionMode is not IdentityPermissionResolutionMode.RolesOnly)
+        {
+            var userPermissions = await _db.DomainUserPermissionMappings
+                .AsNoTracking()
+                .Where(x => x.IsEnabled)
+                .Where(x =>
+                    (x.UserProfileId != null && x.UserProfileId == profile.Id)
+                    || (x.ExternalSubject != null && x.ExternalSubject == profile.ExternalSubject)
+                    || (x.Email != null && x.Email == email))
+                .Join(
+                    _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled && x.Permission == permission),
+                    mapping => mapping.PermissionId,
+                    permissionEntity => permissionEntity.Id,
+                    (mapping, _) => mapping.IsGranted)
+                .ToArrayAsync(ct);
+
+            if (userPermissions.Any(x => !x))
+                return false;
+
+            directGranted = userPermissions.Any(x => x);
+            if (directGranted && _options.PermissionMode is IdentityPermissionResolutionMode.UserOnly)
+                return true;
+        }
+
+        if (_options.PermissionMode is IdentityPermissionResolutionMode.UserOnly)
+            return false;
+
         var roleIds = await _db.DomainUserRoleMappings
             .AsNoTracking()
             .Where(x => x.IsEnabled)
@@ -46,9 +79,9 @@ public sealed class SqlDomainUserPermissionStore : IDomainUserPermissionStore
             .ToArrayAsync(ct);
 
         if (roleIds.Length == 0)
-            return false;
+            return directGranted;
 
-        return await _db.DomainRolePermissions
+        return directGranted || await _db.DomainRolePermissions
             .AsNoTracking()
             .Where(x => roleIds.Contains(x.RoleId))
             .Join(

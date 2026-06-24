@@ -2,9 +2,11 @@ using AFH.Adviser.Application.Models.Auth;
 using AFH.Adviser.Application.Models.OrganisationAssignments;
 using AFH.Identity.Infrastructure.Persistence;
 using AFH.Identity.Infrastructure.Persistence.Entities;
+using AFH.Identity.Infrastructure.Options;
 using AFH.Adviser.Contract.V1.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AFH.Adviser.Tests;
 
@@ -407,7 +409,7 @@ public sealed class OrganisationAssignmentDirectoryTests
             });
         await db.SaveChangesAsync();
 
-        var store = new SqlDomainUserContextStore(db);
+        var store = new SqlDomainUserContextStore(db, DefaultRbacOptions());
         var context = await store.GetContextAsync(
             new DomainUserIdentity(
                 "user-1",
@@ -470,7 +472,7 @@ public sealed class OrganisationAssignmentDirectoryTests
         });
         await db.SaveChangesAsync();
 
-        var store = new SqlDomainUserPermissionStore(db);
+        var store = new SqlDomainUserPermissionStore(db, DefaultRbacOptions());
         var allowed = await store.HasPermissionAsync(
             new DomainUserIdentity(
                 "user-1",
@@ -478,6 +480,93 @@ public sealed class OrganisationAssignmentDirectoryTests
                 "Alex Example",
                 [],
                 []),
+            BookingPermissionNames.ApprovalRequestsCreate,
+            CancellationToken.None);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task UserPermissionStore_DirectDenyOverridesRolePermission()
+    {
+        await using var db = CreateIdentityDb();
+        var roleId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
+        var permissionId = Guid.NewGuid();
+        db.DomainUserProfiles.Add(new DomainUserProfileEntity
+        {
+            Id = profileId,
+            ExternalSubject = "user-1",
+            Email = "alex@afh.co.uk",
+            DisplayName = "Alex Example",
+            CreatedUtc = DateTime.UtcNow
+        });
+        db.DomainRoles.Add(new DomainRoleEntity { Id = roleId, Role = "Adviser", CreatedUtc = DateTime.UtcNow });
+        db.DomainPermissions.Add(Permission(permissionId, BookingPermissionNames.ApprovalRequestsCreate));
+        db.DomainUserRoleMappings.Add(new DomainUserRoleMappingEntity
+        {
+            Id = Guid.NewGuid(),
+            UserProfileId = profileId,
+            RoleId = roleId,
+            IsEnabled = true,
+            CreatedUtc = DateTime.UtcNow
+        });
+        db.DomainRolePermissions.Add(new DomainRolePermissionEntity
+        {
+            Id = Guid.NewGuid(),
+            RoleId = roleId,
+            PermissionId = permissionId,
+            CreatedUtc = DateTime.UtcNow
+        });
+        db.DomainUserPermissionMappings.Add(new DomainUserPermissionMappingEntity
+        {
+            Id = Guid.NewGuid(),
+            UserProfileId = profileId,
+            PermissionId = permissionId,
+            IsGranted = false,
+            IsEnabled = true,
+            CreatedUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var store = new SqlDomainUserPermissionStore(db, DefaultRbacOptions());
+        var allowed = await store.HasPermissionAsync(
+            new DomainUserIdentity("user-1", "alex@afh.co.uk", "Alex Example", [], []),
+            BookingPermissionNames.ApprovalRequestsCreate,
+            CancellationToken.None);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public async Task UserPermissionStore_DirectGrantAllowsPermissionWithoutRole()
+    {
+        await using var db = CreateIdentityDb();
+        var profileId = Guid.NewGuid();
+        var permissionId = Guid.NewGuid();
+        db.DomainUserProfiles.Add(new DomainUserProfileEntity
+        {
+            Id = profileId,
+            ExternalSubject = "user-1",
+            Email = "alex@afh.co.uk",
+            DisplayName = "Alex Example",
+            CreatedUtc = DateTime.UtcNow
+        });
+        db.DomainPermissions.Add(Permission(permissionId, BookingPermissionNames.ApprovalRequestsCreate));
+        db.DomainUserPermissionMappings.Add(new DomainUserPermissionMappingEntity
+        {
+            Id = Guid.NewGuid(),
+            UserProfileId = profileId,
+            PermissionId = permissionId,
+            IsGranted = true,
+            IsEnabled = true,
+            CreatedUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var store = new SqlDomainUserPermissionStore(db, DefaultRbacOptions());
+        var allowed = await store.HasPermissionAsync(
+            new DomainUserIdentity("user-1", "alex@afh.co.uk", "Alex Example", [], []),
             BookingPermissionNames.ApprovalRequestsCreate,
             CancellationToken.None);
 
@@ -509,6 +598,9 @@ public sealed class OrganisationAssignmentDirectoryTests
             .Options;
         return new IdentityDbContext(options);
     }
+
+    private static IOptions<IdentityRbacOptions> DefaultRbacOptions() =>
+        Options.Create(new IdentityRbacOptions());
 
     private static OrganisationAssignmentScopedSearch ScopedSearch(
         string adviserId,

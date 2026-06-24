@@ -46,10 +46,28 @@ BEGIN
         [Email] nvarchar(320) NOT NULL,
         [DisplayName] nvarchar(200) NOT NULL,
         [AdviserId] nvarchar(100) NULL,
+        [JobRole] nvarchar(100) NULL,
         [Status] nvarchar(40) NOT NULL,
         [CreatedUtc] datetime2 NOT NULL,
         [UpdatedUtc] datetime2 NULL,
         CONSTRAINT [PK_DomainUserProfiles] PRIMARY KEY ([Id])
+    );
+END
+
+IF OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DomainUserPermissionMappings] (
+        [Id] uniqueidentifier NOT NULL,
+        [UserProfileId] uniqueidentifier NULL,
+        [PermissionId] uniqueidentifier NOT NULL,
+        [ExternalSubject] nvarchar(160) NULL,
+        [Email] nvarchar(320) NULL,
+        [IsGranted] bit NOT NULL,
+        [IsEnabled] bit NOT NULL,
+        [Reason] nvarchar(500) NULL,
+        [CreatedUtc] datetime2 NOT NULL,
+        [UpdatedUtc] datetime2 NULL,
+        CONSTRAINT [PK_DomainUserPermissionMappings] PRIMARY KEY ([Id])
     );
 END
 
@@ -71,6 +89,9 @@ END
 
 IF COL_LENGTH(N'[dbo].[DomainUserRoleMappings]', N'UserProfileId') IS NULL
     ALTER TABLE [dbo].[DomainUserRoleMappings] ADD [UserProfileId] uniqueidentifier NULL;
+
+IF COL_LENGTH(N'[dbo].[DomainUserProfiles]', N'JobRole') IS NULL
+    ALTER TABLE [dbo].[DomainUserProfiles] ADD [JobRole] nvarchar(100) NULL;
 
 IF COL_LENGTH(N'[dbo].[DomainRolePermissions]', N'PermissionId') IS NULL
     ALTER TABLE [dbo].[DomainRolePermissions] ADD [PermissionId] uniqueidentifier NULL;
@@ -110,6 +131,23 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappi
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserRoleMappings_UserProfileId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserRoleMappings]'))
     CREATE INDEX [IX_DomainUserRoleMappings_UserProfileId] ON [dbo].[DomainUserRoleMappings] ([UserProfileId]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_UserProfileId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+    CREATE INDEX [IX_DomainUserPermissionMappings_UserProfileId] ON [dbo].[DomainUserPermissionMappings] ([UserProfileId]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_ExternalSubject' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+    CREATE INDEX [IX_DomainUserPermissionMappings_ExternalSubject] ON [dbo].[DomainUserPermissionMappings] ([ExternalSubject]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+    CREATE INDEX [IX_DomainUserPermissionMappings_Email] ON [dbo].[DomainUserPermissionMappings] ([Email]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_PermissionId_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+    CREATE INDEX [IX_DomainUserPermissionMappings_PermissionId_IsEnabled] ON [dbo].[DomainUserPermissionMappings] ([PermissionId], [IsEnabled]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissionMappings_UserProfileId_PermissionId_ExternalSubject_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserPermissionMappings]'))
+    CREATE UNIQUE INDEX [IX_DomainUserPermissionMappings_UserProfileId_PermissionId_ExternalSubject_Email]
+    ON [dbo].[DomainUserPermissionMappings] ([UserProfileId], [PermissionId], [ExternalSubject], [Email])
+    WHERE [UserProfileId] IS NOT NULL AND [ExternalSubject] IS NOT NULL AND [Email] IS NOT NULL;
 
 MERGE [dbo].[DomainRoles] AS target
 USING (VALUES
@@ -259,11 +297,12 @@ ON target.[Email] = source.[Email]
 WHEN MATCHED THEN
     UPDATE SET
         [DisplayName] = source.[DisplayName],
+        [JobRole] = 'Administrator',
         [Status] = 'Active',
         [UpdatedUtc] = @now
 WHEN NOT MATCHED THEN
-    INSERT ([Id], [ExternalSubject], [Email], [DisplayName], [AdviserId], [Status], [CreatedUtc], [UpdatedUtc])
-    VALUES (NEWID(), source.[Email], source.[Email], source.[DisplayName], NULL, 'Active', @now, NULL);
+    INSERT ([Id], [ExternalSubject], [Email], [DisplayName], [AdviserId], [JobRole], [Status], [CreatedUtc], [UpdatedUtc])
+    VALUES (NEWID(), source.[Email], source.[Email], source.[DisplayName], NULL, 'Administrator', 'Active', @now, NULL);
 
 INSERT INTO [dbo].[DomainUserRoleMappings]
     ([Id], [UserProfileId], [RoleId], [Email], [ExternalRole], [ExternalGroupId], [IsEnabled], [CreatedUtc], [UpdatedUtc])
@@ -282,13 +321,15 @@ DECLARE @AdviserProfiles TABLE (
     [Email] nvarchar(320),
     [DisplayName] nvarchar(200),
     [AdviserId] nvarchar(100),
+    [JobRole] nvarchar(100),
     [Role] nvarchar(100)
 );
 
 -- Optional adviser profile mappings. AdviserId must match the adviser id used by Booking.
--- INSERT INTO @AdviserProfiles ([Email], [DisplayName], [AdviserId], [Role])
+-- JobRole is the business/job title shown on /me; Role is the RBAC role.
+-- INSERT INTO @AdviserProfiles ([Email], [DisplayName], [AdviserId], [JobRole], [Role])
 -- VALUES
--- ('adviser@example.com', 'Ava Adviser', 'adv-123', 'Adviser');
+-- ('adviser@example.com', 'Ava Adviser', 'adv-123', 'Financial Adviser', 'Adviser');
 
 MERGE [dbo].[DomainUserProfiles] AS target
 USING @AdviserProfiles AS source
@@ -297,11 +338,12 @@ WHEN MATCHED THEN
     UPDATE SET
         [DisplayName] = source.[DisplayName],
         [AdviserId] = source.[AdviserId],
+        [JobRole] = source.[JobRole],
         [Status] = 'Active',
         [UpdatedUtc] = @now
 WHEN NOT MATCHED THEN
-    INSERT ([Id], [ExternalSubject], [Email], [DisplayName], [AdviserId], [Status], [CreatedUtc], [UpdatedUtc])
-    VALUES (NEWID(), source.[Email], source.[Email], source.[DisplayName], source.[AdviserId], 'Active', @now, NULL);
+    INSERT ([Id], [ExternalSubject], [Email], [DisplayName], [AdviserId], [JobRole], [Status], [CreatedUtc], [UpdatedUtc])
+    VALUES (NEWID(), source.[Email], source.[Email], source.[DisplayName], source.[AdviserId], source.[JobRole], 'Active', @now, NULL);
 
 INSERT INTO [dbo].[DomainUserRoleMappings]
     ([Id], [UserProfileId], [RoleId], [Email], [ExternalRole], [ExternalGroupId], [IsEnabled], [CreatedUtc], [UpdatedUtc])
@@ -326,7 +368,7 @@ JOIN [dbo].[DomainRoles] r ON r.[Id] = rp.[RoleId]
 JOIN [dbo].[DomainPermissions] p ON p.[Id] = rp.[PermissionId]
 ORDER BY r.[Role], p.[Permission];
 
-SELECT up.[Email], up.[DisplayName], up.[AdviserId], up.[Status], r.[Role], m.[ExternalRole], m.[IsEnabled]
+SELECT up.[Email], up.[DisplayName], up.[AdviserId], up.[JobRole], up.[Status], r.[Role], m.[ExternalRole], m.[IsEnabled]
 FROM [dbo].[DomainUserRoleMappings] m
 JOIN [dbo].[DomainRoles] r ON r.[Id] = m.[RoleId]
 LEFT JOIN [dbo].[DomainUserProfiles] up ON up.[Id] = m.[UserProfileId]

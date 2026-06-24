@@ -15,6 +15,7 @@ public sealed class IdentityDbContext : DbContext
     public DbSet<DomainPermissionEntity> DomainPermissions => Set<DomainPermissionEntity>();
     public DbSet<DomainRolePermissionEntity> DomainRolePermissions => Set<DomainRolePermissionEntity>();
     public DbSet<DomainUserRoleMappingEntity> DomainUserRoleMappings => Set<DomainUserRoleMappingEntity>();
+    public DbSet<DomainUserPermissionMappingEntity> DomainUserPermissionMappings => Set<DomainUserPermissionMappingEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +24,7 @@ public sealed class IdentityDbContext : DbContext
         modelBuilder.Entity<DomainPermissionEntity>(ConfigureDomainPermission);
         modelBuilder.Entity<DomainRolePermissionEntity>(ConfigureDomainRolePermission);
         modelBuilder.Entity<DomainUserRoleMappingEntity>(ConfigureDomainUserRoleMapping);
+        modelBuilder.Entity<DomainUserPermissionMappingEntity>(ConfigureDomainUserPermissionMapping);
     }
 
     private static void ConfigureDomainUserProfile(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserProfileEntity> entity)
@@ -33,6 +35,7 @@ public sealed class IdentityDbContext : DbContext
         entity.Property(x => x.Email).HasMaxLength(320).IsRequired();
         entity.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
         entity.Property(x => x.AdviserId).HasMaxLength(100);
+        entity.Property(x => x.JobRole).HasMaxLength(100);
         entity.Property(x => x.Status).HasMaxLength(40).IsRequired();
         entity.HasIndex(x => x.ExternalSubject).IsUnique();
         entity.HasIndex(x => x.Email);
@@ -80,5 +83,21 @@ public sealed class IdentityDbContext : DbContext
         entity.HasIndex(x => x.ExternalRole);
         entity.HasIndex(x => x.ExternalGroupId);
         entity.HasIndex(x => new { x.RoleId, x.IsEnabled });
+    }
+
+    private static void ConfigureDomainUserPermissionMapping(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserPermissionMappingEntity> entity)
+    {
+        entity.ToTable("DomainUserPermissionMappings");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.UserProfileId);
+        entity.Property(x => x.PermissionId).IsRequired();
+        entity.Property(x => x.ExternalSubject).HasMaxLength(160);
+        entity.Property(x => x.Email).HasMaxLength(320);
+        entity.Property(x => x.Reason).HasMaxLength(500);
+        entity.HasIndex(x => x.UserProfileId);
+        entity.HasIndex(x => x.ExternalSubject);
+        entity.HasIndex(x => x.Email);
+        entity.HasIndex(x => new { x.PermissionId, x.IsEnabled });
+        entity.HasIndex(x => new { x.UserProfileId, x.PermissionId, x.ExternalSubject, x.Email }).IsUnique();
     }
 }

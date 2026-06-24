@@ -43,6 +43,7 @@ public sealed class LocationIdentityCurrentUserService : IIdentityCurrentUserSer
             Email = context.Email,
             DisplayName = context.DisplayName,
             AdviserId = context.AdviserId,
+            JobRole = context.JobRole,
             TenantId = identityResult.TenantId,
             Roles = context.Roles,
             Permissions = context.Permissions

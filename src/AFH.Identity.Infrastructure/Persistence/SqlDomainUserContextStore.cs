@@ -1,18 +1,23 @@
 using AFH.Adviser.Application.Abstractions.Auth;
 using AFH.Adviser.Application.Models.Auth;
 using AFH.Identity.Infrastructure.Persistence.Entities;
-using AFH.Identity.Infrastructure.Persistence;
+using AFH.Identity.Infrastructure.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace AFH.Identity.Infrastructure.Persistence;
 
 public sealed class SqlDomainUserContextStore : IDomainUserContextStore
 {
     private readonly IdentityDbContext _db;
+    private readonly IdentityRbacOptions _options;
 
-    public SqlDomainUserContextStore(IdentityDbContext db)
+    public SqlDomainUserContextStore(
+        IdentityDbContext db,
+        IOptions<IdentityRbacOptions> options)
     {
         _db = db;
+        _options = options.Value;
     }
 
     public async Task<DomainUserContext> GetContextAsync(DomainUserIdentity identity, CancellationToken ct)
@@ -44,23 +49,7 @@ public sealed class SqlDomainUserContextStore : IDomainUserContextStore
             .OrderBy(x => x)
             .ToArrayAsync(ct);
 
-        var rolePermissions = matchedRoleIds.Length == 0
-            ? []
-            : await _db.DomainRolePermissions
-            .AsNoTracking()
-            .Where(x => matchedRoleIds.Contains(x.RoleId))
-            .Join(
-                _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled),
-                rolePermission => rolePermission.PermissionId,
-                permission => permission.Id,
-                (_, permission) => permission.Permission)
-            .Distinct()
-            .ToArrayAsync(ct);
-
-        var permissions = rolePermissions
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x)
-            .ToArray();
+        var permissions = await ResolvePermissionsAsync(profile.Id, profile.ExternalSubject, email, matchedRoleIds, ct);
 
         return new DomainUserContext(
             profile.Id.ToString("D"),
@@ -68,8 +57,64 @@ public sealed class SqlDomainUserContextStore : IDomainUserContextStore
             profile.Email,
             profile.DisplayName,
             profile.AdviserId,
+            profile.JobRole,
             roles,
             permissions);
+    }
+
+    private async Task<IReadOnlyList<string>> ResolvePermissionsAsync(
+        Guid userProfileId,
+        string externalSubject,
+        string email,
+        IReadOnlyList<Guid> roleIds,
+        CancellationToken ct)
+    {
+        var rolePermissions = _options.PermissionMode is IdentityPermissionResolutionMode.UserOnly || roleIds.Count == 0
+            ? []
+            : await _db.DomainRolePermissions
+                .AsNoTracking()
+                .Where(x => roleIds.Contains(x.RoleId))
+                .Join(
+                    _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled),
+                    rolePermission => rolePermission.PermissionId,
+                    permission => permission.Id,
+                    (_, permission) => permission.Permission)
+                .Distinct()
+                .ToArrayAsync(ct);
+
+        if (_options.PermissionMode is IdentityPermissionResolutionMode.RolesOnly)
+        {
+            return rolePermissions
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToArray();
+        }
+
+        var userMappings = await _db.DomainUserPermissionMappings
+            .AsNoTracking()
+            .Where(x => x.IsEnabled)
+            .Where(x =>
+                (x.UserProfileId != null && x.UserProfileId == userProfileId)
+                || (x.ExternalSubject != null && x.ExternalSubject == externalSubject)
+                || (x.Email != null && x.Email == email))
+            .Join(
+                _db.DomainPermissions.AsNoTracking().Where(x => x.IsEnabled),
+                mapping => mapping.PermissionId,
+                permission => permission.Id,
+                (mapping, permission) => new { permission.Permission, mapping.IsGranted })
+            .ToArrayAsync(ct);
+
+        var denied = userMappings
+            .Where(x => !x.IsGranted)
+            .Select(x => x.Permission)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return rolePermissions
+            .Concat(userMappings.Where(x => x.IsGranted).Select(x => x.Permission))
+            .Where(x => !denied.Contains(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToArray();
     }
 
     private async Task<DomainUserProfileEntity> GetOrCreateProfileAsync(DomainUserIdentity identity, CancellationToken ct)
@@ -91,6 +136,7 @@ public sealed class SqlDomainUserContextStore : IDomainUserContextStore
                     ExternalSubject = externalSubject,
                     Email = email,
                     DisplayName = displayName,
+                    JobRole = null,
                     Status = "Active",
                     CreatedUtc = now
                 };

@@ -19,9 +19,7 @@ public sealed class IdentityDbContextFactory : IDesignTimeDbContextFactory<Ident
         var connectionString = ServiceCollectionExtensions.ResolveIdentityDbConnectionString(config);
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException(
-                "Missing SQL connection string for IdentityDbContext. " +
-                "Set ConnectionStrings:IdentityDb or ConnectionStrings:AdviserDirectoryDb.");
+            connectionString = "Server=localhost;Database=AFH.Identity.DesignTime;Trusted_Connection=True;TrustServerCertificate=True";
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<IdentityDbContext>();
