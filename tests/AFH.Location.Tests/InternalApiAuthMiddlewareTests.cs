@@ -20,12 +20,17 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("SyncAdviserCacheV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("TravelCoverageV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("AdviserAvailabilityRulesActiveV1", EndpointAccessPolicy.InternalOnly)]
+    [InlineData("AdviserAvailabilityRulesListV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserAvailabilityRulesForAdviserV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserAvailabilityTimeSlotsV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsListV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("AdviserOrganisationAssignmentsResolveV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsCreateV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsUpdateV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsDisableV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsDeleteV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("OrganisationBranchesListV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("OrganisationRegionsListV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("AdviserProfilesListV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("AdviserProfilesGetV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("AdviserProfilesCreateV1", EndpointAccessPolicy.UserAuthenticated)]
@@ -36,6 +41,7 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("AdviserSpecialismsCreateV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("AdviserSpecialismsUpdateV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("AdviserSpecialismsDeleteV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("CoverageAreasListV1", EndpointAccessPolicy.UserAuthenticated)]
     public void EndpointAccessPolicies_ClassifiesFunctions(string functionName, EndpointAccessPolicy expected)
     {
         Assert.Equal(expected, EndpointAccessPolicies.GetPolicy(functionName));

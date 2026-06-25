@@ -1,4 +1,5 @@
 using AFH.Adviser.Application.Abstractions.Availability;
+using AFH.Adviser.Application.Abstractions.Coverage;
 using AFH.Adviser.Application.Abstractions.Repositories;
 using AFH.Adviser.Application.Abstractions.Clients;
 using AFH.Adviser.Application.Abstractions.Feed;
@@ -6,11 +7,13 @@ using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
 using AFH.Adviser.Application.Abstractions.Profiles;
 using AFH.Adviser.Application.Abstractions.Skills;
 using AFH.Adviser.Application.Services.Availability;
+using AFH.Adviser.Application.Services.Coverage;
 using AFH.Adviser.Application.Services.OrganisationAssignments;
 using AFH.Adviser.Application.Services.Profiles;
 using AFH.Adviser.Infrastructure.External.Calendar;
 using AFH.Adviser.Infrastructure.Options;
 using AFH.Adviser.Infrastructure.Persistence.Availability;
+using AFH.Adviser.Infrastructure.Persistence.Coverage;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
 using AFH.Adviser.Infrastructure.Persistence.Skills;
@@ -54,6 +57,8 @@ public static class AdviserInfrastructureDependencyInjection
 
         services.AddDbContext<AdviserDirectoryDbContext>(options => options.UseSqlServer(adviserDirectoryConnectionString));
         services.AddScoped<IOrganisationAssignmentDirectory, SqlOrganisationAssignmentDirectory>();
+        services.AddScoped<ICoverageRegionRepository, SqlCoverageRegionRepository>();
+        services.AddScoped<ICoverageRegionAdminService, CoverageRegionAdminService>();
         services.AddScoped<IAdviserAvailabilityRulesRepository, SqlAdviserAvailabilityRulesRepository>();
         services.AddScoped<IAdviserAvailabilityRulesService, AdviserAvailabilityRulesService>();
         services.AddHostedService<AdviserDirectoryDbInitializer>();

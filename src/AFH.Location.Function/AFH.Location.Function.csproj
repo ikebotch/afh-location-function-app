@@ -26,6 +26,8 @@
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
+		<PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.22.2" />
+		<PackageReference Include="OpenTelemetry.Api" Version="1.16.0" />
 	</ItemGroup>
 
 	<ItemGroup>

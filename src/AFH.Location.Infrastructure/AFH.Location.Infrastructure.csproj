@@ -23,6 +23,8 @@
 		<PackageReference Include="AFH.Common.Errors.Email" Version="1.0.2"/>
 		<PackageReference Include="AFH.Common.Errors.ApplicationInsights" Version="1.0.2" />
 		<PackageReference Include="AFH.Common.Errors.EntityFramework" Version="1.0.2" />
+		<PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.22.2" />
+		<PackageReference Include="OpenTelemetry.Api" Version="1.16.0" />
 
 
 	</ItemGroup>

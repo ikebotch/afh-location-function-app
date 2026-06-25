@@ -1,5 +1,6 @@
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments.Entities;
 using AFH.Adviser.Infrastructure.Persistence.Availability.Entities;
+using AFH.Adviser.Infrastructure.Persistence.Coverage.Entities;
 using AFH.Adviser.Infrastructure.Persistence.Skills.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +18,8 @@ public sealed class AdviserDirectoryDbContext : DbContext
     public DbSet<AdviserWorkingPatternRuleEntity> AdviserWorkingPatternRules => Set<AdviserWorkingPatternRuleEntity>();
     public DbSet<AdviserCapacityLimitRuleEntity> AdviserCapacityLimitRules => Set<AdviserCapacityLimitRuleEntity>();
     public DbSet<AdviserSkillCatalogEntity> AdviserSkillCatalog => Set<AdviserSkillCatalogEntity>();
+    public DbSet<CoverageRegionEntity> CoverageRegions => Set<CoverageRegionEntity>();
+    public DbSet<AdviserRegionAssignmentEntity> AdviserRegionAssignments => Set<AdviserRegionAssignmentEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +28,8 @@ public sealed class AdviserDirectoryDbContext : DbContext
         modelBuilder.Entity<AdviserWorkingPatternRuleEntity>(ConfigureAdviserWorkingPatternRule);
         modelBuilder.Entity<AdviserCapacityLimitRuleEntity>(ConfigureAdviserCapacityLimitRule);
         modelBuilder.Entity<AdviserSkillCatalogEntity>(ConfigureAdviserSkillCatalog);
+        modelBuilder.Entity<CoverageRegionEntity>(ConfigureCoverageRegion);
+        modelBuilder.Entity<AdviserRegionAssignmentEntity>(ConfigureAdviserRegionAssignment);
     }
 
     internal static void ConfigureOrganisationAssignment(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<OrganisationAssignmentEntity> entity)
@@ -95,5 +100,34 @@ public sealed class AdviserDirectoryDbContext : DbContext
         entity.Property(x => x.Certification).HasMaxLength(160);
         entity.HasIndex(x => x.Name).IsUnique();
         entity.HasIndex(x => new { x.IsActive, x.Category });
+    }
+
+    internal static void ConfigureCoverageRegion(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<CoverageRegionEntity> entity)
+    {
+        entity.ToTable("CoverageRegions");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Code).HasMaxLength(32).IsRequired();
+        entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+        entity.Property(x => x.LeadAdviserId).HasMaxLength(100);
+        entity.Property(x => x.LeadAdviserName).HasMaxLength(200);
+        entity.Property(x => x.Postcodes).HasMaxLength(2000).IsRequired();
+        entity.Property(x => x.Skills).HasMaxLength(2000).IsRequired();
+        entity.HasIndex(x => x.Code).IsUnique();
+        entity.HasIndex(x => new { x.IsActive, x.Name });
+        entity.HasMany(x => x.AdviserAssignments)
+            .WithOne(x => x.Region)
+            .HasForeignKey(x => x.RegionId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+
+    internal static void ConfigureAdviserRegionAssignment(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<AdviserRegionAssignmentEntity> entity)
+    {
+        entity.ToTable("AdviserRegionAssignments");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.AdviserId).HasMaxLength(100).IsRequired();
+        entity.Property(x => x.AdviserName).HasMaxLength(200).IsRequired();
+        entity.Property(x => x.Role).HasMaxLength(100);
+        entity.HasIndex(x => new { x.RegionId, x.AdviserId }).IsUnique();
+        entity.HasIndex(x => new { x.AdviserId, x.IsActive });
     }
 }

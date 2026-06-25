@@ -17,6 +17,9 @@ public static class EndpointAccessPolicies
             ["SyncAdviserCacheV1"] = EndpointAccessPolicy.InternalOnly,
             ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly,
             ["AdviserAvailabilityRulesActiveV1"] = EndpointAccessPolicy.InternalOnly,
+            ["AdviserAvailabilityRulesListV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserAvailabilityRulesForAdviserV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserAvailabilityTimeSlotsV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["Identity_CurrentUserContextV1"] = EndpointAccessPolicy.InternalOnly,
             ["Identity_ListUserProfilesV1"] = EndpointAccessPolicy.InternalOnly,
             ["Identity_GetUserProfileV1"] = EndpointAccessPolicy.InternalOnly,
@@ -44,6 +47,8 @@ public static class EndpointAccessPolicies
             ["OrganisationAssignmentsUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsDisableV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsDeleteV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["OrganisationBranchesListV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["OrganisationRegionsListV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["AdviserProfilesListV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["AdviserProfilesGetV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["AdviserProfilesCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
@@ -53,7 +58,16 @@ public static class EndpointAccessPolicies
             ["AdviserSpecialismsListV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["AdviserSpecialismsCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["AdviserSpecialismsUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
-            ["AdviserSpecialismsDeleteV1"] = EndpointAccessPolicy.UserAuthenticated
+            ["AdviserSpecialismsDeleteV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageRegionsListV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageRegionsGetV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageRegionsCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageRegionsUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageRegionsDisableV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageRegionsDeleteV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageRegionsAssignAdviserV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageRegionsRemoveAdviserV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["CoverageAreasListV1"] = EndpointAccessPolicy.UserAuthenticated
         };
 
     internal static IReadOnlyCollection<string> KnownHttpFunctions => Policies.Keys.ToArray();
