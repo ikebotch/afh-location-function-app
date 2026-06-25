@@ -44,6 +44,79 @@ public sealed class IdentityDbInitializer : IHostedService
 
         await db.SaveChangesAsync(ct);
 
+        var fullControlCentrePermissions = new[]
+        {
+            DashboardRead,
+            AdviserRead,
+            AdviserManage,
+            AdviserSpecialismsManage,
+            CalendarRead,
+            CalendarManage,
+            CalendarSlotsOverride,
+            CoverageRead,
+            CoverageManage,
+            NotificationsRead,
+            NotificationsTemplatesRead,
+            NotificationsTemplatesManage,
+            NotificationsSettingsRead,
+            NotificationsSettingsManage,
+            ReportingRead,
+            AuditRead,
+            SystemRead,
+            SystemManage,
+            SystemHealthRead,
+            SystemAuditRead,
+            SystemDiagnosticsRead,
+            UsersRead,
+            RbacRead,
+            RbacManage,
+            PartnersRead
+        };
+
+        var operationsControlCentrePermissions = fullControlCentrePermissions
+            .Where(permission => permission != RbacManage && permission != SystemManage)
+            .ToArray();
+
+        var operationsPermissions = new[]
+        {
+            OrganisationAssignmentPermissions.Read,
+            OrganisationAssignmentPermissions.Create,
+            OrganisationAssignmentPermissions.Update,
+            OrganisationAssignmentPermissions.Disable,
+            OrganisationAssignmentPermissions.Delete,
+            OrganisationAssignmentsManage,
+            BookingPermissionNames.ApprovalsRead,
+            BookingPermissionNames.ApprovalsReview,
+            BookingPermissionNames.ApprovalRequestsCreate,
+            BookingPermissionNames.ApprovalRequestsReadOwn,
+            BookingPermissionNames.CancelAsLeadTech,
+            BookingPermissionNames.CancelDirect,
+            BookingPermissionNames.RearrangeAsLeadTech,
+            BookingPermissionNames.RearrangeDirect,
+            BookingPermissionNames.RearrangementOptionsRead,
+            BookingPermissionNames.AdminRead
+        }.Concat(operationsControlCentrePermissions).ToArray();
+
+        var adminPermissions = new[]
+        {
+            OrganisationAssignmentPermissions.Read,
+            OrganisationAssignmentPermissions.Create,
+            OrganisationAssignmentPermissions.Update,
+            OrganisationAssignmentPermissions.Disable,
+            OrganisationAssignmentPermissions.Delete,
+            OrganisationAssignmentsManage,
+            BookingPermissionNames.ApprovalsRead,
+            BookingPermissionNames.ApprovalsReview,
+            BookingPermissionNames.ApprovalRequestsCreate,
+            BookingPermissionNames.ApprovalRequestsReadOwn,
+            BookingPermissionNames.CancelAsLeadTech,
+            BookingPermissionNames.CancelDirect,
+            BookingPermissionNames.RearrangeAsLeadTech,
+            BookingPermissionNames.RearrangeDirect,
+            BookingPermissionNames.RearrangementOptionsRead,
+            BookingPermissionNames.AdminRead
+        }.Concat(fullControlCentrePermissions).ToArray();
+
         var permissionsByRole = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
             ["Adviser"] =
@@ -55,60 +128,39 @@ public sealed class IdentityDbInitializer : IHostedService
             [
                 OrganisationAssignmentPermissions.Read,
                 BookingPermissionNames.ApprovalsRead,
-                BookingPermissionNames.ApprovalsReview
+                BookingPermissionNames.ApprovalsReview,
+                DashboardRead,
+                BookingPermissionNames.AdminRead
             ],
             ["LeadTech"] =
             [
                 OrganisationAssignmentPermissions.Read,
+                DashboardRead,
+                BookingPermissionNames.AdminRead,
                 BookingPermissionNames.ApprovalsRead,
                 BookingPermissionNames.CancelAsLeadTech,
                 BookingPermissionNames.RearrangeAsLeadTech,
-                BookingPermissionNames.RearrangementOptionsRead
+                BookingPermissionNames.RearrangementOptionsRead,
+                AdviserRead,
+                CalendarRead,
+                CoverageRead
             ],
             ["Manager"] =
             [
                 OrganisationAssignmentPermissions.Read,
+                DashboardRead,
+                BookingPermissionNames.AdminRead,
                 BookingPermissionNames.ApprovalsRead,
                 BookingPermissionNames.ApprovalsReview,
                 BookingPermissionNames.CancelDirect,
-                BookingPermissionNames.RearrangeDirect
-            ],
-            ["Operations"] =
-            [
-                OrganisationAssignmentPermissions.Read,
-                OrganisationAssignmentPermissions.Create,
-                OrganisationAssignmentPermissions.Update,
-                OrganisationAssignmentPermissions.Disable,
-                OrganisationAssignmentPermissions.Delete,
-                BookingPermissionNames.ApprovalsRead,
-                BookingPermissionNames.ApprovalsReview,
-                BookingPermissionNames.ApprovalRequestsCreate,
-                BookingPermissionNames.ApprovalRequestsReadOwn,
-                BookingPermissionNames.CancelAsLeadTech,
-                BookingPermissionNames.CancelDirect,
-                BookingPermissionNames.RearrangeAsLeadTech,
                 BookingPermissionNames.RearrangeDirect,
-                BookingPermissionNames.RearrangementOptionsRead,
-                BookingPermissionNames.AdminRead
+                AdviserRead,
+                CalendarRead,
+                CoverageRead,
+                ReportingRead
             ],
-            ["Admin"] =
-            [
-                OrganisationAssignmentPermissions.Read,
-                OrganisationAssignmentPermissions.Create,
-                OrganisationAssignmentPermissions.Update,
-                OrganisationAssignmentPermissions.Disable,
-                OrganisationAssignmentPermissions.Delete,
-                BookingPermissionNames.ApprovalsRead,
-                BookingPermissionNames.ApprovalsReview,
-                BookingPermissionNames.ApprovalRequestsCreate,
-                BookingPermissionNames.ApprovalRequestsReadOwn,
-                BookingPermissionNames.CancelAsLeadTech,
-                BookingPermissionNames.CancelDirect,
-                BookingPermissionNames.RearrangeAsLeadTech,
-                BookingPermissionNames.RearrangeDirect,
-                BookingPermissionNames.RearrangementOptionsRead,
-                BookingPermissionNames.AdminRead
-            ]
+            ["Operations"] = operationsPermissions,
+            ["Admin"] = adminPermissions
         };
 
         var permissionNames = permissionsByRole.Values
@@ -187,4 +239,31 @@ public sealed class IdentityDbInitializer : IHostedService
 
     private static string ToDisplayName(string permission) =>
         permission.Replace(".", " ", StringComparison.Ordinal);
+
+    private const string DashboardRead = "Dashboard.Read";
+    private const string RbacRead = "Rbac.Read";
+    private const string RbacManage = "Rbac.Manage";
+    private const string OrganisationAssignmentsManage = "OrganisationAssignments.Manage";
+    private const string AdviserRead = "Advisers.Read";
+    private const string AdviserManage = "Advisers.Manage";
+    private const string AdviserSpecialismsManage = "Advisers.Specialisms.Manage";
+    private const string CalendarRead = "Calendar.Read";
+    private const string CalendarManage = "Calendar.Manage";
+    private const string CalendarSlotsOverride = "Calendar.Slots.Override";
+    private const string CoverageRead = "Coverage.Read";
+    private const string CoverageManage = "Coverage.Manage";
+    private const string NotificationsRead = "Notifications.Read";
+    private const string NotificationsTemplatesRead = "Notifications.Templates.Read";
+    private const string NotificationsTemplatesManage = "Notifications.Templates.Manage";
+    private const string NotificationsSettingsRead = "Notifications.Settings.Read";
+    private const string NotificationsSettingsManage = "Notifications.Settings.Manage";
+    private const string ReportingRead = "Reporting.Read";
+    private const string AuditRead = "Audit.Read";
+    private const string SystemRead = "System.Read";
+    private const string SystemManage = "System.Manage";
+    private const string SystemHealthRead = "System.Health.Read";
+    private const string SystemAuditRead = "System.Audit.Read";
+    private const string SystemDiagnosticsRead = "System.Diagnostics.Read";
+    private const string UsersRead = "Users.Read";
+    private const string PartnersRead = "Partners.Read";
 }
