@@ -51,19 +51,6 @@ static void ConfigureAppConfiguration(IConfigurationBuilder cfg)
         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
         .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
         .AddEnvironmentVariables();
-
-    AddFlattenedValuesSection(cfg);
-}
-
-static void AddFlattenedValuesSection(IConfigurationBuilder cfg)
-{
-    var built = cfg.Build();
-    var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-    foreach (var child in built.GetSection("Values").GetChildren())
-        values[child.Key] = child.Value;
-
-    if (values.Count > 0)
-        cfg.AddInMemoryCollection(values);
 }
 
 static void AddSharedErrorHandling(

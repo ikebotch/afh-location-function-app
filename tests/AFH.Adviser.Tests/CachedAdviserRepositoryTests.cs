@@ -3,6 +3,8 @@ using AFH.Adviser.Infrastructure.Persistence.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using AFH.Adviser.Application.Abstractions.Repositories;
+using AFH.Location.Infrastructure.Persistence.PolicyStore;
+using Microsoft.EntityFrameworkCore;
 using Entities = AFH.Adviser.Domain.Entities;
 
 namespace AFH.Adviser.Tests;
@@ -12,7 +14,9 @@ public class CachedAdviserRepositoryTests
     [Fact]
     public async Task GetAllAsync_UsesCacheBeforeLiveSource()
     {
-        var cache = new InMemoryAdviserReferenceCacheRepository();
+        var options = CreateDbOptions();
+        await using var db = CreateDb(options);
+        var cache = new SqlAdviserReferenceCacheRepository(db);
         await cache.UpsertAsync([
             new Entities.Adviser
             {
@@ -28,7 +32,7 @@ public class CachedAdviserRepositoryTests
         var sut = new CachedAdviserRepository(
             cache,
             source,
-            CreateRefreshCoordinator(cache, source),
+            CreateRefreshCoordinator(options, source),
             NullLogger<CachedAdviserRepository>.Instance);
 
         var advisers = await sut.GetAllAsync(null, CancellationToken.None);
@@ -41,7 +45,9 @@ public class CachedAdviserRepositoryTests
     [Fact]
     public async Task GetAllAsync_CoalescesConcurrentFullCacheMisses()
     {
-        var cache = new InMemoryAdviserReferenceCacheRepository();
+        var options = CreateDbOptions();
+        await using var db = CreateDb(options);
+        var cache = new SqlAdviserReferenceCacheRepository(db);
         var source = new BlockingAdviserSourceRepository([
             new Entities.Adviser
             {
@@ -55,7 +61,7 @@ public class CachedAdviserRepositoryTests
         var sut = new CachedAdviserRepository(
             cache,
             source,
-            CreateRefreshCoordinator(cache, source),
+            CreateRefreshCoordinator(options, source),
             NullLogger<CachedAdviserRepository>.Instance);
 
         var firstTask = sut.GetAllAsync(null, CancellationToken.None);
@@ -81,16 +87,27 @@ public class CachedAdviserRepositoryTests
     }
 
     private static AdviserSourceRefreshCoordinator CreateRefreshCoordinator(
-        IAdviserReferenceCacheRepository cache,
+        DbContextOptions<LocationPolicyDbContext> options,
         IAdviserSourceRepository source)
     {
         var services = new ServiceCollection();
-        services.AddScoped<IAdviserReferenceCacheRepository>(_ => cache);
+        services.AddScoped(_ => new LocationPolicyDbContext(options));
+        services.AddScoped<IAdviserReferenceCacheRepository, SqlAdviserReferenceCacheRepository>();
         services.AddScoped<IAdviserSourceRepository>(_ => source);
 
         var provider = services.BuildServiceProvider();
         return new AdviserSourceRefreshCoordinator(provider.GetRequiredService<IServiceScopeFactory>());
     }
+
+    private static DbContextOptions<LocationPolicyDbContext> CreateDbOptions()
+    {
+        return new DbContextOptionsBuilder<LocationPolicyDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+    }
+
+    private static LocationPolicyDbContext CreateDb(DbContextOptions<LocationPolicyDbContext> options)
+        => new(options);
 
     private sealed class StubAdviserSourceRepository : IAdviserSourceRepository
     {

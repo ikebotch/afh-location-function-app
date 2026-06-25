@@ -19,12 +19,23 @@ public class InternalApiAuthMiddlewareTests
     [InlineData("RouteTimeV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("SyncAdviserCacheV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("TravelCoverageV1", EndpointAccessPolicy.InternalOnly)]
+    [InlineData("AdviserAvailabilityRulesActiveV1", EndpointAccessPolicy.InternalOnly)]
     [InlineData("OrganisationAssignmentsListV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("AdviserOrganisationAssignmentsResolveV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsCreateV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsUpdateV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsDisableV1", EndpointAccessPolicy.UserAuthenticated)]
     [InlineData("OrganisationAssignmentsDeleteV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserProfilesListV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserProfilesGetV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserProfilesCreateV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserProfilesUpdateV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserProfilesDisableV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserProfilesDeleteV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserSpecialismsListV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserSpecialismsCreateV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserSpecialismsUpdateV1", EndpointAccessPolicy.UserAuthenticated)]
+    [InlineData("AdviserSpecialismsDeleteV1", EndpointAccessPolicy.UserAuthenticated)]
     public void EndpointAccessPolicies_ClassifiesFunctions(string functionName, EndpointAccessPolicy expected)
     {
         Assert.Equal(expected, EndpointAccessPolicies.GetPolicy(functionName));

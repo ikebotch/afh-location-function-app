@@ -16,6 +16,7 @@ public static class EndpointAccessPolicies
             ["TravelCoverageV1"] = EndpointAccessPolicy.InternalOnly,
             ["SyncAdviserCacheV1"] = EndpointAccessPolicy.InternalOnly,
             ["AdviserCoverageV1"] = EndpointAccessPolicy.InternalOnly,
+            ["AdviserAvailabilityRulesActiveV1"] = EndpointAccessPolicy.InternalOnly,
             ["Identity_CurrentUserContextV1"] = EndpointAccessPolicy.InternalOnly,
             ["Identity_ListUserProfilesV1"] = EndpointAccessPolicy.InternalOnly,
             ["Identity_GetUserProfileV1"] = EndpointAccessPolicy.InternalOnly,
@@ -42,7 +43,17 @@ public static class EndpointAccessPolicies
             ["OrganisationAssignmentsCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["OrganisationAssignmentsDisableV1"] = EndpointAccessPolicy.UserAuthenticated,
-            ["OrganisationAssignmentsDeleteV1"] = EndpointAccessPolicy.UserAuthenticated
+            ["OrganisationAssignmentsDeleteV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserProfilesListV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserProfilesGetV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserProfilesCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserProfilesUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserProfilesDisableV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserProfilesDeleteV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserSpecialismsListV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserSpecialismsCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserSpecialismsUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserSpecialismsDeleteV1"] = EndpointAccessPolicy.UserAuthenticated
         };
 
     internal static IReadOnlyCollection<string> KnownHttpFunctions => Policies.Keys.ToArray();

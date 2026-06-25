@@ -1,6 +1,5 @@
 using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
-using AFH.Location.Infrastructure.Caching;
 using AFH.Location.Infrastructure.Persistence.PolicyStore;
 using AFH.Location.Infrastructure.Persistence.Repositories;
 using Microsoft.Extensions.Configuration;
@@ -16,8 +15,8 @@ internal static class PolicyStoreModuleServiceCollectionExtensions
         services.AddScoped<IGeoCache, SqlGeoCache>();
         services.AddHostedService<LocationPolicyDbInitializer>();
 
-        services.AddSingleton<IRouteMatrixPolicyProvider, InMemoryRouteMatrixPolicyProvider>();
-        services.AddSingleton<IGeoCachePolicyProvider, InMemoryGeoCachePolicyProvider>();
+        services.AddScoped<IRouteMatrixPolicyProvider, SqlRouteMatrixPolicyProvider>();
+        services.AddScoped<IGeoCachePolicyProvider, SqlGeoCachePolicyProvider>();
 
         return services;
     }

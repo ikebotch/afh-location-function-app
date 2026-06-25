@@ -35,6 +35,7 @@ public sealed class LocationPolicyDbInitializer : IHostedService
         var db = scope.ServiceProvider.GetRequiredService<LocationPolicyDbContext>();
 
         await db.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsurePolicySettingsTableAsync(db, cancellationToken);
         await SeedIfEmptyAsync(db, cancellationToken);
     }
 
@@ -128,10 +129,78 @@ public sealed class LocationPolicyDbInitializer : IHostedService
             }
         }
 
+        await SeedPolicySettingAsync(
+            db,
+            "RouteMatrix.MaxOriginsPerCall",
+            _configuration.GetValue<int?>("LocationSearch:RouteMatrix:MaxOriginsPerCall")?.ToString() ?? "50",
+            ct);
+        await SeedPolicySettingAsync(
+            db,
+            "RouteMatrix.MaxDestinationsPerCall",
+            _configuration.GetValue<int?>("LocationSearch:RouteMatrix:MaxDestinationsPerCall")?.ToString() ?? "50",
+            ct);
+        await SeedPolicySettingAsync(
+            db,
+            "RouteMatrix.SuccessConfidence",
+            _configuration.GetValue<string>("LocationSearch:RouteMatrix:SuccessConfidence") ?? "High",
+            ct);
+        await SeedPolicySettingAsync(
+            db,
+            "RouteMatrix.FailureConfidence",
+            _configuration.GetValue<string>("LocationSearch:RouteMatrix:FailureConfidence") ?? "Low",
+            ct);
+        await SeedPolicySettingAsync(
+            db,
+            "GeoCache.SuccessTtlMinutes",
+            _configuration.GetValue<int?>("LocationSearch:GeoCache:SuccessTtlMinutes")?.ToString() ?? (7 * 24 * 60).ToString(),
+            ct);
+        await SeedPolicySettingAsync(
+            db,
+            "GeoCache.FailureTtlMinutes",
+            _configuration.GetValue<int?>("LocationSearch:GeoCache:FailureTtlMinutes")?.ToString() ?? "30",
+            ct);
+
         if (db.ChangeTracker.HasChanges())
         {
             await db.SaveChangesAsync(ct);
             _logger.LogInformation("Location policy store created/seeded successfully.");
         }
+    }
+
+    private static async Task EnsurePolicySettingsTableAsync(LocationPolicyDbContext db, CancellationToken ct)
+    {
+        if (!string.Equals(db.Database.ProviderName, "Microsoft.EntityFrameworkCore.SqlServer", StringComparison.Ordinal))
+            return;
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            IF OBJECT_ID(N'[LocationPolicySettings]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [LocationPolicySettings] (
+                    [Key] nvarchar(128) NOT NULL,
+                    [Value] nvarchar(512) NOT NULL,
+                    [UpdatedUtc] datetime2 NOT NULL,
+                    CONSTRAINT [PK_LocationPolicySettings] PRIMARY KEY ([Key])
+                );
+            END
+            """,
+            ct);
+    }
+
+    private static async Task SeedPolicySettingAsync(
+        LocationPolicyDbContext db,
+        string key,
+        string value,
+        CancellationToken ct)
+    {
+        if (await db.PolicySettings.AnyAsync(x => x.Key == key, ct))
+            return;
+
+        db.PolicySettings.Add(new LocationPolicySettingEntity
+        {
+            Key = key,
+            Value = value,
+            UpdatedUtc = DateTime.UtcNow
+        });
     }
 }

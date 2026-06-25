@@ -22,6 +22,7 @@ public sealed class LocationPolicyDbContext : DbContext
     public DbSet<AdviserReferenceCacheEntity> AdviserReferenceCache => Set<AdviserReferenceCacheEntity>();
     public DbSet<GeoCacheEntryEntity> GeoCacheEntries => Set<GeoCacheEntryEntity>();
     public DbSet<RouteCacheEntryEntity> RouteCacheEntries => Set<RouteCacheEntryEntity>();
+    public DbSet<LocationPolicySettingEntity> PolicySettings => Set<LocationPolicySettingEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -128,5 +129,13 @@ public sealed class LocationPolicyDbContext : DbContext
             entity.HasIndex(x => x.ExpiresUtc);
         });
 
+        modelBuilder.Entity<LocationPolicySettingEntity>(entity =>
+        {
+            entity.ToTable("LocationPolicySettings");
+            entity.HasKey(x => x.Key);
+            entity.Property(x => x.Key).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Value).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.UpdatedUtc).IsRequired();
+        });
     }
 }

@@ -66,6 +66,31 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
     public Task<bool> HasDataAsync(CancellationToken ct)
         => _db.AdviserReferenceCache.AnyAsync(ct);
 
+    public async Task<bool> SetActiveAsync(string adviserId, bool isActive, CancellationToken ct)
+    {
+        var normalizedId = adviserId.Trim();
+        var row = await _db.AdviserReferenceCache.SingleOrDefaultAsync(x => x.AdviserId == normalizedId, ct);
+        if (row is null)
+            return false;
+
+        row.IsActive = isActive;
+        row.LastSyncedUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<bool> DeleteAsync(string adviserId, CancellationToken ct)
+    {
+        var normalizedId = adviserId.Trim();
+        var row = await _db.AdviserReferenceCache.SingleOrDefaultAsync(x => x.AdviserId == normalizedId, ct);
+        if (row is null)
+            return false;
+
+        _db.AdviserReferenceCache.Remove(row);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
     private static Entities.Adviser Map(AdviserReferenceCacheEntity entity)
     {
         return new Entities.Adviser

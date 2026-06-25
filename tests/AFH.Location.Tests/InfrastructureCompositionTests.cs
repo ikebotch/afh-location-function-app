@@ -117,9 +117,7 @@ public sealed class InfrastructureCompositionTests
                 "Server=(localdb)\\mssqllocaldb;Database=AFHLocationCompositionTests;Trusted_Connection=True;TrustServerCertificate=True";
         }
 
-        return new ConfigurationBuilder()
-            .AddInMemoryCollection(values)
-            .Build();
+        return TestConfiguration.Create(values);
     }
 
     private sealed class FakeHostEnvironment : IHostEnvironment

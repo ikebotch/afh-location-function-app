@@ -22,6 +22,142 @@ namespace AFH.Adviser.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Availability.Entities.AdviserCapacityLimitRuleEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdviserId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DailyLimit")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaxActiveBookings")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MonthlyLimit")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RuleSetId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("WeeklyLimit")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RuleSetId", "AdviserId", "IsActive");
+
+                    b.ToTable("AdviserCapacityLimitRules", (string)null);
+                });
+
+            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Availability.Entities.AdviserWorkingPatternRuleEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdviserId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("End")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RuleSetId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Start")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RuleSetId", "AdviserId", "IsActive");
+
+                    b.ToTable("AdviserWorkingPatternRules", (string)null);
+                });
+
+            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Availability.Entities.AvailabilityRuleSetEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CapacityWindowDays")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DefaultWorkingDayEnd")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("DefaultWorkingDayStart")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MinimumAppointmentMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ProjectContext")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectContext", "IsActive", "UpdatedUtc");
+
+                    b.ToTable("AdviserAvailabilityRuleSets", (string)null);
+                });
+
             modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments.Entities.OrganisationAssignmentEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -97,6 +233,83 @@ namespace AFH.Adviser.Infrastructure.Migrations
                     b.HasIndex("Context", "AssignmentType", "IsEnabled", "Priority");
 
                     b.ToTable("OrganisationAssignments", (string)null);
+                });
+
+            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Skills.Entities.AdviserSkillCatalogEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Certification")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(800)
+                        .HasColumnType("nvarchar(800)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("LicenseRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<int?>("RenewalMonths")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive", "Category");
+
+                    b.ToTable("AdviserSkillCatalog", (string)null);
+                });
+
+            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Availability.Entities.AdviserCapacityLimitRuleEntity", b =>
+                {
+                    b.HasOne("AFH.Adviser.Infrastructure.Persistence.Availability.Entities.AvailabilityRuleSetEntity", "RuleSet")
+                        .WithMany("CapacityLimits")
+                        .HasForeignKey("RuleSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RuleSet");
+                });
+
+            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Availability.Entities.AdviserWorkingPatternRuleEntity", b =>
+                {
+                    b.HasOne("AFH.Adviser.Infrastructure.Persistence.Availability.Entities.AvailabilityRuleSetEntity", "RuleSet")
+                        .WithMany("WorkingPatterns")
+                        .HasForeignKey("RuleSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RuleSet");
+                });
+
+            modelBuilder.Entity("AFH.Adviser.Infrastructure.Persistence.Availability.Entities.AvailabilityRuleSetEntity", b =>
+                {
+                    b.Navigation("CapacityLimits");
+
+                    b.Navigation("WorkingPatterns");
                 });
 #pragma warning restore 612, 618
         }

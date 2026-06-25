@@ -21,13 +21,11 @@ public sealed class ConfigurationValidationTests
     [Fact]
     public void ResolveLocationPolicyDbConnectionString_PrefersConnectionStringsThenLegacyFallback()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:LocationPolicyDb"] = "Server=cs;",
-                ["LocationSearch:PolicyStore:ConnectionString"] = "Server=legacy;"
-            })
-            .Build();
+        var configuration = TestConfiguration.Create(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:LocationPolicyDb"] = "Server=cs;",
+            ["LocationSearch:PolicyStore:ConnectionString"] = "Server=legacy;"
+        });
 
         var connectionString = typeof(AFH.Location.Infrastructure.Composition.DependencyInjection)
             .GetMethod("ResolveLocationPolicyDbConnectionString", BindingFlags.Static | BindingFlags.NonPublic)?

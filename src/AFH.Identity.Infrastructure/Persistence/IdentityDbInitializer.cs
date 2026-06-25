@@ -47,7 +47,13 @@ public sealed class IdentityDbInitializer : IHostedService
         var fullControlCentrePermissions = new[]
         {
             DashboardRead,
-            AdviserRead,
+            AdviserAdminPermissions.Read,
+            AdviserAdminPermissions.Create,
+            AdviserAdminPermissions.Update,
+            AdviserAdminPermissions.Disable,
+            AdviserAdminPermissions.Delete,
+            AdviserAdminPermissions.SkillsRead,
+            AdviserAdminPermissions.SkillsManage,
             AdviserManage,
             AdviserSpecialismsManage,
             CalendarRead,
@@ -141,7 +147,8 @@ public sealed class IdentityDbInitializer : IHostedService
                 BookingPermissionNames.CancelAsLeadTech,
                 BookingPermissionNames.RearrangeAsLeadTech,
                 BookingPermissionNames.RearrangementOptionsRead,
-                AdviserRead,
+                AdviserAdminPermissions.Read,
+                AdviserAdminPermissions.SkillsRead,
                 CalendarRead,
                 CoverageRead
             ],
@@ -154,7 +161,8 @@ public sealed class IdentityDbInitializer : IHostedService
                 BookingPermissionNames.ApprovalsReview,
                 BookingPermissionNames.CancelDirect,
                 BookingPermissionNames.RearrangeDirect,
-                AdviserRead,
+                AdviserAdminPermissions.Read,
+                AdviserAdminPermissions.SkillsRead,
                 CalendarRead,
                 CoverageRead,
                 ReportingRead
@@ -244,7 +252,6 @@ public sealed class IdentityDbInitializer : IHostedService
     private const string RbacRead = "Rbac.Read";
     private const string RbacManage = "Rbac.Manage";
     private const string OrganisationAssignmentsManage = "OrganisationAssignments.Manage";
-    private const string AdviserRead = "Advisers.Read";
     private const string AdviserManage = "Advisers.Manage";
     private const string AdviserSpecialismsManage = "Advisers.Specialisms.Manage";
     private const string CalendarRead = "Calendar.Read";

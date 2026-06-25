@@ -1,12 +1,19 @@
+using AFH.Adviser.Application.Abstractions.Availability;
 using AFH.Adviser.Application.Abstractions.Repositories;
 using AFH.Adviser.Application.Abstractions.Clients;
 using AFH.Adviser.Application.Abstractions.Feed;
 using AFH.Adviser.Application.Abstractions.OrganisationAssignments;
+using AFH.Adviser.Application.Abstractions.Profiles;
+using AFH.Adviser.Application.Abstractions.Skills;
+using AFH.Adviser.Application.Services.Availability;
 using AFH.Adviser.Application.Services.OrganisationAssignments;
+using AFH.Adviser.Application.Services.Profiles;
 using AFH.Adviser.Infrastructure.External.Calendar;
 using AFH.Adviser.Infrastructure.Options;
+using AFH.Adviser.Infrastructure.Persistence.Availability;
 using AFH.Adviser.Infrastructure.Persistence.OrganisationAssignments;
 using AFH.Adviser.Infrastructure.Persistence.Repositories;
+using AFH.Adviser.Infrastructure.Persistence.Skills;
 using AFH.Common.SharePointUtils.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -47,6 +54,8 @@ public static class AdviserInfrastructureDependencyInjection
 
         services.AddDbContext<AdviserDirectoryDbContext>(options => options.UseSqlServer(adviserDirectoryConnectionString));
         services.AddScoped<IOrganisationAssignmentDirectory, SqlOrganisationAssignmentDirectory>();
+        services.AddScoped<IAdviserAvailabilityRulesRepository, SqlAdviserAvailabilityRulesRepository>();
+        services.AddScoped<IAdviserAvailabilityRulesService, AdviserAvailabilityRulesService>();
         services.AddHostedService<AdviserDirectoryDbInitializer>();
 
         services.AddScoped<ICalendarServiceClient, CalendarServiceClient>();
@@ -69,6 +78,8 @@ public static class AdviserInfrastructureDependencyInjection
         services.AddScoped<AFH.Adviser.Application.Abstractions.Sync.IAdviserCacheSyncService, AFH.Adviser.Application.Services.Sync.AdviserCacheSyncService>();
         services.AddScoped<IAdviserRepository, CachedAdviserRepository>();
         services.AddScoped<IEffectiveCoveragePolicyResolver, SqlEffectiveCoveragePolicyResolver>();
+        services.AddScoped<IAdviserProfileAdminService, AdviserProfileAdminService>();
+        services.AddScoped<IAdviserSkillAdminService, SqlAdviserSkillAdminService>();
         services.AddScoped<AFH.Adviser.Application.Abstractions.Skills.IAdviserSkillCatalogService, AFH.Adviser.Application.Services.Skills.AdviserSkillCatalogService>();
         services.AddScoped<AFH.Adviser.Application.Abstractions.Feed.IAdviserFeedService, AFH.Adviser.Application.Services.Feed.AdviserFeedService>();
         services.AddScoped<IOrganisationAssignmentAdminService, OrganisationAssignmentAdminService>();

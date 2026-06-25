@@ -147,15 +147,6 @@
 //            new SqlEffectiveCoveragePolicyResolver(db));
 //    }
 
-//    private static LocationPolicyDbContext CreateDbContext()
-//    {
-//        var options = new DbContextOptionsBuilder<LocationPolicyDbContext>()
-//            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-//            .Options;
-
-//        return new LocationPolicyDbContext(options);
-//    }
-
 //    private sealed class StubAdviserRepository : IAdviserRepository
 //    {
 //        private readonly IReadOnlyList<Entities.Adviser> _advisers;

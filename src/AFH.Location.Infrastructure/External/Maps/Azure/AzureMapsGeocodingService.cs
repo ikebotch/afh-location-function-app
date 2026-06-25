@@ -38,7 +38,7 @@ public sealed class AzureMapsGeocodingService : IGeocodingService
         var url =
             $"https://atlas.microsoft.com/search/address/json" +
             $"?api-version=1.0" +
-            $"&query={address.ToLower()}" +
+            $"&query={encoded}" +
             $"&limit=1" +
             $"&countrySet=GB" +
             $"&typeahead=false" +
