@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<IdentityDbContext>(options => options.UseSqlServer(identityConnectionString));
         services.Configure<IdentityRbacOptions>(configuration.GetSection("IdentityRbac"));
         services.AddHostedService<IdentityDbInitializer>();
+        services.AddScoped<IDomainUserTokenValidator, EntraDomainUserTokenValidator>();
         services.AddScoped<IDomainUserPermissionStore, SqlDomainUserPermissionStore>();
         services.AddScoped<IDomainUserContextStore, SqlDomainUserContextStore>();
         services.AddScoped<IIdentityCurrentUserService, LocationIdentityCurrentUserService>();

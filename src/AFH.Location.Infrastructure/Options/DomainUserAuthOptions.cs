@@ -8,6 +8,7 @@ public sealed class DomainUserAuthOptions
     public string? TenantId { get; set; }
     public string? Authority { get; set; }
     public string? Audience { get; set; }
+    public bool RequireHttpsMetadata { get; set; } = true;
     public string[] AllowedTenantIds { get; set; } = [];
     public string[] AllowedEmailDomains { get; set; } = [];
 }
