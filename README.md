@@ -3,11 +3,18 @@
 ## Service Ownership Split
 
 ### Location Service (this repo)
-- Owns adviser discovery and search inputs.
-- Uses SQL-cached adviser reference data on the hot path and keeps live adviser-source reads behind a sync path.
+- Owns location/geography data and location-owned reference data.
 - Owns geocode and route caching for adviser search and ranking.
-- Reads adviser availability from Calendar Service batch schedule endpoints using `PreferCached` freshness on search paths.
-- Returns ranked advisers with coverage and travel outputs.
+- Remains the source for location boundaries, office/branch metadata, and map/routing provider integration.
+
+### Adviser Service (separate repo)
+- Owns adviser profile, skill/license, availability-rule, coverage-region, and adviser-region assignment APIs.
+- Uses the Location Service for geography/routing concepts when needed.
+- The standalone service folder is `../afh-adviser-function-app`.
+
+### Identity Service (separate repo)
+- Owns Entra token validation, current-user resolution, roles, permissions, and RBAC assignment APIs.
+- The standalone service folder is `../afh-identity-function-app`.
 
 ### Booking Service (separate repo)
 - Owns booking lifecycle: create/confirm/cancel.
@@ -31,6 +38,7 @@
 - `RouteCacheEntries` stores travel-time and distance results for repeated routing evaluations.
 - `POST /api/v1/admin/advisers/cache/sync` refreshes the adviser reference cache from the configured live adviser source.
 - Search reads `IAdviserRepository`, which now resolves from cache first and only falls back to the live source when the cache is empty.
+- During migration these adviser-oriented read models can remain in Location for compatibility, but new gateway wiring should route admin adviser operations to the standalone Adviser service.
 
 ## Organisation Assignment Resolution
 - `GET /api/v1/admin/organisation-assignments` remains the admin/config list endpoint. When no adviser, organisation, or region scope is supplied it can return all matching assignment rows for the requested context and assignment types.
