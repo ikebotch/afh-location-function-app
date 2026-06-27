@@ -53,7 +53,7 @@ public sealed class EntraDomainUserTokenValidator : IDomainUserTokenValidator
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 ValidAudiences = [_options.Audience],
-                ValidIssuers = configuration.Issuer is null ? null : [configuration.Issuer],
+                ValidIssuers = GetValidIssuers(configuration.Issuer, _options),
                 IssuerSigningKeys = configuration.SigningKeys,
                 NameClaimType = "name",
                 RoleClaimType = "roles",
@@ -149,6 +149,32 @@ public sealed class EntraDomainUserTokenValidator : IDomainUserTokenValidator
             metadataAddress,
             new OpenIdConnectConfigurationRetriever(),
             new HttpDocumentRetriever { RequireHttps = options.RequireHttpsMetadata });
+    }
+
+    private static IReadOnlyList<string>? GetValidIssuers(
+        string? configurationIssuer,
+        DomainUserAuthOptions options)
+    {
+        var tenantIds = options.AllowedTenantIds
+            .Append(options.TenantId)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim().Trim('/'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var issuers = new List<string>();
+        if (!string.IsNullOrWhiteSpace(configurationIssuer))
+            issuers.Add(configurationIssuer.TrimEnd('/'));
+
+        foreach (var tenantId in tenantIds)
+        {
+            issuers.Add($"https://login.microsoftonline.com/{tenantId}/v2.0");
+            issuers.Add($"https://sts.windows.net/{tenantId}/");
+        }
+
+        return issuers.Count == 0
+            ? null
+            : issuers.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
     private static string? GetClaimValue(ClaimsPrincipal principal, params string[] claimTypes)
