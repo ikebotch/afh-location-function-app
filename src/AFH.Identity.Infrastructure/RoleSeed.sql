@@ -87,6 +87,37 @@ BEGIN
     );
 END
 
+IF OBJECT_ID(N'[dbo].[DomainAccessScopes]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DomainAccessScopes] (
+        [Id] uniqueidentifier NOT NULL,
+        [Area] nvarchar(80) NOT NULL,
+        [ScopeType] nvarchar(80) NOT NULL,
+        [ScopeValue] nvarchar(200) NULL,
+        [DisplayName] nvarchar(200) NOT NULL,
+        [Description] nvarchar(500) NULL,
+        [IsEnabled] bit NOT NULL,
+        [CreatedUtc] datetime2 NOT NULL,
+        [UpdatedUtc] datetime2 NULL,
+        CONSTRAINT [PK_DomainAccessScopes] PRIMARY KEY ([Id])
+    );
+END
+
+IF OBJECT_ID(N'[dbo].[DomainUserAccessScopeMappings]', N'U') IS NULL
+BEGIN
+    CREATE TABLE [dbo].[DomainUserAccessScopeMappings] (
+        [Id] uniqueidentifier NOT NULL,
+        [UserProfileId] uniqueidentifier NULL,
+        [AccessScopeId] uniqueidentifier NOT NULL,
+        [ExternalSubject] nvarchar(160) NULL,
+        [Email] nvarchar(320) NULL,
+        [IsEnabled] bit NOT NULL,
+        [CreatedUtc] datetime2 NOT NULL,
+        [UpdatedUtc] datetime2 NULL,
+        CONSTRAINT [PK_DomainUserAccessScopeMappings] PRIMARY KEY ([Id])
+    );
+END
+
 IF COL_LENGTH(N'[dbo].[DomainUserRoleMappings]', N'UserProfileId') IS NULL
     ALTER TABLE [dbo].[DomainUserRoleMappings] ADD [UserProfileId] uniqueidentifier NULL;
 
@@ -148,6 +179,74 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserPermissio
     CREATE UNIQUE INDEX [IX_DomainUserPermissionMappings_UserProfileId_PermissionId_ExternalSubject_Email]
     ON [dbo].[DomainUserPermissionMappings] ([UserProfileId], [PermissionId], [ExternalSubject], [Email])
     WHERE [UserProfileId] IS NOT NULL AND [ExternalSubject] IS NOT NULL AND [Email] IS NOT NULL;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainAccessScopes_Area_ScopeType_ScopeValue' AND [object_id] = OBJECT_ID(N'[dbo].[DomainAccessScopes]'))
+    CREATE UNIQUE INDEX [IX_DomainAccessScopes_Area_ScopeType_ScopeValue]
+    ON [dbo].[DomainAccessScopes] ([Area], [ScopeType], [ScopeValue]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainAccessScopes_Area_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainAccessScopes]'))
+    CREATE INDEX [IX_DomainAccessScopes_Area_IsEnabled] ON [dbo].[DomainAccessScopes] ([Area], [IsEnabled]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserAccessScopeMappings_UserProfileId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserAccessScopeMappings]'))
+    CREATE INDEX [IX_DomainUserAccessScopeMappings_UserProfileId] ON [dbo].[DomainUserAccessScopeMappings] ([UserProfileId]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserAccessScopeMappings_ExternalSubject' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserAccessScopeMappings]'))
+    CREATE INDEX [IX_DomainUserAccessScopeMappings_ExternalSubject] ON [dbo].[DomainUserAccessScopeMappings] ([ExternalSubject]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserAccessScopeMappings_Email' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserAccessScopeMappings]'))
+    CREATE INDEX [IX_DomainUserAccessScopeMappings_Email] ON [dbo].[DomainUserAccessScopeMappings] ([Email]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserAccessScopeMappings_AccessScopeId_IsEnabled' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserAccessScopeMappings]'))
+    CREATE INDEX [IX_DomainUserAccessScopeMappings_AccessScopeId_IsEnabled]
+    ON [dbo].[DomainUserAccessScopeMappings] ([AccessScopeId], [IsEnabled]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_DomainUserAccessScopeMappings_UserProfileId_ExternalSubject_Email_AccessScopeId' AND [object_id] = OBJECT_ID(N'[dbo].[DomainUserAccessScopeMappings]'))
+    CREATE UNIQUE INDEX [IX_DomainUserAccessScopeMappings_UserProfileId_ExternalSubject_Email_AccessScopeId]
+    ON [dbo].[DomainUserAccessScopeMappings] ([UserProfileId], [ExternalSubject], [Email], [AccessScopeId]);
+
+IF OBJECT_ID(N'[dbo].[DomainUserAccessScopes]', N'U') IS NOT NULL
+BEGIN
+    MERGE [dbo].[DomainAccessScopes] AS target
+    USING (
+        SELECT DISTINCT
+            [Area],
+            [ScopeType],
+            [ScopeValue],
+            COALESCE(NULLIF([DisplayName], N''), COALESCE([ScopeValue], [ScopeType])) AS [DisplayName],
+            CAST(MAX(CAST([IsEnabled] AS int)) AS bit) AS [IsEnabled],
+            MIN([CreatedUtc]) AS [CreatedUtc]
+        FROM [dbo].[DomainUserAccessScopes]
+        GROUP BY [Area], [ScopeType], [ScopeValue], COALESCE(NULLIF([DisplayName], N''), COALESCE([ScopeValue], [ScopeType]))
+    ) AS source
+    ON target.[Area] = source.[Area]
+        AND target.[ScopeType] = source.[ScopeType]
+        AND ISNULL(target.[ScopeValue], N'') = ISNULL(source.[ScopeValue], N'')
+    WHEN NOT MATCHED THEN
+        INSERT ([Id], [Area], [ScopeType], [ScopeValue], [DisplayName], [IsEnabled], [CreatedUtc])
+        VALUES (NEWID(), source.[Area], source.[ScopeType], source.[ScopeValue], source.[DisplayName], source.[IsEnabled], source.[CreatedUtc]);
+
+    INSERT INTO [dbo].[DomainUserAccessScopeMappings]
+        ([Id], [UserProfileId], [AccessScopeId], [ExternalSubject], [Email], [IsEnabled], [CreatedUtc], [UpdatedUtc])
+    SELECT
+        old.[Id],
+        old.[UserProfileId],
+        scope.[Id],
+        old.[ExternalSubject],
+        old.[Email],
+        old.[IsEnabled],
+        old.[CreatedUtc],
+        old.[UpdatedUtc]
+    FROM [dbo].[DomainUserAccessScopes] old
+    INNER JOIN [dbo].[DomainAccessScopes] scope
+        ON scope.[Area] = old.[Area]
+        AND scope.[ScopeType] = old.[ScopeType]
+        AND ISNULL(scope.[ScopeValue], N'') = ISNULL(old.[ScopeValue], N'')
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM [dbo].[DomainUserAccessScopeMappings] existing
+        WHERE existing.[Id] = old.[Id]
+    );
+END
 
 MERGE [dbo].[DomainRoles] AS target
 USING (VALUES

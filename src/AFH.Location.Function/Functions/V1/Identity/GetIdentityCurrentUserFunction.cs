@@ -56,7 +56,16 @@ public sealed class GetIdentityCurrentUserFunction
             JobRole = result.User.JobRole,
             TenantId = result.User.TenantId,
             Roles = result.User.Roles,
-            Permissions = result.User.Permissions
+            Permissions = result.User.Permissions,
+            AccessScopes = result.User.AccessScopes
+                .Select(x => new IdentityAccessScopeResponse
+                {
+                    Area = x.Area,
+                    ScopeType = x.ScopeType,
+                    ScopeValue = x.ScopeValue,
+                    DisplayName = x.DisplayName
+                })
+                .ToArray()
         }, ct);
     }
 
