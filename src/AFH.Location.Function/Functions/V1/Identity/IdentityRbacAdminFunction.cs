@@ -330,6 +330,114 @@ public sealed class IdentityRbacAdminFunction
             : await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "USER_PERMISSION_MAPPING_NOT_FOUND", message = "User permission mapping was not found." }, ct);
     }
 
+    [Function("Identity_ListAccessScopesV1")]
+    [LocationOpenApiOperation("Identity", "List access scope catalogue", ResponseType = typeof(IReadOnlyList<IdentityAccessScopeAdminResponse>))]
+    public async Task<HttpResponseData> ListAccessScopesAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "internal/identity/v1/access-scopes")]
+        HttpRequestData req,
+        CancellationToken ct)
+    {
+        var results = await _admin.ListAccessScopesAsync(ct);
+        return await req.WriteSuccessAsync(results.Select(ToAccessScopeAdminResponse).ToArray(), ct);
+    }
+
+    [Function("Identity_UpsertAccessScopeV1")]
+    [LocationOpenApiOperation("Identity", "Create or update an access scope",
+        RequestBodyType = typeof(IdentityAccessScopeUpsertRequest),
+        ResponseType = typeof(IdentityAccessScopeAdminResponse))]
+    public async Task<HttpResponseData> UpsertAccessScopeAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "internal/identity/v1/access-scopes")]
+        HttpRequestData req,
+        CancellationToken ct)
+    {
+        var body = await req.ReadFromJsonAsync<IdentityAccessScopeUpsertRequest>(ct);
+        if (body is null || string.IsNullOrWhiteSpace(body.Area) || string.IsNullOrWhiteSpace(body.ScopeType))
+            return await BadRequest(req, "INVALID_ACCESS_SCOPE", "area and scopeType are required.", ct);
+
+        var result = await _admin.UpsertAccessScopeAsync(new IdentityAccessScopeUpsert
+        {
+            AccessScopeId = body.AccessScopeId,
+            Area = body.Area!,
+            ScopeType = body.ScopeType!,
+            ScopeValue = body.ScopeValue,
+            DisplayName = body.DisplayName,
+            Description = body.Description,
+            IsEnabled = body.IsEnabled ?? true
+        }, ct);
+
+        return await req.WriteSuccessAsync(ToAccessScopeAdminResponse(result), ct);
+    }
+
+    [Function("Identity_DeleteAccessScopeV1")]
+    [LocationOpenApiOperation("Identity", "Delete an access scope", ResponseType = typeof(object))]
+    public async Task<HttpResponseData> DeleteAccessScopeAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "internal/identity/v1/access-scopes/{accessScopeId:guid}")]
+        HttpRequestData req,
+        Guid accessScopeId,
+        CancellationToken ct)
+    {
+        var deleted = await _admin.DeleteAccessScopeAsync(accessScopeId, ct);
+        return deleted
+            ? await req.WriteSuccessAsync(new { deleted = true }, ct)
+            : await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "ACCESS_SCOPE_NOT_FOUND", message = "Access scope was not found." }, ct);
+    }
+
+    [Function("Identity_ListUserAccessScopeMappingsV1")]
+    [LocationOpenApiOperation("Identity", "List user access scope mappings", ResponseType = typeof(IReadOnlyList<IdentityUserAccessScopeMappingResponse>))]
+    public async Task<HttpResponseData> ListUserAccessScopeMappingsAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "internal/identity/v1/user-access-scopes")]
+        HttpRequestData req,
+        CancellationToken ct)
+    {
+        var results = await _admin.ListUserAccessScopeMappingsAsync(ct);
+        return await req.WriteSuccessAsync(results.Select(ToUserAccessScopeMappingResponse).ToArray(), ct);
+    }
+
+    [Function("Identity_AssignUserAccessScopeV1")]
+    [LocationOpenApiOperation("Identity", "Assign an access scope to a user",
+        RequestBodyType = typeof(IdentityUserAccessScopeMappingRequest),
+        ResponseType = typeof(IdentityUserAccessScopeMappingResponse),
+        SuccessStatusCode = HttpStatusCode.Created)]
+    public async Task<HttpResponseData> AssignUserAccessScopeAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "internal/identity/v1/user-access-scopes")]
+        HttpRequestData req,
+        CancellationToken ct)
+    {
+        var body = await req.ReadFromJsonAsync<IdentityUserAccessScopeMappingRequest>(ct);
+        var validation = Validate(body);
+        if (validation is not null)
+            return await BadRequest(req, "INVALID_USER_ACCESS_SCOPE_MAPPING", validation, ct);
+
+        var result = await _admin.AssignUserAccessScopeAsync(new IdentityUserAccessScopeAssignment
+        {
+            UserProfileId = body!.UserProfileId,
+            AccessScopeId = body.AccessScopeId,
+            ExternalSubject = body.ExternalSubject,
+            Email = body.Email,
+            Area = body.Area ?? string.Empty,
+            ScopeType = body.ScopeType ?? string.Empty,
+            ScopeValue = body.ScopeValue,
+            DisplayName = body.DisplayName,
+            IsEnabled = body.IsEnabled ?? true
+        }, ct);
+
+        return await req.WriteSuccessAsync(ToUserAccessScopeMappingResponse(result), ct, statusCode: HttpStatusCode.Created);
+    }
+
+    [Function("Identity_DeleteUserAccessScopeMappingV1")]
+    [LocationOpenApiOperation("Identity", "Delete a user access scope mapping", ResponseType = typeof(object))]
+    public async Task<HttpResponseData> DeleteUserAccessScopeMappingAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "internal/identity/v1/user-access-scopes/{mappingId:guid}")]
+        HttpRequestData req,
+        Guid mappingId,
+        CancellationToken ct)
+    {
+        var deleted = await _admin.DeleteUserAccessScopeMappingAsync(mappingId, ct);
+        return deleted
+            ? await req.WriteSuccessAsync(new { deleted = true }, ct)
+            : await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "USER_ACCESS_SCOPE_MAPPING_NOT_FOUND", message = "User access scope mapping was not found." }, ct);
+    }
+
     private static string? Validate(IdentityUserRoleMappingRequest? request)
     {
         if (request is null)
@@ -356,6 +464,27 @@ public sealed class IdentityRbacAdminFunction
 
         if (string.IsNullOrWhiteSpace(request.Permission))
             return "permission is required.";
+
+        if (string.IsNullOrWhiteSpace(request.Email)
+            && request.UserProfileId is null
+            && string.IsNullOrWhiteSpace(request.ExternalSubject))
+        {
+            return "At least one of userProfileId, email, or externalSubject is required.";
+        }
+
+        return null;
+    }
+
+    private static string? Validate(IdentityUserAccessScopeMappingRequest? request)
+    {
+        if (request is null)
+            return "Request body is required.";
+
+        if (request.AccessScopeId is null && string.IsNullOrWhiteSpace(request.Area))
+            return "area is required.";
+
+        if (request.AccessScopeId is null && string.IsNullOrWhiteSpace(request.ScopeType))
+            return "scopeType is required.";
 
         if (string.IsNullOrWhiteSpace(request.Email)
             && request.UserProfileId is null
@@ -426,5 +555,32 @@ public sealed class IdentityRbacAdminFunction
             IsGranted = result.IsGranted,
             IsEnabled = result.IsEnabled,
             Reason = result.Reason
+        };
+
+    private static IdentityAccessScopeAdminResponse ToAccessScopeAdminResponse(IdentityAccessScopeAdminResult result) =>
+        new()
+        {
+            AccessScopeId = result.AccessScopeId,
+            Area = result.Area,
+            ScopeType = result.ScopeType,
+            ScopeValue = result.ScopeValue,
+            DisplayName = result.DisplayName,
+            Description = result.Description,
+            IsEnabled = result.IsEnabled
+        };
+
+    private static IdentityUserAccessScopeMappingResponse ToUserAccessScopeMappingResponse(IdentityUserAccessScopeMappingResult result) =>
+        new()
+        {
+            MappingId = result.MappingId,
+            UserProfileId = result.UserProfileId,
+            AccessScopeId = result.AccessScopeId,
+            ExternalSubject = result.ExternalSubject,
+            Email = result.Email,
+            Area = result.Area,
+            ScopeType = result.ScopeType,
+            ScopeValue = result.ScopeValue,
+            DisplayName = result.DisplayName,
+            IsEnabled = result.IsEnabled
         };
 }

@@ -16,6 +16,8 @@ public sealed class IdentityDbContext : DbContext
     public DbSet<DomainRolePermissionEntity> DomainRolePermissions => Set<DomainRolePermissionEntity>();
     public DbSet<DomainUserRoleMappingEntity> DomainUserRoleMappings => Set<DomainUserRoleMappingEntity>();
     public DbSet<DomainUserPermissionMappingEntity> DomainUserPermissionMappings => Set<DomainUserPermissionMappingEntity>();
+    public DbSet<DomainAccessScopeEntity> DomainAccessScopes => Set<DomainAccessScopeEntity>();
+    public DbSet<DomainUserAccessScopeMappingEntity> DomainUserAccessScopeMappings => Set<DomainUserAccessScopeMappingEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +27,8 @@ public sealed class IdentityDbContext : DbContext
         modelBuilder.Entity<DomainRolePermissionEntity>(ConfigureDomainRolePermission);
         modelBuilder.Entity<DomainUserRoleMappingEntity>(ConfigureDomainUserRoleMapping);
         modelBuilder.Entity<DomainUserPermissionMappingEntity>(ConfigureDomainUserPermissionMapping);
+        modelBuilder.Entity<DomainAccessScopeEntity>(ConfigureDomainAccessScope);
+        modelBuilder.Entity<DomainUserAccessScopeMappingEntity>(ConfigureDomainUserAccessScopeMapping);
     }
 
     private static void ConfigureDomainUserProfile(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserProfileEntity> entity)
@@ -99,5 +103,33 @@ public sealed class IdentityDbContext : DbContext
         entity.HasIndex(x => x.Email);
         entity.HasIndex(x => new { x.PermissionId, x.IsEnabled });
         entity.HasIndex(x => new { x.UserProfileId, x.PermissionId, x.ExternalSubject, x.Email }).IsUnique();
+    }
+
+    private static void ConfigureDomainAccessScope(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainAccessScopeEntity> entity)
+    {
+        entity.ToTable("DomainAccessScopes");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.Area).HasMaxLength(80).IsRequired();
+        entity.Property(x => x.ScopeType).HasMaxLength(80).IsRequired();
+        entity.Property(x => x.ScopeValue).HasMaxLength(200);
+        entity.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
+        entity.Property(x => x.Description).HasMaxLength(500);
+        entity.HasIndex(x => new { x.Area, x.ScopeType, x.ScopeValue }).IsUnique();
+        entity.HasIndex(x => new { x.Area, x.IsEnabled });
+    }
+
+    private static void ConfigureDomainUserAccessScopeMapping(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<DomainUserAccessScopeMappingEntity> entity)
+    {
+        entity.ToTable("DomainUserAccessScopeMappings");
+        entity.HasKey(x => x.Id);
+        entity.Property(x => x.UserProfileId);
+        entity.Property(x => x.AccessScopeId).IsRequired();
+        entity.Property(x => x.ExternalSubject).HasMaxLength(160);
+        entity.Property(x => x.Email).HasMaxLength(320);
+        entity.HasIndex(x => x.UserProfileId);
+        entity.HasIndex(x => x.ExternalSubject);
+        entity.HasIndex(x => x.Email);
+        entity.HasIndex(x => new { x.AccessScopeId, x.IsEnabled });
+        entity.HasIndex(x => new { x.UserProfileId, x.ExternalSubject, x.Email, x.AccessScopeId }).IsUnique();
     }
 }

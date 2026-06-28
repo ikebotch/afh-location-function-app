@@ -11,4 +11,5 @@ public sealed class IdentityCurrentUserResponse
     public string? TenantId { get; init; }
     public IReadOnlyList<string> Roles { get; init; } = [];
     public IReadOnlyList<string> Permissions { get; init; } = [];
+    public IReadOnlyList<IdentityAccessScopeResponse> AccessScopes { get; init; } = [];
 }

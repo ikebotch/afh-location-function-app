@@ -39,7 +39,16 @@ public sealed class LocationIdentityCurrentUserService : IIdentityCurrentUserSer
             JobRole = context.JobRole,
             TenantId = identityResult.TenantId,
             Roles = context.Roles,
-            Permissions = context.Permissions
+            Permissions = context.Permissions,
+            AccessScopes = context.AccessScopes
+                .Select(x => new IdentityAccessScope
+                {
+                    Area = x.Area,
+                    ScopeType = x.ScopeType,
+                    ScopeValue = x.ScopeValue,
+                    DisplayName = x.DisplayName
+                })
+                .ToArray()
         });
     }
 }

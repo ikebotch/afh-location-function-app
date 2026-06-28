@@ -50,6 +50,7 @@ public sealed class SqlDomainUserContextStore : IDomainUserContextStore
             .ToArrayAsync(ct);
 
         var permissions = await ResolvePermissionsAsync(profile.Id, profile.ExternalSubject, email, matchedRoleIds, ct);
+        var accessScopes = await ResolveAccessScopesAsync(profile, email, roles, permissions, ct);
 
         return new DomainUserContext(
             profile.Id.ToString("D"),
@@ -59,7 +60,8 @@ public sealed class SqlDomainUserContextStore : IDomainUserContextStore
             profile.AdviserId,
             profile.JobRole,
             roles,
-            permissions);
+            permissions,
+            accessScopes);
     }
 
     private async Task<IReadOnlyList<string>> ResolvePermissionsAsync(
@@ -114,6 +116,60 @@ public sealed class SqlDomainUserContextStore : IDomainUserContextStore
             .Where(x => !denied.Contains(x))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x)
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<DomainAccessScope>> ResolveAccessScopesAsync(
+        DomainUserProfileEntity profile,
+        string email,
+        IReadOnlyList<string> roles,
+        IReadOnlyList<string> permissions,
+        CancellationToken ct)
+    {
+        var scopes = new List<DomainAccessScope>();
+
+        if (permissions.Contains("*", StringComparer.OrdinalIgnoreCase)
+            || roles.Contains("Admin", StringComparer.OrdinalIgnoreCase)
+            || roles.Contains("Operations", StringComparer.OrdinalIgnoreCase))
+        {
+            scopes.Add(new DomainAccessScope("*", "All", null, "All records"));
+        }
+        else if (roles.Contains("Manager", StringComparer.OrdinalIgnoreCase))
+        {
+            scopes.Add(new DomainAccessScope("*", "Organisation", null, "Organisation"));
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.AdviserId))
+        {
+            var adviserId = profile.AdviserId.Trim();
+            scopes.Add(new DomainAccessScope("Bookings", "AdviserSelf", adviserId, "Own adviser bookings"));
+            scopes.Add(new DomainAccessScope("Advisers", "AdviserSelf", adviserId, "Own adviser profile"));
+            scopes.Add(new DomainAccessScope("Calendar", "AdviserSelf", adviserId, "Own adviser calendar"));
+        }
+
+        var explicitScopes = await _db.DomainUserAccessScopeMappings
+            .AsNoTracking()
+            .Where(x => x.IsEnabled)
+            .Where(x =>
+                (x.UserProfileId != null && x.UserProfileId == profile.Id)
+                || (x.ExternalSubject != null && x.ExternalSubject == profile.ExternalSubject)
+                || (x.Email != null && x.Email == email))
+            .Join(
+                _db.DomainAccessScopes.AsNoTracking().Where(x => x.IsEnabled),
+                mapping => mapping.AccessScopeId,
+                scope => scope.Id,
+                (_, scope) => new DomainAccessScope(scope.Area, scope.ScopeType, scope.ScopeValue, scope.DisplayName))
+            .ToArrayAsync(ct);
+
+        scopes.AddRange(explicitScopes);
+
+        return scopes
+            .Where(x => !string.IsNullOrWhiteSpace(x.Area) && !string.IsNullOrWhiteSpace(x.ScopeType))
+            .GroupBy(x => $"{x.Area.Trim()}|{x.ScopeType.Trim()}|{x.ScopeValue?.Trim() ?? string.Empty}", StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(x => x.Area)
+            .ThenBy(x => x.ScopeType)
+            .ThenBy(x => x.ScopeValue)
             .ToArray();
     }
 

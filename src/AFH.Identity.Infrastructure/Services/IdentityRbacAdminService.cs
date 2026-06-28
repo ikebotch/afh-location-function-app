@@ -83,8 +83,10 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
 
         var roleMappings = await _db.DomainUserRoleMappings.Where(x => x.UserProfileId == userProfileId).ToArrayAsync(ct);
         var permissionMappings = await _db.DomainUserPermissionMappings.Where(x => x.UserProfileId == userProfileId).ToArrayAsync(ct);
+        var accessScopeMappings = await _db.DomainUserAccessScopeMappings.Where(x => x.UserProfileId == userProfileId).ToArrayAsync(ct);
         _db.DomainUserRoleMappings.RemoveRange(roleMappings);
         _db.DomainUserPermissionMappings.RemoveRange(permissionMappings);
+        _db.DomainUserAccessScopeMappings.RemoveRange(accessScopeMappings);
         _db.DomainUserProfiles.Remove(profile);
         await _db.SaveChangesAsync(ct);
         return true;
@@ -358,6 +360,125 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         return true;
     }
 
+    public async Task<IReadOnlyList<IdentityAccessScopeAdminResult>> ListAccessScopesAsync(CancellationToken ct) =>
+        await _db.DomainAccessScopes
+            .AsNoTracking()
+            .OrderBy(x => x.Area)
+            .ThenBy(x => x.ScopeType)
+            .ThenBy(x => x.ScopeValue)
+            .Select(x => ToAccessScopeAdminResult(x))
+            .ToArrayAsync(ct);
+
+    public async Task<IdentityAccessScopeAdminResult> UpsertAccessScopeAsync(
+        IdentityAccessScopeUpsert upsert,
+        CancellationToken ct)
+    {
+        var entity = upsert.AccessScopeId is not null
+            ? await _db.DomainAccessScopes.SingleOrDefaultAsync(x => x.Id == upsert.AccessScopeId.Value, ct)
+            : null;
+
+        if (entity is null)
+            entity = await GetOrCreateAccessScopeAsync(upsert.Area, upsert.ScopeType, upsert.ScopeValue, upsert.DisplayName, ct);
+
+        entity.Description = NormalizeOptional(upsert.Description);
+        entity.DisplayName = NormalizeOptional(upsert.DisplayName) ?? entity.ScopeValue ?? entity.ScopeType;
+        entity.IsEnabled = upsert.IsEnabled;
+        entity.UpdatedUtc = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        return ToAccessScopeAdminResult(entity);
+    }
+
+    public async Task<bool> DeleteAccessScopeAsync(Guid accessScopeId, CancellationToken ct)
+    {
+        var entity = await _db.DomainAccessScopes.SingleOrDefaultAsync(x => x.Id == accessScopeId, ct);
+        if (entity is null)
+            return false;
+
+        var mappings = await _db.DomainUserAccessScopeMappings.Where(x => x.AccessScopeId == accessScopeId).ToArrayAsync(ct);
+        _db.DomainUserAccessScopeMappings.RemoveRange(mappings);
+        _db.DomainAccessScopes.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<IdentityUserAccessScopeMappingResult>> ListUserAccessScopeMappingsAsync(CancellationToken ct) =>
+        await _db.DomainUserAccessScopeMappings
+            .AsNoTracking()
+            .Join(
+                _db.DomainAccessScopes.AsNoTracking(),
+                mapping => mapping.AccessScopeId,
+                scope => scope.Id,
+                (mapping, scope) => ToUserAccessScopeMappingResult(mapping, scope))
+            .OrderBy(x => x.Area)
+            .ThenBy(x => x.ScopeType)
+            .ThenBy(x => x.ScopeValue)
+            .ThenBy(x => x.Email)
+            .ToArrayAsync(ct);
+
+    public async Task<IdentityUserAccessScopeMappingResult> AssignUserAccessScopeAsync(
+        IdentityUserAccessScopeAssignment assignment,
+        CancellationToken ct)
+    {
+        var normalizedEmail = NormalizeOptional(assignment.Email);
+        var normalizedExternalSubject = NormalizeOptional(assignment.ExternalSubject);
+        var userProfileId = await ResolveUserProfileIdAsync(assignment.UserProfileId, normalizedEmail, ct);
+        var accessScope = assignment.AccessScopeId is not null
+            ? await _db.DomainAccessScopes.SingleOrDefaultAsync(x => x.Id == assignment.AccessScopeId.Value, ct)
+            : await GetOrCreateAccessScopeAsync(
+                assignment.Area,
+                assignment.ScopeType,
+                assignment.ScopeValue,
+                assignment.DisplayName,
+                ct);
+
+        if (accessScope is null)
+            throw new InvalidOperationException($"Access scope '{assignment.AccessScopeId}' was not found.");
+
+        var mapping = await _db.DomainUserAccessScopeMappings
+            .SingleOrDefaultAsync(x =>
+                x.UserProfileId == userProfileId
+                && x.ExternalSubject == normalizedExternalSubject
+                && x.Email == normalizedEmail
+                && x.AccessScopeId == accessScope.Id,
+                ct);
+
+        var now = DateTime.UtcNow;
+        if (mapping is null)
+        {
+            mapping = new DomainUserAccessScopeMappingEntity
+            {
+                Id = Guid.NewGuid(),
+                UserProfileId = userProfileId,
+                AccessScopeId = accessScope.Id,
+                ExternalSubject = normalizedExternalSubject,
+                Email = normalizedEmail,
+                IsEnabled = assignment.IsEnabled,
+                CreatedUtc = now
+            };
+            _db.DomainUserAccessScopeMappings.Add(mapping);
+        }
+        else
+        {
+            mapping.IsEnabled = assignment.IsEnabled;
+            mapping.UpdatedUtc = now;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return ToUserAccessScopeMappingResult(mapping, accessScope);
+    }
+
+    public async Task<bool> DeleteUserAccessScopeMappingAsync(Guid mappingId, CancellationToken ct)
+    {
+        var mapping = await _db.DomainUserAccessScopeMappings.SingleOrDefaultAsync(x => x.Id == mappingId, ct);
+        if (mapping is null)
+            return false;
+
+        _db.DomainUserAccessScopeMappings.Remove(mapping);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
     private async Task<Guid?> ResolveUserProfileIdAsync(Guid? userProfileId, string? email, CancellationToken ct)
     {
         if (userProfileId is not null)
@@ -413,6 +534,46 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
             CreatedUtc = DateTime.UtcNow
         };
         _db.DomainPermissions.Add(entity);
+        return entity;
+    }
+
+    private async Task<DomainAccessScopeEntity> GetOrCreateAccessScopeAsync(
+        string area,
+        string scopeType,
+        string? scopeValue,
+        string? displayName,
+        CancellationToken ct)
+    {
+        var normalizedArea = NormalizeRequired(area);
+        var normalizedScopeType = NormalizeRequired(scopeType);
+        var normalizedScopeValue = NormalizeOptional(scopeValue);
+        var normalizedDisplayName = NormalizeOptional(displayName) ?? normalizedScopeValue ?? normalizedScopeType;
+
+        var entity = await _db.DomainAccessScopes.SingleOrDefaultAsync(x =>
+            x.Area == normalizedArea
+            && x.ScopeType == normalizedScopeType
+            && x.ScopeValue == normalizedScopeValue,
+            ct);
+
+        if (entity is not null)
+        {
+            entity.DisplayName = normalizedDisplayName;
+            entity.IsEnabled = true;
+            entity.UpdatedUtc = DateTime.UtcNow;
+            return entity;
+        }
+
+        entity = new DomainAccessScopeEntity
+        {
+            Id = Guid.NewGuid(),
+            Area = normalizedArea,
+            ScopeType = normalizedScopeType,
+            ScopeValue = normalizedScopeValue,
+            DisplayName = normalizedDisplayName,
+            IsEnabled = true,
+            CreatedUtc = DateTime.UtcNow
+        };
+        _db.DomainAccessScopes.Add(entity);
         return entity;
     }
 
@@ -532,5 +693,34 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
             IsGranted = mapping.IsGranted,
             IsEnabled = mapping.IsEnabled,
             Reason = mapping.Reason
+        };
+
+    private static IdentityAccessScopeAdminResult ToAccessScopeAdminResult(DomainAccessScopeEntity scope) =>
+        new()
+        {
+            AccessScopeId = scope.Id,
+            Area = scope.Area,
+            ScopeType = scope.ScopeType,
+            ScopeValue = scope.ScopeValue,
+            DisplayName = scope.DisplayName,
+            Description = scope.Description,
+            IsEnabled = scope.IsEnabled
+        };
+
+    private static IdentityUserAccessScopeMappingResult ToUserAccessScopeMappingResult(
+        DomainUserAccessScopeMappingEntity mapping,
+        DomainAccessScopeEntity scope) =>
+        new()
+        {
+            MappingId = mapping.Id,
+            UserProfileId = mapping.UserProfileId,
+            AccessScopeId = scope.Id,
+            ExternalSubject = mapping.ExternalSubject,
+            Email = mapping.Email,
+            Area = scope.Area,
+            ScopeType = scope.ScopeType,
+            ScopeValue = scope.ScopeValue,
+            DisplayName = scope.DisplayName,
+            IsEnabled = mapping.IsEnabled
         };
 }

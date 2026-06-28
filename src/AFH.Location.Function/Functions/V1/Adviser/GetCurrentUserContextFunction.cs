@@ -36,6 +36,9 @@ public sealed class GetCurrentUserContextFunction
             context.Email,
             context.DisplayName,
             context.Roles,
-            context.Permissions), ct);
+            context.Permissions,
+            context.AccessScopes
+                .Select(x => new CurrentUserAccessScopeResponseV1(x.Area, x.ScopeType, x.ScopeValue, x.DisplayName))
+                .ToArray()), ct);
     }
 }

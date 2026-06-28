@@ -58,4 +58,20 @@ public interface IIdentityRbacAdminService
         CancellationToken ct);
 
     Task<bool> DeleteUserPermissionMappingAsync(Guid mappingId, CancellationToken ct);
+
+    Task<IReadOnlyList<IdentityAccessScopeAdminResult>> ListAccessScopesAsync(CancellationToken ct);
+
+    Task<IdentityAccessScopeAdminResult> UpsertAccessScopeAsync(
+        IdentityAccessScopeUpsert upsert,
+        CancellationToken ct);
+
+    Task<bool> DeleteAccessScopeAsync(Guid accessScopeId, CancellationToken ct);
+
+    Task<IReadOnlyList<IdentityUserAccessScopeMappingResult>> ListUserAccessScopeMappingsAsync(CancellationToken ct);
+
+    Task<IdentityUserAccessScopeMappingResult> AssignUserAccessScopeAsync(
+        IdentityUserAccessScopeAssignment assignment,
+        CancellationToken ct);
+
+    Task<bool> DeleteUserAccessScopeMappingAsync(Guid mappingId, CancellationToken ct);
 }
