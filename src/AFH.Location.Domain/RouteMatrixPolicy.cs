@@ -6,4 +6,6 @@ public sealed class RouteMatrixPolicy
     public int MaxDestinationsPerCall { get; set; } = 50;
     public string SuccessConfidence { get; set; } = "High";
     public string FailureConfidence { get; set; } = "Low";
+    public TimeSpan SuccessCacheTtl { get; set; } = TimeSpan.FromMinutes(30);
+    public TimeSpan FailureCacheTtl { get; set; } = TimeSpan.FromMinutes(5);
 }
