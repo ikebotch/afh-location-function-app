@@ -159,6 +159,16 @@ public sealed class LocationPolicyDbInitializer : IHostedService
             "GeoCache.FailureTtlMinutes",
             _configuration.GetValue<int?>("LocationSearch:GeoCache:FailureTtlMinutes")?.ToString() ?? "30",
             ct);
+        await SeedPolicySettingAsync(
+            db,
+            "RouteCache.SuccessTtlMinutes",
+            _configuration.GetValue<int?>("LocationSearch:RouteCache:SuccessTtlMinutes")?.ToString() ?? "30",
+            ct);
+        await SeedPolicySettingAsync(
+            db,
+            "RouteCache.FailureTtlMinutes",
+            _configuration.GetValue<int?>("LocationSearch:RouteCache:FailureTtlMinutes")?.ToString() ?? "5",
+            ct);
 
         if (db.ChangeTracker.HasChanges())
         {

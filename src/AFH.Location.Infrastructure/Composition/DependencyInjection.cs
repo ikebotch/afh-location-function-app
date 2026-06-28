@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IRouteMatrixService>(sp => new CachedRouteMatrixService(
             sp.GetRequiredService<AzureMapsRouteMatrixService>(),
             sp.GetRequiredService<IRouteCache>(),
+            sp.GetRequiredService<IRouteMatrixPolicyProvider>(),
             sp.GetRequiredService<ILogger<CachedRouteMatrixService>>()));
         services.AddScoped<RouteMatrixCoordinator>();
         services.AddScoped<IPostcodeCoordinateResolver, PostcodeCoordinateResolver>();

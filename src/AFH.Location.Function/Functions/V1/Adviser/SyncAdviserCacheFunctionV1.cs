@@ -26,7 +26,13 @@ public sealed class SyncAdviserCacheFunctionV1
         HttpRequestData req,
         CancellationToken ct)
     {
-        var synced = await _syncService.SyncAsync(null, ct);
-        return await req.WriteSuccessAsync(new SyncAdviserCacheResponseV1 { Synced = synced }, ct);
+        var result = await _syncService.SyncAsync(null, ct);
+        return await req.WriteSuccessAsync(new SyncAdviserCacheResponseV1
+        {
+            Synced = result.Synced,
+            Created = result.Created,
+            Updated = result.Updated,
+            Unchanged = result.Unchanged
+        }, ct);
     }
 }

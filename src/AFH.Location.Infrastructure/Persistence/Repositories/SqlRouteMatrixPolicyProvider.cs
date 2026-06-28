@@ -11,6 +11,8 @@ public sealed class SqlRouteMatrixPolicyProvider : IRouteMatrixPolicyProvider
     private const string MaxDestinationsKey = "RouteMatrix.MaxDestinationsPerCall";
     private const string SuccessConfidenceKey = "RouteMatrix.SuccessConfidence";
     private const string FailureConfidenceKey = "RouteMatrix.FailureConfidence";
+    private const string SuccessCacheTtlKey = "RouteCache.SuccessTtlMinutes";
+    private const string FailureCacheTtlKey = "RouteCache.FailureTtlMinutes";
     private readonly IDbContextFactory<LocationPolicyDbContext> _dbContextFactory;
 
     public SqlRouteMatrixPolicyProvider(IDbContextFactory<LocationPolicyDbContext> dbContextFactory)
@@ -27,7 +29,9 @@ public sealed class SqlRouteMatrixPolicyProvider : IRouteMatrixPolicyProvider
                 x.Key == MaxOriginsKey ||
                 x.Key == MaxDestinationsKey ||
                 x.Key == SuccessConfidenceKey ||
-                x.Key == FailureConfidenceKey)
+                x.Key == FailureConfidenceKey ||
+                x.Key == SuccessCacheTtlKey ||
+                x.Key == FailureCacheTtlKey)
             .ToDictionaryAsync(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase, ct);
 
         return new RouteMatrixPolicy
@@ -35,7 +39,9 @@ public sealed class SqlRouteMatrixPolicyProvider : IRouteMatrixPolicyProvider
             MaxOriginsPerCall = ReadPositiveInt(values, MaxOriginsKey, 50),
             MaxDestinationsPerCall = ReadPositiveInt(values, MaxDestinationsKey, 50),
             SuccessConfidence = ReadString(values, SuccessConfidenceKey, "High"),
-            FailureConfidence = ReadString(values, FailureConfidenceKey, "Low")
+            FailureConfidence = ReadString(values, FailureConfidenceKey, "Low"),
+            SuccessCacheTtl = TimeSpan.FromMinutes(ReadPositiveInt(values, SuccessCacheTtlKey, 30)),
+            FailureCacheTtl = TimeSpan.FromMinutes(ReadPositiveInt(values, FailureCacheTtlKey, 5))
         };
     }
 

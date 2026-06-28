@@ -1,5 +1,7 @@
 using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Domain;
 using AFH.Location.Domain.Travel;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -10,6 +12,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
 {
     private readonly IRouteMatrixService _inner;
     private readonly IRouteCache _cache;
+    private readonly IRouteMatrixPolicyProvider _policyProvider;
     private readonly ILogger<CachedRouteMatrixService>? _logger;
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, RouteResult> _requestCache = new(StringComparer.OrdinalIgnoreCase);
@@ -17,10 +20,12 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
     public CachedRouteMatrixService(
         IRouteMatrixService inner,
         IRouteCache cache,
+        IRouteMatrixPolicyProvider policyProvider,
         ILogger<CachedRouteMatrixService>? logger = null)
     {
         _inner = inner;
         _cache = cache;
+        _policyProvider = policyProvider;
         _logger = logger;
     }
 
@@ -29,12 +34,13 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         (double Lat, double Lng) destination,
         CancellationToken ct)
     {
+        var policy = await _policyProvider.GetAsync(ct);
         var cached = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
         var misses = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var adviser in adviserOrigins)
         {
-            if (TryGetCachedRoute(adviser.Value, destination, adviser.Key, out var route))
+            if (TryGetCachedRoute(adviser.Value, destination, adviser.Key, policy, out var route))
                 cached[adviser.Key] = route;
             else
                 misses[adviser.Key] = adviser.Value;
@@ -48,7 +54,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
             {
                 cached[item.Key] = item.Value;
                 if (!IsSyntheticFallback(item.Value) && misses.TryGetValue(item.Key, out var adviserCoords))
-                    CacheRoute(adviserCoords, destination, item.Key, item.Value);
+                    CacheRoute(adviserCoords, destination, item.Key, item.Value, policy);
             }
         }
         else
@@ -65,6 +71,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         DateTimeOffset? departAt = null,
         CancellationToken ct = default)
     {
+        var policy = await _policyProvider.GetAsync(ct);
         var cached = new Dictionary<string, RouteResult>(StringComparer.OrdinalIgnoreCase);
         var misses = new Dictionary<string, (double Lat, double Lng)>(StringComparer.OrdinalIgnoreCase);
         var lookupKeys = new Dictionary<string, RouteCacheLookupKeys>(StringComparer.OrdinalIgnoreCase);
@@ -111,7 +118,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
                     misses.Remove(miss.Key);
 
                     if (cacheHits.ContainsKey(keys.SingleKey) && !cacheHits.ContainsKey(keys.SpecificKey))
-                        cacheWrites[keys.SpecificKey] = new RouteCacheEntry(route, GetTtl(route));
+                        cacheWrites[keys.SpecificKey] = new RouteCacheEntry(route, GetTtl(route, policy));
                 }
             }
         }
@@ -137,7 +144,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
                 // provider had no route data for this pair — do not cache it, otherwise
                 // a transient provider failure poisons the cache for the failure TTL window.
                 if (!IsSyntheticFallback(item.Value) && misses.TryGetValue(item.Key, out var destCoords))
-                    AddCacheRouteWrite(origin, destCoords, item.Key, item.Value, departAt, cacheWrites);
+                    AddCacheRouteWrite(origin, destCoords, item.Key, item.Value, departAt, policy, cacheWrites);
             }
 
             // Destinations not returned by the provider at all get the fallback.
@@ -173,9 +180,10 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         (double Lat, double Lng) origin,
         (double Lat, double Lng) destination,
         string id,
+        RouteMatrixPolicy policy,
         out RouteResult route)
     {
-        return TryGetCachedRoute(origin, destination, id, null, out route);
+        return TryGetCachedRoute(origin, destination, id, null, policy, out route);
     }
 
     private bool TryGetCachedRoute(
@@ -183,6 +191,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         (double Lat, double Lng) destination,
         string id,
         DateTimeOffset? departAt,
+        RouteMatrixPolicy policy,
         out RouteResult route)
     {
         var specificKey = BuildKey(origin, destination, id, departAt);
@@ -206,7 +215,7 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         {
             _requestCache[specificKey] = route;
             _requestCache[singleKey] = route;
-            _cache.Set(specificKey, route, GetTtl(route));
+            _cache.Set(specificKey, route, GetTtl(route, policy));
             return true;
         }
 
@@ -219,10 +228,11 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         (double Lat, double Lng) destination,
         string id,
         RouteResult route,
+        RouteMatrixPolicy policy,
         DateTimeOffset? departAt = null)
     {
         var cacheWrites = new Dictionary<string, RouteCacheEntry>(StringComparer.OrdinalIgnoreCase);
-        AddCacheRouteWrite(origin, destination, id, route, departAt, cacheWrites);
+        AddCacheRouteWrite(origin, destination, id, route, departAt, policy, cacheWrites);
 
         foreach (var item in cacheWrites)
             _cache.Set(item.Key, item.Value.Result, item.Value.Ttl);
@@ -234,9 +244,10 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         string id,
         RouteResult route,
         DateTimeOffset? departAt,
+        RouteMatrixPolicy policy,
         IDictionary<string, RouteCacheEntry> cacheWrites)
     {
-        var ttl = GetTtl(route);
+        var ttl = GetTtl(route, policy);
         var specificKey = BuildKey(origin, destination, id, departAt);
         var singleKey = BuildSingleKey(origin, destination, departAt);
 
@@ -247,8 +258,8 @@ public sealed class CachedRouteMatrixService : IRouteMatrixService
         cacheWrites[singleKey] = new RouteCacheEntry(route, ttl);
     }
 
-    private static TimeSpan GetTtl(RouteResult route)
-        => route.EtaMinutes > 0 ? TimeSpan.FromMinutes(30) : TimeSpan.FromMinutes(5);
+    private static TimeSpan GetTtl(RouteResult route, RouteMatrixPolicy policy)
+        => route.EtaMinutes > 0 ? policy.SuccessCacheTtl : policy.FailureCacheTtl;
 
     /// <summary>
     /// Returns true when the result is the synthetic fallback that the provider

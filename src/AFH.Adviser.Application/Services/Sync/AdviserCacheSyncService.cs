@@ -25,11 +25,11 @@ public sealed class AdviserCacheSyncService : IAdviserCacheSyncService
         _logger = logger;
     }
 
-    public async Task<int> SyncAsync(IReadOnlyCollection<string>? adviserIds, CancellationToken ct)
+    public async Task<AdviserReferenceCacheSyncResult> SyncAsync(IReadOnlyCollection<string>? adviserIds, CancellationToken ct)
     {
         var advisers = await _sourceRepository.GetAllAsync(adviserIds, ct);
         var syncedUtc = DateTime.UtcNow;
-        await _cacheRepository.UpsertAsync(advisers, syncedUtc, ct);
+        var result = await _cacheRepository.UpsertAsync(advisers, syncedUtc, ct);
 
         var mailboxUserIds = advisers
             .Where(x => !string.IsNullOrWhiteSpace(x.MailboxUserId))
@@ -49,6 +49,6 @@ public sealed class AdviserCacheSyncService : IAdviserCacheSyncService
             }
         }
 
-        return advisers.Count;
+        return result;
     }
 }

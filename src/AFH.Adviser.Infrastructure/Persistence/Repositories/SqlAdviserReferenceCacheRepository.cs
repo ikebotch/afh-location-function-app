@@ -30,10 +30,13 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
         return rows.Select(Map).ToList();
     }
 
-    public async Task UpsertAsync(IReadOnlyCollection<Entities.Adviser> advisers, DateTime syncedUtc, CancellationToken ct)
+    public async Task<AdviserReferenceCacheSyncResult> UpsertAsync(IReadOnlyCollection<Entities.Adviser> advisers, DateTime syncedUtc, CancellationToken ct)
     {
         var byId = advisers.ToDictionary(x => x.AdviserId, StringComparer.OrdinalIgnoreCase);
         var existing = await _db.AdviserReferenceCache.Where(x => byId.Keys.Contains(x.AdviserId)).ToListAsync(ct);
+        var created = 0;
+        var updated = 0;
+        var unchanged = 0;
 
         foreach (var adviser in advisers)
         {
@@ -42,6 +45,15 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
             {
                 row = new AdviserReferenceCacheEntity { AdviserId = adviser.AdviserId };
                 _db.AdviserReferenceCache.Add(row);
+                created++;
+            }
+            else if (HasBusinessChanges(row, adviser))
+            {
+                updated++;
+            }
+            else
+            {
+                unchanged++;
             }
 
             row.DisplayName = adviser.DisplayName;
@@ -61,6 +73,7 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
         }
 
         await _db.SaveChangesAsync(ct);
+        return new AdviserReferenceCacheSyncResult(advisers.Count, created, updated, unchanged);
     }
 
     public Task<bool> HasDataAsync(CancellationToken ct)
@@ -112,4 +125,29 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
             LastSyncedUtc = entity.LastSyncedUtc
         };
     }
+
+    private static bool HasBusinessChanges(AdviserReferenceCacheEntity row, Entities.Adviser adviser)
+        => !StringEquals(row.DisplayName, adviser.DisplayName)
+            || !StringEquals(row.MailboxUserId, adviser.MailboxUserId)
+            || !StringEquals(row.HomePostcode, adviser.HomePostcode)
+            || !StringEquals(row.Region, adviser.Region)
+            || !StringEquals(row.BaseOfficeId, adviser.BaseOfficeId)
+            || !StringEquals(row.TeamName, adviser.TeamName)
+            || !StringEquals(row.ManagerId, adviser.ManagerId)
+            || !StringEquals(row.SkillsCsv, SkillNormaliser.ToCsv(adviser.Skills))
+            || !DoubleEquals(row.Rating, adviser.Rating)
+            || row.IsActive != adviser.IsActive
+            || row.IsBookable != adviser.IsBookable
+            || !NullableDoubleEquals(row.CoverageRadiusMiles, adviser.CoverageRadiusMiles)
+            || row.MaxTravelTimeMinutes != adviser.MaxTravelTimeMinutes;
+
+    private static bool StringEquals(string? left, string? right)
+        => string.Equals(left ?? string.Empty, right ?? string.Empty, StringComparison.Ordinal);
+
+    private static bool DoubleEquals(double left, double right)
+        => Math.Abs(left - right) < 0.0001d;
+
+    private static bool NullableDoubleEquals(double? left, double? right)
+        => left.HasValue == right.HasValue
+            && (!left.HasValue || DoubleEquals(left.Value, right!.Value));
 }
