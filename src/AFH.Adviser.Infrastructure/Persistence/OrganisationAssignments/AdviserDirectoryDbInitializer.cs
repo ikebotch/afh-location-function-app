@@ -75,6 +75,13 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
                 ADD [DayOfWeek] nvarchar(16) NULL;
             END
 
+            IF OBJECT_ID(N'[dbo].[AdviserWorkingPatternRules]', N'U') IS NOT NULL
+               AND COL_LENGTH(N'[dbo].[AdviserWorkingPatternRules]', N'DayOfWeek') IS NOT NULL
+            BEGIN
+                DELETE FROM [dbo].[AdviserWorkingPatternRules]
+                WHERE [DayOfWeek] IS NULL OR LTRIM(RTRIM([DayOfWeek])) = N'';
+            END
+
             IF OBJECT_ID(N'[dbo].[AdviserAvailabilityRuleSets]', N'U') IS NOT NULL
             BEGIN
                 UPDATE [dbo].[AdviserAvailabilityRuleSets]

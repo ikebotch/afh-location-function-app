@@ -133,8 +133,8 @@ public sealed class AdviserAvailabilityRulesServiceTests
             CapacityWindowDays = 2,
             WorkingPatterns =
             [
-                new AdviserWorkingPatternRule { AdviserId = "adv-001", Start = "08:00", End = "08:30" },
-                new AdviserWorkingPatternRule { AdviserId = "adv-002", Start = "09:30", End = "10:30" }
+                new AdviserWorkingPatternRule { AdviserId = "adv-001", DayOfWeek = "Monday", Start = "08:00", End = "08:30" },
+                new AdviserWorkingPatternRule { AdviserId = "adv-002", DayOfWeek = "Monday", Start = "09:30", End = "10:30" }
             ],
             CapacityLimits =
             [

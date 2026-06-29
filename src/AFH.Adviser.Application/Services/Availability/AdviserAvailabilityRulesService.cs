@@ -56,7 +56,7 @@ public sealed class AdviserAvailabilityRulesService : IAdviserAvailabilityRulesS
     private static AdviserAvailabilityRules FilterRulesForAdviser(AdviserAvailabilityRules rules, string? adviserId)
     {
         if (string.IsNullOrWhiteSpace(adviserId))
-            return rules;
+            return WithValidWorkingPatterns(rules, rules.WorkingPatterns);
 
         return new AdviserAvailabilityRules
         {
@@ -65,13 +65,29 @@ public sealed class AdviserAvailabilityRulesService : IAdviserAvailabilityRulesS
             DefaultWorkingDayEnd = rules.DefaultWorkingDayEnd,
             CapacityWindowDays = rules.CapacityWindowDays,
             WorkingPatterns = rules.WorkingPatterns
-                .Where(rule => string.Equals(rule.AdviserId, adviserId, StringComparison.OrdinalIgnoreCase))
+                .Where(rule => HasDay(rule) && string.Equals(rule.AdviserId, adviserId, StringComparison.OrdinalIgnoreCase))
                 .ToArray(),
             CapacityLimits = rules.CapacityLimits
                 .Where(rule => string.Equals(rule.AdviserId, adviserId, StringComparison.OrdinalIgnoreCase))
                 .ToArray()
         };
     }
+
+    private static AdviserAvailabilityRules WithValidWorkingPatterns(
+        AdviserAvailabilityRules rules,
+        IReadOnlyCollection<AdviserWorkingPatternRule> workingPatterns)
+        => new()
+        {
+            MinimumAppointmentMinutes = rules.MinimumAppointmentMinutes,
+            DefaultWorkingDayStart = rules.DefaultWorkingDayStart,
+            DefaultWorkingDayEnd = rules.DefaultWorkingDayEnd,
+            CapacityWindowDays = rules.CapacityWindowDays,
+            WorkingPatterns = workingPatterns.Where(HasDay).ToArray(),
+            CapacityLimits = rules.CapacityLimits
+        };
+
+    private static bool HasDay(AdviserWorkingPatternRule pattern)
+        => !string.IsNullOrWhiteSpace(pattern.DayOfWeek);
 
     private static IReadOnlyList<AvailabilityTimeSlot> GenerateSlots(
         AdviserAvailabilityRules rules,
@@ -120,8 +136,7 @@ public sealed class AdviserAvailabilityRulesService : IAdviserAvailabilityRulesS
     }
 
     private static bool AppliesToDate(AdviserWorkingPatternRule pattern, DateOnly date)
-        => string.IsNullOrWhiteSpace(pattern.DayOfWeek)
-           || string.Equals(pattern.DayOfWeek, date.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase);
+        => string.Equals(pattern.DayOfWeek, date.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase);
 
     private static void ValidateRule(AvailabilityRuleUpsert request)
     {
