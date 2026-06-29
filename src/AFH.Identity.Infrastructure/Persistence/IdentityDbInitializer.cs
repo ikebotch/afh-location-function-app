@@ -28,7 +28,7 @@ public sealed class IdentityDbInitializer : IHostedService
     private static async Task SeedDomainRbacAsync(IdentityDbContext db, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
-        var roleNames = new[] { "Adviser", "Approver", "LeadTech", "Manager", "Operations", "Admin" };
+        var roleNames = new[] { "Adviser", "Approver", "Partner", "Manager", "Operations", "Admin" };
         foreach (var roleName in roleNames)
         {
             if (!await db.DomainRoles.AnyAsync(x => x.Role == roleName, ct))
@@ -101,9 +101,9 @@ public sealed class IdentityDbInitializer : IHostedService
             BookingPermissionNames.ApprovalsReview,
             BookingPermissionNames.ApprovalRequestsCreate,
             BookingPermissionNames.ApprovalRequestsReadOwn,
-            BookingPermissionNames.CancelAsLeadTech,
+            BookingPermissionNames.CancelAsPartner,
             BookingPermissionNames.CancelDirect,
-            BookingPermissionNames.RearrangeAsLeadTech,
+            BookingPermissionNames.RearrangeAsPartner,
             BookingPermissionNames.RearrangeDirect,
             BookingPermissionNames.RearrangementOptionsRead,
             BookingPermissionNames.AdminRead
@@ -121,9 +121,9 @@ public sealed class IdentityDbInitializer : IHostedService
             BookingPermissionNames.ApprovalsReview,
             BookingPermissionNames.ApprovalRequestsCreate,
             BookingPermissionNames.ApprovalRequestsReadOwn,
-            BookingPermissionNames.CancelAsLeadTech,
+            BookingPermissionNames.CancelAsPartner,
             BookingPermissionNames.CancelDirect,
-            BookingPermissionNames.RearrangeAsLeadTech,
+            BookingPermissionNames.RearrangeAsPartner,
             BookingPermissionNames.RearrangeDirect,
             BookingPermissionNames.RearrangementOptionsRead,
             BookingPermissionNames.AdminRead
@@ -144,14 +144,14 @@ public sealed class IdentityDbInitializer : IHostedService
                 DashboardRead,
                 BookingPermissionNames.AdminRead
             ],
-            ["LeadTech"] =
+            ["Partner"] =
             [
                 OrganisationAssignmentPermissions.Read,
                 DashboardRead,
                 BookingPermissionNames.AdminRead,
                 BookingPermissionNames.ApprovalsRead,
-                BookingPermissionNames.CancelAsLeadTech,
-                BookingPermissionNames.RearrangeAsLeadTech,
+                BookingPermissionNames.CancelAsPartner,
+                BookingPermissionNames.RearrangeAsPartner,
                 BookingPermissionNames.RearrangementOptionsRead,
                 AdviserAdminPermissions.Read,
                 AdviserAdminPermissions.SkillsRead,
