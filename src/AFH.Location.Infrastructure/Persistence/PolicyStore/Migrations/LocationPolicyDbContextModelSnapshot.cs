@@ -243,34 +243,6 @@ namespace AFH.Location.Infrastructure.Persistence.PolicyStore.Migrations
                     b.ToTable("ApplicationLogs", (string)null);
                 });
 
-            modelBuilder.Entity("AFH.Location.Infrastructure.Persistence.PolicyStore.Entities.AvailabilityDefaultPolicyEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("DefaultCompanyBufferMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<int>("DefaultTravelBufferMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MaxCompanyBufferMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MaxTravelBufferMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PreviousClientProximityMinutes")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AvailabilityDefaultPolicies", (string)null);
-                });
-
             modelBuilder.Entity("AFH.Location.Infrastructure.Persistence.PolicyStore.Entities.CoverageAdviserPolicyEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -438,6 +410,25 @@ namespace AFH.Location.Infrastructure.Persistence.PolicyStore.Migrations
                     b.ToTable("IntegrationOperationAudit", (string)null);
                 });
 
+            modelBuilder.Entity("AFH.Location.Infrastructure.Persistence.PolicyStore.Entities.LocationPolicySettingEntity", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("LocationPolicySettings", (string)null);
+                });
+
             modelBuilder.Entity("AFH.Location.Infrastructure.Persistence.PolicyStore.Entities.RouteCacheEntryEntity", b =>
                 {
                     b.Property<string>("CacheKey")
@@ -466,81 +457,6 @@ namespace AFH.Location.Infrastructure.Persistence.PolicyStore.Migrations
                     b.HasIndex("ExpiresUtc");
 
                     b.ToTable("RouteCacheEntries", (string)null);
-                });
-
-            modelBuilder.Entity("AFH.Location.Infrastructure.Persistence.PolicyStore.Entities.SearchAuditRecordEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("CandidatesReturned")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("DestinationPostcode")
-                        .HasMaxLength(24)
-                        .HasColumnType("nvarchar(24)");
-
-                    b.Property<int>("DurationMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<string>("PayloadJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RegionsCsv")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("RequestId")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<DateTime>("RequestedStartUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("SearchHorizonMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<bool?>("SelectedAdviserGoldStar")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("SelectedAdviserId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<double?>("SelectedAdviserRating")
-                        .HasColumnType("float");
-
-                    b.Property<int?>("SelectedCompanyBufferMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("SelectedMaxTravelTimeMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SelectedOriginSource")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<int?>("SelectedTravelBufferMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("SelectedTravelMinutes")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedUtc");
-
-                    b.HasIndex("RequestId");
-
-                    b.ToTable("SearchAuditRecords", (string)null);
                 });
 #pragma warning restore 612, 618
         }
