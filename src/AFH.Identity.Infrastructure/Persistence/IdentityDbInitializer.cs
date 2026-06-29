@@ -61,6 +61,12 @@ public sealed class IdentityDbInitializer : IHostedService
             CalendarSlotsOverride,
             CoverageRead,
             CoverageManage,
+            CoverageRegionsRead,
+            CoverageRegionsCreate,
+            CoverageRegionsUpdate,
+            CoverageRegionsDisable,
+            CoverageRegionsDelete,
+            CoverageRegionsAssignAdvisers,
             NotificationsRead,
             NotificationsTemplatesRead,
             NotificationsTemplatesManage,
@@ -150,7 +156,8 @@ public sealed class IdentityDbInitializer : IHostedService
                 AdviserAdminPermissions.Read,
                 AdviserAdminPermissions.SkillsRead,
                 CalendarRead,
-                CoverageRead
+                CoverageRead,
+                CoverageRegionsRead
             ],
             ["Manager"] =
             [
@@ -165,6 +172,7 @@ public sealed class IdentityDbInitializer : IHostedService
                 AdviserAdminPermissions.SkillsRead,
                 CalendarRead,
                 CoverageRead,
+                CoverageRegionsRead,
                 ReportingRead
             ],
             ["Operations"] = operationsPermissions,
@@ -259,6 +267,12 @@ public sealed class IdentityDbInitializer : IHostedService
     private const string CalendarSlotsOverride = "Calendar.Slots.Override";
     private const string CoverageRead = "Coverage.Read";
     private const string CoverageManage = "Coverage.Manage";
+    private const string CoverageRegionsRead = "CoverageRegions.Read";
+    private const string CoverageRegionsCreate = "CoverageRegions.Create";
+    private const string CoverageRegionsUpdate = "CoverageRegions.Update";
+    private const string CoverageRegionsDisable = "CoverageRegions.Disable";
+    private const string CoverageRegionsDelete = "CoverageRegions.Delete";
+    private const string CoverageRegionsAssignAdvisers = "CoverageRegions.AssignAdvisers";
     private const string NotificationsRead = "Notifications.Read";
     private const string NotificationsTemplatesRead = "Notifications.Templates.Read";
     private const string NotificationsTemplatesManage = "Notifications.Templates.Manage";

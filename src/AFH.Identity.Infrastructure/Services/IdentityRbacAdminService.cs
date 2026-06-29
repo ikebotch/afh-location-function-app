@@ -40,7 +40,11 @@ public sealed class IdentityRbacAdminService : IIdentityRbacAdminService
         var normalizedJobRole = NormalizeOptional(upsert.JobRole);
         var normalizedStatus = NormalizeOptional(upsert.Status) ?? "Active";
 
-        var profile = await _db.DomainUserProfiles
+        var profile = upsert.UserProfileId is Guid userProfileId
+            ? await _db.DomainUserProfiles.SingleOrDefaultAsync(x => x.Id == userProfileId, ct)
+            : null;
+
+        profile ??= await _db.DomainUserProfiles
             .SingleOrDefaultAsync(x => x.ExternalSubject == normalizedExternalSubject, ct)
             ?? await _db.DomainUserProfiles.SingleOrDefaultAsync(x => x.Email == normalizedEmail, ct);
 

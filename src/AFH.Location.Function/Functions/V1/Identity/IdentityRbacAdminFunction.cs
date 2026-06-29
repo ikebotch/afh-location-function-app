@@ -60,6 +60,7 @@ public sealed class IdentityRbacAdminFunction
 
         var result = await _admin.UpsertUserProfileAsync(new IdentityUserProfileUpsert
         {
+            UserProfileId = body.UserProfileId,
             ExternalSubject = body.ExternalSubject,
             Email = body.Email!,
             DisplayName = body.DisplayName,

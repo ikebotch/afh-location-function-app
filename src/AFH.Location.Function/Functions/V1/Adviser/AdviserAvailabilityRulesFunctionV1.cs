@@ -34,7 +34,7 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/admin/advisers/availability-rules/active")]
         HttpRequestData req,
         CancellationToken ct)
-        => await WriteActiveRulesAsync(req, null, ct);
+        => await WriteActiveRulesAsync(req, null, returnNotFoundWhenMissing: true, ct);
 
     [Function("AdviserAvailabilityRulesListV1")]
     [LocationOpenApiOperation("Admin", "Get adviser availability rules",
@@ -48,7 +48,7 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         CancellationToken ct)
     {
         var query = QueryHelpers.ParseQuery(req.Url.Query);
-        return await WriteActiveRulesAsync(req, Get(query, "adviserId"), ct);
+        return await WriteActiveRulesAsync(req, Get(query, "adviserId"), returnNotFoundWhenMissing: false, ct);
     }
 
     [Function("AdviserAvailabilityRulesForAdviserV1")]
@@ -61,7 +61,7 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         HttpRequestData req,
         string adviserId,
         CancellationToken ct)
-        => await WriteActiveRulesAsync(req, adviserId, ct);
+        => await WriteActiveRulesAsync(req, adviserId, returnNotFoundWhenMissing: false, ct);
 
     [Function("AdviserAvailabilityTimeSlotsV1")]
     [LocationOpenApiOperation("Admin", "Get adviser availability time slots",
@@ -87,10 +87,8 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         var rules = await _rules.GetActiveRulesAsync(projectContext, ct);
         if (rules is null)
         {
-            return await req.WriteFailureAsync(
-                HttpStatusCode.NotFound,
-                new { code = "ADVISER_AVAILABILITY_RULES_NOT_FOUND", message = "No active adviser availability rule set was found." },
-                ct);
+            var emptyResponse = new AvailabilityTimeSlotsResponseV1([]);
+            return await req.WriteSuccessAsync(emptyResponse, ct, ApiEnvelopeExtensions.SinglePage(0));
         }
 
         var from = GetDate(query, "from") ?? DateOnly.FromDateTime(DateTime.UtcNow);
@@ -105,6 +103,7 @@ public sealed class AdviserAvailabilityRulesFunctionV1
     private async Task<HttpResponseData> WriteActiveRulesAsync(
         HttpRequestData req,
         string? adviserId,
+        bool returnNotFoundWhenMissing,
         CancellationToken ct)
     {
         var authFailure = await _auth.AuthorizeAsync(req, "Calendar.Read", allowInternal: true, ct);
@@ -117,6 +116,13 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         var rules = await _rules.GetActiveRulesAsync(projectContext, ct);
         if (rules is null)
         {
+            if (!returnNotFoundWhenMissing)
+            {
+                return await req.WriteSuccessAsync(
+                    AdviserAvailabilityRulesContractMapper.ToContractResponse(new AdviserAvailabilityRules()),
+                    ct);
+            }
+
             return await req.WriteFailureAsync(
                 HttpStatusCode.NotFound,
                 new { code = "ADVISER_AVAILABILITY_RULES_NOT_FOUND", message = "No active adviser availability rule set was found." },

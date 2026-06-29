@@ -2,6 +2,7 @@ namespace AFH.Identity.Contracts.V1.Requests;
 
 public sealed class IdentityUserProfileUpsertRequest
 {
+    public Guid? UserProfileId { get; init; }
     public string? ExternalSubject { get; init; }
     public string? Email { get; init; }
     public string? DisplayName { get; init; }
