@@ -34,7 +34,7 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v1/admin/advisers/availability-rules/active")]
         HttpRequestData req,
         CancellationToken ct)
-        => await WriteActiveRulesAsync(req, null, returnNotFoundWhenMissing: true, ct);
+        => await WriteActiveRulesAsync(req, null, requireActiveRules: true, ct);
 
     [Function("AdviserAvailabilityRulesListV1")]
     [LocationOpenApiOperation("Admin", "Get adviser availability rules",
@@ -48,7 +48,7 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         CancellationToken ct)
     {
         var query = QueryHelpers.ParseQuery(req.Url.Query);
-        return await WriteActiveRulesAsync(req, Get(query, "adviserId"), returnNotFoundWhenMissing: false, ct);
+        return await WriteActiveRulesAsync(req, Get(query, "adviserId"), requireActiveRules: false, ct);
     }
 
     [Function("AdviserAvailabilityRulesForAdviserV1")]
@@ -61,7 +61,85 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         HttpRequestData req,
         string adviserId,
         CancellationToken ct)
-        => await WriteActiveRulesAsync(req, adviserId, returnNotFoundWhenMissing: false, ct);
+        => await WriteActiveRulesAsync(req, adviserId, requireActiveRules: false, ct);
+
+    [Function("AdviserAvailabilityRulesCreateV1")]
+    [LocationOpenApiOperation("Admin", "Create adviser availability rule",
+        Description = "Creates an adviser working-pattern rule in the active availability ruleset.",
+        ResponseType = typeof(AvailabilityRuleResponseV1))]
+    public async Task<HttpResponseData> CreateAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/admin/availability-rules")]
+        HttpRequestData req,
+        CancellationToken ct)
+    {
+        var authFailure = await _auth.AuthorizeAsync(req, "Calendar.Manage", allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
+        var body = await req.ReadFromJsonAsync<AvailabilityRuleUpsertRequestV1>(ct);
+        if (body is null)
+            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_AVAILABILITY_RULE", message = "Request body is required." }, ct);
+
+        try
+        {
+            var created = await _rules.CreateRuleAsync(ToUpsert(body), ct);
+            return await req.WriteSuccessAsync(ToRuleResponse(created), ct, statusCode: HttpStatusCode.Created);
+        }
+        catch (ArgumentException ex)
+        {
+            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_AVAILABILITY_RULE", message = ex.Message }, ct);
+        }
+    }
+
+    [Function("AdviserAvailabilityRulesUpdateV1")]
+    [LocationOpenApiOperation("Admin", "Update adviser availability rule",
+        Description = "Updates an adviser working-pattern rule in the active availability ruleset.",
+        ResponseType = typeof(AvailabilityRuleResponseV1))]
+    public async Task<HttpResponseData> UpdateAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/admin/availability-rules/{id}")]
+        HttpRequestData req,
+        string id,
+        CancellationToken ct)
+    {
+        var authFailure = await _auth.AuthorizeAsync(req, "Calendar.Manage", allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
+        var body = await req.ReadFromJsonAsync<AvailabilityRuleUpsertRequestV1>(ct);
+        if (body is null)
+            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_AVAILABILITY_RULE", message = "Request body is required." }, ct);
+
+        try
+        {
+            var updated = await _rules.UpdateRuleAsync(id, ToUpsert(body), ct);
+            return updated is null
+                ? await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "AVAILABILITY_RULE_NOT_FOUND", message = "Availability rule was not found." }, ct)
+                : await req.WriteSuccessAsync(ToRuleResponse(updated), ct);
+        }
+        catch (ArgumentException ex)
+        {
+            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_AVAILABILITY_RULE", message = ex.Message }, ct);
+        }
+    }
+
+    [Function("AdviserAvailabilityRulesDeleteV1")]
+    [LocationOpenApiOperation("Admin", "Delete adviser availability rule",
+        Description = "Disables an adviser working-pattern rule in the active availability ruleset.")]
+    public async Task<HttpResponseData> DeleteAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v1/admin/availability-rules/{id}")]
+        HttpRequestData req,
+        string id,
+        CancellationToken ct)
+    {
+        var authFailure = await _auth.AuthorizeAsync(req, "Calendar.Manage", allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
+        var deleted = await _rules.DeleteRuleAsync(id, ct);
+        return deleted
+            ? await req.WriteSuccessAsync(new { id, deleted = true }, ct)
+            : await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "AVAILABILITY_RULE_NOT_FOUND", message = "Availability rule was not found." }, ct);
+    }
 
     [Function("AdviserAvailabilityTimeSlotsV1")]
     [LocationOpenApiOperation("Admin", "Get adviser availability time slots",
@@ -81,29 +159,30 @@ public sealed class AdviserAvailabilityRulesFunctionV1
             return authFailure;
 
         var query = QueryHelpers.ParseQuery(req.Url.Query);
-        var projectContext = Get(query, "projectContext");
-        var adviserId = Get(query, "adviserId");
-
-        var rules = await _rules.GetActiveRulesAsync(projectContext, ct);
-        if (rules is null)
+        var result = await _rules.GetAdminTimeSlotsAsync(new AvailabilityTimeSlotsQuery
         {
-            var emptyResponse = new AvailabilityTimeSlotsResponseV1([]);
-            return await req.WriteSuccessAsync(emptyResponse, ct, ApiEnvelopeExtensions.SinglePage(0));
+            ProjectContext = Get(query, "projectContext"),
+            AdviserId = Get(query, "adviserId"),
+            From = GetDate(query, "from"),
+            To = GetDate(query, "to")
+        }, ct);
+
+        if (!result.Succeeded)
+        {
+            return await req.WriteFailureAsync(
+                HttpStatusCode.BadRequest,
+                new { code = result.ErrorCode, message = result.ErrorMessage },
+                ct);
         }
 
-        var from = GetDate(query, "from") ?? DateOnly.FromDateTime(DateTime.UtcNow);
-        var to = GetDate(query, "to") ?? from.AddDays(Math.Max(0, rules.CapacityWindowDays - 1));
-        if (to < from)
-            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_DATE_RANGE", message = "to must be on or after from." }, ct);
-
-        var response = new AvailabilityTimeSlotsResponseV1(GenerateSlots(rules, adviserId, from, to));
+        var response = new AvailabilityTimeSlotsResponseV1(MapSlots(result.Slots));
         return await req.WriteSuccessAsync(response, ct, ApiEnvelopeExtensions.SinglePage(response.Slots.Count));
     }
 
     private async Task<HttpResponseData> WriteActiveRulesAsync(
         HttpRequestData req,
         string? adviserId,
-        bool returnNotFoundWhenMissing,
+        bool requireActiveRules,
         CancellationToken ct)
     {
         var authFailure = await _auth.AuthorizeAsync(req, "Calendar.Read", allowInternal: true, ct);
@@ -113,15 +192,11 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         var query = QueryHelpers.ParseQuery(req.Url.Query);
         var projectContext = query.TryGetValue("projectContext", out var values) ? values.FirstOrDefault() : null;
 
-        var rules = await _rules.GetActiveRulesAsync(projectContext, ct);
-        if (rules is null)
+        if (requireActiveRules)
         {
-            if (!returnNotFoundWhenMissing)
-            {
-                return await req.WriteSuccessAsync(
-                    AdviserAvailabilityRulesContractMapper.ToContractResponse(new AdviserAvailabilityRules()),
-                    ct);
-            }
+            var activeRules = await _rules.GetActiveRulesAsync(projectContext, ct);
+            if (activeRules is not null)
+                return await req.WriteSuccessAsync(AdviserAvailabilityRulesContractMapper.ToContractResponse(activeRules), ct);
 
             return await req.WriteFailureAsync(
                 HttpStatusCode.NotFound,
@@ -129,72 +204,22 @@ public sealed class AdviserAvailabilityRulesFunctionV1
                 ct);
         }
 
-        var filtered = FilterRulesForAdviser(rules, adviserId);
-        return await req.WriteSuccessAsync(AdviserAvailabilityRulesContractMapper.ToContractResponse(filtered), ct);
+        var rules = await _rules.GetAdminRulesAsync(projectContext, adviserId, ct);
+        return await req.WriteSuccessAsync(AdviserAvailabilityRulesContractMapper.ToContractResponse(rules), ct);
     }
 
-    private static AdviserAvailabilityRules FilterRulesForAdviser(AdviserAvailabilityRules rules, string? adviserId)
-    {
-        if (string.IsNullOrWhiteSpace(adviserId))
-            return rules;
-
-        return new AdviserAvailabilityRules
-        {
-            MinimumAppointmentMinutes = rules.MinimumAppointmentMinutes,
-            DefaultWorkingDayStart = rules.DefaultWorkingDayStart,
-            DefaultWorkingDayEnd = rules.DefaultWorkingDayEnd,
-            CapacityWindowDays = rules.CapacityWindowDays,
-            WorkingPatterns = rules.WorkingPatterns
-                .Where(rule => string.Equals(rule.AdviserId, adviserId, StringComparison.OrdinalIgnoreCase))
-                .ToArray(),
-            CapacityLimits = rules.CapacityLimits
-                .Where(rule => string.Equals(rule.AdviserId, adviserId, StringComparison.OrdinalIgnoreCase))
-                .ToArray()
-        };
-    }
-
-    private static IReadOnlyList<AvailabilityTimeSlotResponseV1> GenerateSlots(
-        AdviserAvailabilityRules rules,
-        string? adviserId,
-        DateOnly from,
-        DateOnly to)
-    {
-        var filtered = FilterRulesForAdviser(rules, adviserId);
-        if (filtered.WorkingPatterns.Count == 0)
-            return [];
-
-        var duration = Math.Max(1, filtered.MinimumAppointmentMinutes);
-        var slots = new List<AvailabilityTimeSlotResponseV1>();
-
-        foreach (var pattern in filtered.WorkingPatterns)
-        {
-            if (!TimeOnly.TryParse(pattern.Start, out var start) || !TimeOnly.TryParse(pattern.End, out var end) || end <= start)
-                continue;
-
-            for (var date = from; date <= to; date = date.AddDays(1))
-            {
-                for (var slotStart = start; slotStart.AddMinutes(duration) <= end; slotStart = slotStart.AddMinutes(duration))
-                {
-                    var slotEnd = slotStart.AddMinutes(duration);
-                    slots.Add(new AvailabilityTimeSlotResponseV1(
-                        $"{pattern.AdviserId}:{date:yyyyMMdd}:{slotStart:HHmm}",
-                        pattern.AdviserId,
-                        date.ToString("yyyy-MM-dd"),
-                        slotStart.ToString("HH:mm"),
-                        slotEnd.ToString("HH:mm"),
-                        false,
-                        null,
-                        "Available"));
-                }
-            }
-        }
-
-        return slots
-            .OrderBy(slot => slot.Date, StringComparer.Ordinal)
-            .ThenBy(slot => slot.StartTime, StringComparer.Ordinal)
-            .ThenBy(slot => slot.AdviserId, StringComparer.OrdinalIgnoreCase)
+    private static IReadOnlyList<AvailabilityTimeSlotResponseV1> MapSlots(IReadOnlyList<AvailabilityTimeSlot> slots)
+        => slots
+            .Select(slot => new AvailabilityTimeSlotResponseV1(
+                slot.Id,
+                slot.AdviserId,
+                slot.Date,
+                slot.StartTime,
+                slot.EndTime,
+                slot.IsBooked,
+                slot.BookingId,
+                slot.Status))
             .ToArray();
-    }
 
     private static string? Get(Dictionary<string, Microsoft.Extensions.Primitives.StringValues> query, string key)
         => query.TryGetValue(key, out var value) ? value.FirstOrDefault() : null;
@@ -203,7 +228,63 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         => query.TryGetValue(key, out var values) && DateOnly.TryParse(values.FirstOrDefault(), out var parsed)
             ? parsed
             : null;
+
+    private static AvailabilityRuleUpsert ToUpsert(AvailabilityRuleUpsertRequestV1 request)
+        => new()
+        {
+            ProjectContext = request.ProjectContext,
+            AdviserId = request.AdviserId ?? string.Empty,
+            AdviserName = request.AdviserName,
+            DayOfWeek = request.DayOfWeek,
+            StartTime = request.StartTime ?? string.Empty,
+            EndTime = request.EndTime ?? string.Empty,
+            Capacity = request.Capacity,
+            EffectiveFrom = request.EffectiveFrom,
+            EffectiveTo = request.EffectiveTo,
+            Status = request.Status,
+            Notes = request.Notes
+        };
+
+    private static AvailabilityRuleResponseV1 ToRuleResponse(AvailabilityRuleRecord record)
+        => new(
+            record.Id,
+            record.AdviserId,
+            record.AdviserName,
+            record.DayOfWeek,
+            record.StartTime,
+            record.EndTime,
+            record.Capacity,
+            record.EffectiveFrom,
+            record.EffectiveTo,
+            record.Status,
+            record.Notes);
 }
+
+public sealed record AvailabilityRuleUpsertRequestV1(
+    string? ProjectContext,
+    string? AdviserId,
+    string? AdviserName,
+    string? DayOfWeek,
+    string? StartTime,
+    string? EndTime,
+    int Capacity,
+    string? EffectiveFrom,
+    string? EffectiveTo,
+    string? Status,
+    string? Notes);
+
+public sealed record AvailabilityRuleResponseV1(
+    string Id,
+    string AdviserId,
+    string? AdviserName,
+    string? DayOfWeek,
+    string StartTime,
+    string EndTime,
+    int Capacity,
+    string? EffectiveFrom,
+    string? EffectiveTo,
+    string Status,
+    string? Notes);
 
 public sealed record AvailabilityTimeSlotsResponseV1(IReadOnlyList<AvailabilityTimeSlotResponseV1> Slots);
 

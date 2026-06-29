@@ -20,6 +20,7 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
 
         await db.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureOrganisationAssignmentsTableAsync(db, cancellationToken);
+        await EnsureAvailabilityRulesSchemaAsync(db, cancellationToken);
         await EnsureCoverageRegionTablesAsync(db, cancellationToken);
     }
 
@@ -63,6 +64,25 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
 
             IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE [name] = N'IX_OrganisationAssignments_OrganisationId' AND [object_id] = OBJECT_ID(N'[dbo].[OrganisationAssignments]'))
                 CREATE INDEX [IX_OrganisationAssignments_OrganisationId] ON [dbo].[OrganisationAssignments] ([OrganisationId]);
+            """, ct);
+
+    private static Task EnsureAvailabilityRulesSchemaAsync(AdviserDirectoryDbContext db, CancellationToken ct)
+        => db.Database.ExecuteSqlRawAsync("""
+            IF OBJECT_ID(N'[dbo].[AdviserWorkingPatternRules]', N'U') IS NOT NULL
+               AND COL_LENGTH(N'[dbo].[AdviserWorkingPatternRules]', N'DayOfWeek') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[AdviserWorkingPatternRules]
+                ADD [DayOfWeek] nvarchar(16) NULL;
+            END
+
+            IF OBJECT_ID(N'[dbo].[AdviserAvailabilityRuleSets]', N'U') IS NOT NULL
+            BEGIN
+                UPDATE [dbo].[AdviserAvailabilityRuleSets]
+                SET [DefaultWorkingDayStart] = N'08:00'
+                WHERE [DefaultWorkingDayStart] = N'09:00'
+                  AND [DefaultWorkingDayEnd] = N'17:00'
+                  AND [ProjectContext] = N'Booking';
+            END
             """, ct);
 
     private static Task EnsureCoverageRegionTablesAsync(AdviserDirectoryDbContext db, CancellationToken ct)

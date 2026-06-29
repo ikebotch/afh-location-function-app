@@ -5,6 +5,7 @@ public sealed class AdviserWorkingPatternRuleEntity
     public int Id { get; set; }
     public int RuleSetId { get; set; }
     public string AdviserId { get; set; } = string.Empty;
+    public string? DayOfWeek { get; set; }
     public string Start { get; set; } = string.Empty;
     public string End { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;

@@ -11,7 +11,7 @@ public static class AdviserAvailabilityRulesContractMapper
             rules.DefaultWorkingDayStart,
             rules.DefaultWorkingDayEnd,
             rules.CapacityWindowDays,
-            rules.WorkingPatterns.Select(x => new AdviserWorkingPatternRuleResponseV1(x.AdviserId, x.Start, x.End)).ToArray(),
+            rules.WorkingPatterns.Select(x => new AdviserWorkingPatternRuleResponseV1(x.Id, x.AdviserId, x.DayOfWeek, x.Start, x.End, x.IsActive)).ToArray(),
             rules.CapacityLimits
                 .Select(x => new AdviserCapacityLimitRuleResponseV1(
                     x.AdviserId,

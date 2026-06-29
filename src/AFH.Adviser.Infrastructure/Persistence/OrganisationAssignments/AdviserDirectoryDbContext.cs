@@ -77,6 +77,7 @@ public sealed class AdviserDirectoryDbContext : DbContext
         entity.ToTable("AdviserWorkingPatternRules");
         entity.HasKey(x => x.Id);
         entity.Property(x => x.AdviserId).HasMaxLength(100).IsRequired();
+        entity.Property(x => x.DayOfWeek).HasMaxLength(16);
         entity.Property(x => x.Start).HasMaxLength(16).IsRequired();
         entity.Property(x => x.End).HasMaxLength(16).IsRequired();
         entity.HasIndex(x => new { x.RuleSetId, x.AdviserId, x.IsActive });
