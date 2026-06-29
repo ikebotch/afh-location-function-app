@@ -40,6 +40,9 @@ public sealed class EntraDomainUserTokenValidator : IDomainUserTokenValidator
         if (string.IsNullOrWhiteSpace(token))
             return DomainUserTokenValidationResult.Fail("AUTH_ERROR", "Missing bearer token.");
 
+        if (_options.AllowMockTokens && TryCreateMockIdentity(token, out var mockIdentity))
+            return DomainUserTokenValidationResult.Success(mockIdentity, "local-dev");
+
         if (string.IsNullOrWhiteSpace(_options.Audience))
             return DomainUserTokenValidationResult.Fail("AUTH_ERROR", "DomainUserAuth audience is not configured.");
 
@@ -199,4 +202,65 @@ public sealed class EntraDomainUserTokenValidator : IDomainUserTokenValidator
             ? trimmed["Bearer ".Length..].Trim()
             : trimmed;
     }
+
+    private static bool TryCreateMockIdentity(string token, out DomainUserIdentity identity)
+    {
+        identity = default!;
+
+        const string prefix = "mock-token:";
+        if (!token.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var userId = token[prefix.Length..].Trim();
+        if (string.IsNullOrWhiteSpace(userId))
+            return false;
+
+        identity = userId.ToLowerInvariant() switch
+        {
+            "mock-platform-admin" => CreateMockIdentity(
+                userId,
+                "platform.admin@afh.co.uk",
+                "Platform Admin",
+                ["Admin"]),
+            "mock-booking-manager" => CreateMockIdentity(
+                userId,
+                "booking.manager@afh.co.uk",
+                "Booking Manager",
+                ["Operations"]),
+            "mock-location-manager" => CreateMockIdentity(
+                userId,
+                "location.manager@afh.co.uk",
+                "Location Manager",
+                ["Operations"]),
+            "mock-notification-admin" => CreateMockIdentity(
+                userId,
+                "notification.admin@afh.co.uk",
+                "Notification Admin",
+                ["Operations"]),
+            "mock-auditor" => CreateMockIdentity(
+                userId,
+                "audit.reader@afh.co.uk",
+                "Audit Reader",
+                ["Auditor"]),
+            "mock-adviser" => CreateMockIdentity(
+                userId,
+                "john.doe@afh.co.uk",
+                "John Doe",
+                ["Adviser"]),
+            _ => CreateMockIdentity(
+                userId,
+                $"{userId}@afh.co.uk",
+                userId,
+                [])
+        };
+
+        return true;
+    }
+
+    private static DomainUserIdentity CreateMockIdentity(
+        string userId,
+        string email,
+        string displayName,
+        IReadOnlyList<string> roles) =>
+        new(userId, email, displayName, roles, []);
 }

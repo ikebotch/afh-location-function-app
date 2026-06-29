@@ -15,6 +15,7 @@
     "DomainUserAuth:TenantId": "<entra-tenant-id>",
     "DomainUserAuth:Authority": "https://login.microsoftonline.com/<entra-tenant-id>/v2.0",
     "DomainUserAuth:Audience": "api://<location-or-adviser-api-app-id>",
+    "DomainUserAuth:AllowMockTokens": "false",
     "DomainUserAuth:AllowedTenantIds:0": "<entra-tenant-id>",
     "DomainUserAuth:AllowedEmailDomains:0": "example.com",
     "IdentityRbac:PermissionMode": "Hybrid",
