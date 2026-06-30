@@ -179,6 +179,65 @@ public sealed class AdviserAvailabilityRulesFunctionV1
         return await req.WriteSuccessAsync(response, ct, ApiEnvelopeExtensions.SinglePage(response.Slots.Count));
     }
 
+    [Function("AdviserAvailabilityTimeSlotOverrideCreateV1")]
+    [LocationOpenApiOperation("Admin", "Create adviser time slot override",
+        Description = "Creates a one-off adviser availability slot override by writing a date-scoped availability rule.",
+        ResponseType = typeof(AvailabilityTimeSlotOverrideResponseV1))]
+    public async Task<HttpResponseData> CreateTimeSlotOverrideAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/admin/availability/time-slots/overrides")]
+        HttpRequestData req,
+        CancellationToken ct)
+    {
+        var authFailure = await _auth.AuthorizeAsync(req, "Calendar.Slots.Override", allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
+        var body = await req.ReadFromJsonAsync<AvailabilityTimeSlotOverrideRequestV1>(ct);
+        if (body is null)
+            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_TIME_SLOT_OVERRIDE", message = "Request body is required." }, ct);
+
+        try
+        {
+            var created = await _rules.CreateRuleAsync(ToOverrideUpsert(body), ct);
+            return await req.WriteSuccessAsync(ToOverrideResponse(created, body), ct, statusCode: HttpStatusCode.Created);
+        }
+        catch (ArgumentException ex)
+        {
+            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_TIME_SLOT_OVERRIDE", message = ex.Message }, ct);
+        }
+    }
+
+    [Function("AdviserAvailabilityTimeSlotOverrideUpdateV1")]
+    [LocationOpenApiOperation("Admin", "Update adviser time slot override",
+        Description = "Updates a one-off adviser availability slot override.",
+        ResponseType = typeof(AvailabilityTimeSlotOverrideResponseV1))]
+    public async Task<HttpResponseData> UpdateTimeSlotOverrideAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "v1/admin/availability/time-slots/overrides/{id}")]
+        HttpRequestData req,
+        string id,
+        CancellationToken ct)
+    {
+        var authFailure = await _auth.AuthorizeAsync(req, "Calendar.Slots.Override", allowInternal: false, ct);
+        if (authFailure is not null)
+            return authFailure;
+
+        var body = await req.ReadFromJsonAsync<AvailabilityTimeSlotOverrideRequestV1>(ct);
+        if (body is null)
+            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_TIME_SLOT_OVERRIDE", message = "Request body is required." }, ct);
+
+        try
+        {
+            var updated = await _rules.UpdateRuleAsync(id, ToOverrideUpsert(body), ct);
+            return updated is null
+                ? await req.WriteFailureAsync(HttpStatusCode.NotFound, new { code = "TIME_SLOT_OVERRIDE_NOT_FOUND", message = "Time slot override was not found." }, ct)
+                : await req.WriteSuccessAsync(ToOverrideResponse(updated, body), ct);
+        }
+        catch (ArgumentException ex)
+        {
+            return await req.WriteFailureAsync(HttpStatusCode.BadRequest, new { code = "INVALID_TIME_SLOT_OVERRIDE", message = ex.Message }, ct);
+        }
+    }
+
     private async Task<HttpResponseData> WriteActiveRulesAsync(
         HttpRequestData req,
         string? adviserId,
@@ -245,6 +304,33 @@ public sealed class AdviserAvailabilityRulesFunctionV1
             Notes = request.Notes
         };
 
+    private static AvailabilityRuleUpsert ToOverrideUpsert(AvailabilityTimeSlotOverrideRequestV1 request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Date) || !DateOnly.TryParse(request.Date, out var date))
+            throw new ArgumentException("date must be a valid date.", nameof(request));
+
+        var reason = request.Reason?.Trim();
+        var overrideType = request.OverrideType?.Trim();
+        var notes = string.IsNullOrWhiteSpace(overrideType)
+            ? reason
+            : string.IsNullOrWhiteSpace(reason) ? overrideType : $"{overrideType}: {reason}";
+
+        return new AvailabilityRuleUpsert
+        {
+            ProjectContext = request.ProjectContext,
+            AdviserId = request.AdviserId ?? string.Empty,
+            AdviserName = request.AdviserName,
+            DayOfWeek = date.DayOfWeek.ToString(),
+            StartTime = request.StartTime ?? string.Empty,
+            EndTime = request.EndTime ?? string.Empty,
+            Capacity = request.Capacity ?? (request.IsBooked ? 0 : 1),
+            EffectiveFrom = date.ToString("yyyy-MM-dd"),
+            EffectiveTo = date.ToString("yyyy-MM-dd"),
+            Status = request.Status,
+            Notes = notes
+        };
+    }
+
     private static AvailabilityRuleResponseV1 ToRuleResponse(AvailabilityRuleRecord record)
         => new(
             record.Id,
@@ -258,42 +344,20 @@ public sealed class AdviserAvailabilityRulesFunctionV1
             record.EffectiveTo,
             record.Status,
             record.Notes);
+
+    private static AvailabilityTimeSlotOverrideResponseV1 ToOverrideResponse(
+        AvailabilityRuleRecord record,
+        AvailabilityTimeSlotOverrideRequestV1 request)
+        => new(
+            record.Id,
+            record.AdviserId,
+            record.AdviserName,
+            record.EffectiveFrom ?? request.Date ?? string.Empty,
+            record.StartTime,
+            record.EndTime,
+            request.IsBooked,
+            null,
+            request.Status ?? record.Status,
+            request.OverrideType,
+            request.Reason);
 }
-
-public sealed record AvailabilityRuleUpsertRequestV1(
-    string? ProjectContext,
-    string? AdviserId,
-    string? AdviserName,
-    string? DayOfWeek,
-    string? StartTime,
-    string? EndTime,
-    int Capacity,
-    string? EffectiveFrom,
-    string? EffectiveTo,
-    string? Status,
-    string? Notes);
-
-public sealed record AvailabilityRuleResponseV1(
-    string Id,
-    string AdviserId,
-    string? AdviserName,
-    string? DayOfWeek,
-    string StartTime,
-    string EndTime,
-    int Capacity,
-    string? EffectiveFrom,
-    string? EffectiveTo,
-    string Status,
-    string? Notes);
-
-public sealed record AvailabilityTimeSlotsResponseV1(IReadOnlyList<AvailabilityTimeSlotResponseV1> Slots);
-
-public sealed record AvailabilityTimeSlotResponseV1(
-    string Id,
-    string AdviserId,
-    string Date,
-    string StartTime,
-    string EndTime,
-    bool IsBooked,
-    string? BookingId,
-    string Status);

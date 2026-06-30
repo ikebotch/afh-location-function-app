@@ -23,6 +23,8 @@ public static class EndpointAccessPolicies
             ["AdviserAvailabilityRulesUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["AdviserAvailabilityRulesDeleteV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["AdviserAvailabilityTimeSlotsV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserAvailabilityTimeSlotOverrideCreateV1"] = EndpointAccessPolicy.UserAuthenticated,
+            ["AdviserAvailabilityTimeSlotOverrideUpdateV1"] = EndpointAccessPolicy.UserAuthenticated,
             ["Identity_CurrentUserContextV1"] = EndpointAccessPolicy.InternalOnly,
             ["Identity_ListUserProfilesV1"] = EndpointAccessPolicy.InternalOnly,
             ["Identity_GetUserProfileV1"] = EndpointAccessPolicy.InternalOnly,

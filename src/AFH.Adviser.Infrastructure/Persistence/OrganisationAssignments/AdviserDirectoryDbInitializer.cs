@@ -76,6 +76,20 @@ public sealed class AdviserDirectoryDbInitializer : IHostedService
             END
 
             IF OBJECT_ID(N'[dbo].[AdviserWorkingPatternRules]', N'U') IS NOT NULL
+               AND COL_LENGTH(N'[dbo].[AdviserWorkingPatternRules]', N'EffectiveFrom') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[AdviserWorkingPatternRules]
+                ADD [EffectiveFrom] nvarchar(10) NULL;
+            END
+
+            IF OBJECT_ID(N'[dbo].[AdviserWorkingPatternRules]', N'U') IS NOT NULL
+               AND COL_LENGTH(N'[dbo].[AdviserWorkingPatternRules]', N'EffectiveTo') IS NULL
+            BEGIN
+                ALTER TABLE [dbo].[AdviserWorkingPatternRules]
+                ADD [EffectiveTo] nvarchar(10) NULL;
+            END
+
+            IF OBJECT_ID(N'[dbo].[AdviserWorkingPatternRules]', N'U') IS NOT NULL
                AND COL_LENGTH(N'[dbo].[AdviserWorkingPatternRules]', N'DayOfWeek') IS NOT NULL
             BEGIN
                 DELETE FROM [dbo].[AdviserWorkingPatternRules]

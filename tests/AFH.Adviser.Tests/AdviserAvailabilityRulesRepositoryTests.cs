@@ -41,6 +41,8 @@ public sealed class AdviserAvailabilityRulesRepositoryTests
                     AdviserId = "adv-1",
                     Start = "10:00",
                     End = "16:00",
+                    EffectiveFrom = "2026-07-01",
+                    EffectiveTo = "2026-07-31",
                     IsActive = true,
                     CreatedUtc = FixedNow
                 },
@@ -101,6 +103,8 @@ public sealed class AdviserAvailabilityRulesRepositoryTests
         Assert.Equal("adv-1", pattern.AdviserId);
         Assert.Equal("10:00", pattern.Start);
         Assert.Equal("16:00", pattern.End);
+        Assert.Equal("2026-07-01", pattern.EffectiveFrom);
+        Assert.Equal("2026-07-31", pattern.EffectiveTo);
 
         var capacity = Assert.Single(rules.CapacityLimits);
         Assert.Equal("adv-1", capacity.AdviserId);

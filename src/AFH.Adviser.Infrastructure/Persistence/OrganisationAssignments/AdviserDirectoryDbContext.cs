@@ -80,6 +80,8 @@ public sealed class AdviserDirectoryDbContext : DbContext
         entity.Property(x => x.DayOfWeek).HasMaxLength(16);
         entity.Property(x => x.Start).HasMaxLength(16).IsRequired();
         entity.Property(x => x.End).HasMaxLength(16).IsRequired();
+        entity.Property(x => x.EffectiveFrom).HasMaxLength(10);
+        entity.Property(x => x.EffectiveTo).HasMaxLength(10);
         entity.HasIndex(x => new { x.RuleSetId, x.AdviserId, x.IsActive });
     }
 

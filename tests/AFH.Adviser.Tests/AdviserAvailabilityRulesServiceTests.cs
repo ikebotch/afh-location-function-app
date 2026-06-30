@@ -126,6 +126,38 @@ public sealed class AdviserAvailabilityRulesServiceTests
         Assert.All(result.Slots, slot => Assert.Equal("2026-06-29", slot.Date));
     }
 
+    [Fact]
+    public async Task GetAdminTimeSlotsAsync_OnlyGeneratesSlotsInsideEffectiveDateRange()
+    {
+        var sut = new AdviserAvailabilityRulesService(new StubRulesRepository(new AdviserAvailabilityRules
+        {
+            MinimumAppointmentMinutes = 30,
+            WorkingPatterns =
+            [
+                new AdviserWorkingPatternRule
+                {
+                    AdviserId = "adv-002",
+                    DayOfWeek = "Monday",
+                    Start = "09:00",
+                    End = "10:00",
+                    EffectiveFrom = "2026-07-06",
+                    EffectiveTo = "2026-07-06"
+                }
+            ]
+        }));
+
+        var result = await sut.GetAdminTimeSlotsAsync(new AvailabilityTimeSlotsQuery
+        {
+            AdviserId = "adv-002",
+            From = new DateOnly(2026, 6, 29),
+            To = new DateOnly(2026, 7, 13)
+        }, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.Slots.Count);
+        Assert.All(result.Slots, slot => Assert.Equal("2026-07-06", slot.Date));
+    }
+
     private static AdviserAvailabilityRules CreateRules()
         => new()
         {

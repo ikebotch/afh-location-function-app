@@ -109,7 +109,7 @@ public sealed class AdviserAvailabilityRulesService : IAdviserAvailabilityRulesS
 
             for (var date = from; date <= to; date = date.AddDays(1))
             {
-                if (!AppliesToDate(pattern, date))
+                if (!AppliesToDate(pattern, date) || !IsEffectiveOn(pattern, date))
                     continue;
 
                 for (var slotStart = start; slotStart.AddMinutes(duration) <= end; slotStart = slotStart.AddMinutes(duration))
@@ -138,6 +138,17 @@ public sealed class AdviserAvailabilityRulesService : IAdviserAvailabilityRulesS
     private static bool AppliesToDate(AdviserWorkingPatternRule pattern, DateOnly date)
         => string.Equals(pattern.DayOfWeek, date.DayOfWeek.ToString(), StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsEffectiveOn(AdviserWorkingPatternRule pattern, DateOnly date)
+    {
+        if (DateOnly.TryParse(pattern.EffectiveFrom, out var effectiveFrom) && date < effectiveFrom)
+            return false;
+
+        if (DateOnly.TryParse(pattern.EffectiveTo, out var effectiveTo) && date > effectiveTo)
+            return false;
+
+        return true;
+    }
+
     private static void ValidateRule(AvailabilityRuleUpsert request)
     {
         if (string.IsNullOrWhiteSpace(request.AdviserId))
@@ -150,7 +161,20 @@ public sealed class AdviserAvailabilityRulesService : IAdviserAvailabilityRulesS
             throw new ArgumentException("endTime must be after startTime.", nameof(request));
         if (request.Capacity < 0)
             throw new ArgumentException("capacity cannot be negative.", nameof(request));
+        if (!string.IsNullOrWhiteSpace(request.EffectiveFrom) && !DateOnly.TryParse(request.EffectiveFrom, out _))
+            throw new ArgumentException("effectiveFrom must be a valid date.", nameof(request));
+        if (!string.IsNullOrWhiteSpace(request.EffectiveTo) && !DateOnly.TryParse(request.EffectiveTo, out _))
+            throw new ArgumentException("effectiveTo must be a valid date.", nameof(request));
+        if (DateOnly.TryParse(request.EffectiveFrom, out var effectiveFrom)
+            && DateOnly.TryParse(request.EffectiveTo, out var effectiveTo)
+            && effectiveTo < effectiveFrom)
+        {
+            throw new ArgumentException("effectiveTo must be on or after effectiveFrom.", nameof(request));
+        }
     }
+
+    private static string? NormalizeDate(string? date)
+        => DateOnly.TryParse(date, out var parsed) ? parsed.ToString("yyyy-MM-dd") : null;
 
     private static AvailabilityRuleUpsert NormalizeRule(AvailabilityRuleUpsert request)
         => new()
@@ -162,8 +186,8 @@ public sealed class AdviserAvailabilityRulesService : IAdviserAvailabilityRulesS
             StartTime = TimeOnly.Parse(request.StartTime).ToString("HH:mm"),
             EndTime = TimeOnly.Parse(request.EndTime).ToString("HH:mm"),
             Capacity = request.Capacity,
-            EffectiveFrom = request.EffectiveFrom,
-            EffectiveTo = request.EffectiveTo,
+            EffectiveFrom = NormalizeDate(request.EffectiveFrom),
+            EffectiveTo = NormalizeDate(request.EffectiveTo),
             Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status,
             Notes = request.Notes
         };

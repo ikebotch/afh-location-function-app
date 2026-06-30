@@ -46,6 +46,8 @@ public sealed class SqlAdviserAvailabilityRulesRepository : IAdviserAvailability
                     DayOfWeek = x.DayOfWeek,
                     Start = x.Start,
                     End = x.End,
+                    EffectiveFrom = x.EffectiveFrom,
+                    EffectiveTo = x.EffectiveTo,
                     IsActive = x.IsActive
                 })
                 .ToArray(),
@@ -75,6 +77,8 @@ public sealed class SqlAdviserAvailabilityRulesRepository : IAdviserAvailability
             DayOfWeek = request.DayOfWeek,
             Start = request.StartTime,
             End = request.EndTime,
+            EffectiveFrom = request.EffectiveFrom,
+            EffectiveTo = request.EffectiveTo,
             IsActive = IsActive(request.Status),
             CreatedUtc = now
         };
@@ -98,6 +102,8 @@ public sealed class SqlAdviserAvailabilityRulesRepository : IAdviserAvailability
         pattern.DayOfWeek = request.DayOfWeek;
         pattern.Start = request.StartTime;
         pattern.End = request.EndTime;
+        pattern.EffectiveFrom = request.EffectiveFrom;
+        pattern.EffectiveTo = request.EffectiveTo;
         pattern.IsActive = IsActive(request.Status);
         pattern.UpdatedUtc = now;
 

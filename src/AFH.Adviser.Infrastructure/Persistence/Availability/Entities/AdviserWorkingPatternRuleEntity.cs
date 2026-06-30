@@ -8,6 +8,8 @@ public sealed class AdviserWorkingPatternRuleEntity
     public string? DayOfWeek { get; set; }
     public string Start { get; set; } = string.Empty;
     public string End { get; set; } = string.Empty;
+    public string? EffectiveFrom { get; set; }
+    public string? EffectiveTo { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedUtc { get; set; }
     public DateTime? UpdatedUtc { get; set; }

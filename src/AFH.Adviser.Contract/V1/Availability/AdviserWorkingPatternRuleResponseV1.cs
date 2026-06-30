@@ -6,4 +6,6 @@ public sealed record AdviserWorkingPatternRuleResponseV1(
     string? DayOfWeek,
     string Start,
     string End,
+    string? EffectiveFrom,
+    string? EffectiveTo,
     bool IsActive);

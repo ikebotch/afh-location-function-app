@@ -7,5 +7,7 @@ public sealed class AdviserWorkingPatternRule
     public string? DayOfWeek { get; init; }
     public string Start { get; init; } = string.Empty;
     public string End { get; init; } = string.Empty;
+    public string? EffectiveFrom { get; init; }
+    public string? EffectiveTo { get; init; }
     public bool IsActive { get; init; } = true;
 }
