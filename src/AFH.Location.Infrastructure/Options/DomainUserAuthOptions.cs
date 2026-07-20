@@ -12,4 +12,5 @@ public sealed class DomainUserAuthOptions
     public bool AllowMockTokens { get; set; }
     public string[] AllowedTenantIds { get; set; } = [];
     public string[] AllowedEmailDomains { get; set; } = [];
+    public bool AllowExternalGuestsFromAllowedTenants { get; set; } = true;
 }

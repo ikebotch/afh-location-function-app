@@ -72,7 +72,7 @@ public sealed class EntraDomainUserTokenValidator : IDomainUserTokenValidator
             if (string.IsNullOrWhiteSpace(email))
                 return DomainUserTokenValidationResult.Fail("FORBIDDEN", "Bearer token does not contain a user email.");
 
-            if (!IsAllowedEmailDomain(email))
+            if (!IsAllowedEmailDomain(email, tenantId))
                 return DomainUserTokenValidationResult.Fail("FORBIDDEN", "User email domain is not allowed.");
 
             var roles = principal.Claims
@@ -119,7 +119,7 @@ public sealed class EntraDomainUserTokenValidator : IDomainUserTokenValidator
             || (!string.IsNullOrWhiteSpace(tenantId) && allowedTenants.Contains(tenantId.Trim(), StringComparer.OrdinalIgnoreCase));
     }
 
-    private bool IsAllowedEmailDomain(string email)
+    private bool IsAllowedEmailDomain(string email, string? tenantId)
     {
         var at = email.LastIndexOf('@');
         if (at < 0 || at == email.Length - 1)
@@ -131,7 +131,8 @@ public sealed class EntraDomainUserTokenValidator : IDomainUserTokenValidator
             .ToArray();
 
         return allowed.Length == 0
-            || allowed.Any(domain => email.EndsWith("@" + domain, StringComparison.OrdinalIgnoreCase));
+            || allowed.Any(domain => email.EndsWith("@" + domain, StringComparison.OrdinalIgnoreCase))
+            || (_options.AllowExternalGuestsFromAllowedTenants && IsAllowedTenant(tenantId));
     }
 
     private static string GetAuthority(DomainUserAuthOptions options)

@@ -58,6 +58,27 @@ public sealed class EntraDomainUserTokenValidatorTests
         Assert.Equal("AUTH_ERROR", result.Code);
     }
 
+    [Fact]
+    public async Task ValidateAsync_AcceptsExternalGuestEmailWhenTokenTenantIsAllowed()
+    {
+        var validator = CreateValidator(new DomainUserAuthOptions
+        {
+            Enabled = true,
+            TenantId = TenantId,
+            Audience = "api://booking-api",
+            AllowedTenantIds = [TenantId],
+            AllowedEmailDomains = ["internal.com"]
+        });
+
+        var result = await validator.ValidateAsync(
+            CreateToken("api://booking-api", TenantId, "alex@external.com", V2Issuer),
+            CancellationToken.None);
+
+        Assert.NotNull(result.Identity);
+        Assert.Equal("alex@external.com", result.Identity!.Email);
+        Assert.Equal(TenantId, result.TenantId);
+    }
+
     private static EntraDomainUserTokenValidator CreateValidator(DomainUserAuthOptions options)
     {
         var configuration = new OpenIdConnectConfiguration
