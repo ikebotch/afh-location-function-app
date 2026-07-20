@@ -18,6 +18,7 @@
     "DomainUserAuth:AllowMockTokens": "false",
     "DomainUserAuth:AllowedTenantIds:0": "<entra-tenant-id>",
     "DomainUserAuth:AllowedEmailDomains:0": "example.com",
+    "DomainUserAuth:AllowExternalGuestsFromAllowedTenants": "true",
     "IdentityRbac:PermissionMode": "Hybrid",
     "LocationSearch:PolicyStore:AutoCreate": "true",
     "LocationSearch:PolicyStore:SeedFromConfiguration": "true",
