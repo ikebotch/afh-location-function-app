@@ -1,5 +1,7 @@
 using AFH.Location.Application.Abstractions;
+using AFH.Location.Application.Abstractions.Coverage;
 using AFH.Location.Application.Abstractions.Geo;
+using AFH.Location.Domain;
 using AFH.Location.Infrastructure.External.Maps;
 
 namespace AFH.Location.Tests;
@@ -13,7 +15,7 @@ public sealed class CachedRouteMatrixServiceTests
         var cache = new StubRouteCache();
         cache.Set("single:51.500000:-0.100000:51.600000:-0.200000", new RouteResult(18, 7.5, "High"), TimeSpan.FromMinutes(30));
 
-        var sut = new CachedRouteMatrixService(inner, cache);
+        var sut = new CachedRouteMatrixService(inner, cache, new StubRouteMatrixPolicyProvider());
 
         var result = await sut.GetOneToManyAsync(
             (51.5, -0.1),
@@ -37,7 +39,7 @@ public sealed class CachedRouteMatrixServiceTests
         var cache = new StubRouteCache();
         var matrixInner = new RecordingRouteMatrixService();
         var routingInner = new RecordingRoutingService();
-        var matrix = new CachedRouteMatrixService(matrixInner, cache);
+        var matrix = new CachedRouteMatrixService(matrixInner, cache, new StubRouteMatrixPolicyProvider());
         var routing = new CachedRoutingService(routingInner, cache);
 
         await matrix.GetOneToManyAsync(
@@ -84,6 +86,12 @@ public sealed class CachedRouteMatrixServiceTests
 
             return Task.FromResult(result);
         }
+    }
+
+    private sealed class StubRouteMatrixPolicyProvider : IRouteMatrixPolicyProvider
+    {
+        public Task<RouteMatrixPolicy> GetAsync(CancellationToken ct)
+            => Task.FromResult(new RouteMatrixPolicy());
     }
 
     private sealed class RecordingRoutingService : IRoutingService

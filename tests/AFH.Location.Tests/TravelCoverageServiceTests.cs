@@ -172,7 +172,7 @@ public sealed class TravelCoverageServiceTests
         // Arrange — inner always returns no data (simulates ParseMatrix returning empty map).
         var inner = new EmptyRouteMatrixService();
         var cache = new InspectableRouteCache();
-        var sut = new CachedRouteMatrixService(inner, cache);
+        var sut = new CachedRouteMatrixService(inner, cache, new StubRouteMatrixPolicyProvider());
 
         // Act
         await sut.GetOneToManyAsync(
@@ -189,7 +189,7 @@ public sealed class TravelCoverageServiceTests
     {
         var inner = new FixedRouteMatrixService(new RouteResult(12, 3.19, "High", TravelRouteResolutionSource.AzureMaps));
         var cache = new InspectableRouteCache();
-        var sut = new CachedRouteMatrixService(inner, cache);
+        var sut = new CachedRouteMatrixService(inner, cache, new StubRouteMatrixPolicyProvider());
 
         await sut.GetOneToManyAsync(
             (51.73, 0.47),
@@ -910,7 +910,7 @@ public sealed class TravelCoverageServiceTests
         // Arrange
         var mockInner = new FixedRouteMatrixService(new RouteResult(15, 10.0, "High", TravelRouteResolutionSource.AzureMaps));
         var mockPersistentCache = new CountingRouteCache();
-        var sut = new CachedRouteMatrixService(mockInner, mockPersistentCache);
+        var sut = new CachedRouteMatrixService(mockInner, mockPersistentCache, new StubRouteMatrixPolicyProvider());
 
         var origin = (51.73, 0.47);
         var destinations = new Dictionary<string, (double, double)>(StringComparer.OrdinalIgnoreCase)

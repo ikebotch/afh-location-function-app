@@ -85,7 +85,7 @@ internal static class LocationOpenApiDocumentFactory
                 var pathItem = (Dictionary<string, object>)pathItemObj;
                 var metadata = ResolveOperationMetadata(type, method);
 
-                foreach (var httpMethod in httpTrigger.Methods.Select(x => x.ToLowerInvariant()))
+                foreach (var httpMethod in (httpTrigger.Methods ?? []).Select(x => x.ToLowerInvariant()))
                 {
                     var operation = ResolveMetadataForHttpMethod(metadata, httpMethod);
                     var parameters = BuildParameters(route, method);
