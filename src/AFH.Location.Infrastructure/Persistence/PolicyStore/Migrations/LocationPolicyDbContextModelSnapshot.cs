@@ -134,6 +134,10 @@ namespace AFH.Location.Infrastructure.Persistence.PolicyStore.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<string>("XPlanAdviserId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("ManagerId")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");

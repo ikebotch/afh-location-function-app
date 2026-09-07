@@ -3,6 +3,7 @@
 public sealed class Adviser
 {
     public string AdviserId { get; set; } = default!;
+    public string? XPlanAdviserId { get; set; }
     public string DisplayName { get; set; } = default!;
     public string MailboxUserId { get; set; } = string.Empty;
     public string HomePostcode { get; set; } = default!;

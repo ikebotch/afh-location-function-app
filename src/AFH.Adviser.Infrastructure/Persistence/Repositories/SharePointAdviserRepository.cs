@@ -116,6 +116,7 @@ public sealed class SharePointAdviserRepository : IAdviserSourceRepository
             advisers.Add(new Entities.Adviser
             {
                 AdviserId = adviserId,
+                XPlanAdviserId = fields.GetString(fieldProfile, SharePointAdviserFieldNames.XPlanAdviserId)?.Trim(),
                 DisplayName = name,
                 MailboxUserId = fields.GetString(fieldProfile, SharePointAdviserFieldNames.Email) ?? adviserId,
                 HomePostcode = postcode ?? "",

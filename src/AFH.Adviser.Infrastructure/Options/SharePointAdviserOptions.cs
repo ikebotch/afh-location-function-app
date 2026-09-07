@@ -9,6 +9,7 @@ public sealed class SharePointAdviserOptions
 
     // Field mappings (keep simple and explicit)
     public string AdviserIdField { get; set; } = "field_3";
+    public string XPlanAdviserIdField { get; set; } = "Adviser Commpay";
     //public string AdviserIdField { get; set; } = "field_2";
     public string DisplayNameField { get; set; } = "LinkTitle";
     public string NameField { get; set; } = "Title";

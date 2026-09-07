@@ -59,6 +59,7 @@ public sealed class AdviserFeedService : IAdviserFeedService
         return new AdviserFeedItem
         {
             Id = adviser.AdviserId,
+            XPlanAdviserId = adviser.XPlanAdviserId,
             Name = adviser.DisplayName,
             MailboxUserId = string.IsNullOrWhiteSpace(adviser.MailboxUserId) ? adviser.AdviserId : adviser.MailboxUserId.Trim(),
             Region = adviser.Region,

@@ -21,6 +21,7 @@ public class CachedAdviserRepositoryTests
             new Entities.Adviser
             {
                 AdviserId = "adv-1",
+                XPlanAdviserId = "987654321",
                 DisplayName = "Cached Adviser",
                 HomePostcode = "B1 1AA",
                 Region = "West Midlands",
@@ -39,6 +40,7 @@ public class CachedAdviserRepositoryTests
 
         Assert.Single(advisers);
         Assert.Equal("Cached Adviser", advisers[0].DisplayName);
+        Assert.Equal("987654321", advisers[0].XPlanAdviserId);
         Assert.Equal(0, source.CallCount);
     }
 

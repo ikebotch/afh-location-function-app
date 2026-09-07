@@ -3,6 +3,7 @@ namespace AFH.Location.Infrastructure.Persistence.PolicyStore.Entities;
 public sealed class AdviserReferenceCacheEntity
 {
     public string AdviserId { get; set; } = string.Empty;
+    public string? XPlanAdviserId { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public string MailboxUserId { get; set; } = string.Empty;
     public string HomePostcode { get; set; } = string.Empty;

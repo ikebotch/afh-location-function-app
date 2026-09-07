@@ -45,6 +45,7 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
             }
 
             row.DisplayName = adviser.DisplayName;
+            row.XPlanAdviserId = string.IsNullOrWhiteSpace(adviser.XPlanAdviserId) ? null : adviser.XPlanAdviserId.Trim();
             row.MailboxUserId = adviser.MailboxUserId;
             row.HomePostcode = adviser.HomePostcode;
             row.Region = adviser.Region;
@@ -96,6 +97,7 @@ public sealed class SqlAdviserReferenceCacheRepository : IAdviserReferenceCacheR
         return new Entities.Adviser
         {
             AdviserId = entity.AdviserId,
+            XPlanAdviserId = entity.XPlanAdviserId,
             DisplayName = entity.DisplayName,
             MailboxUserId = entity.MailboxUserId,
             HomePostcode = entity.HomePostcode,

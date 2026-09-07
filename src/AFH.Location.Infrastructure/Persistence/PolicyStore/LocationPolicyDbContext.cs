@@ -101,6 +101,7 @@ public sealed class LocationPolicyDbContext : DbContext
             entity.ToTable("AdviserReferenceCache");
             entity.HasKey(x => x.AdviserId);
             entity.Property(x => x.AdviserId).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.XPlanAdviserId).HasMaxLength(100);
             entity.Property(x => x.DisplayName).HasMaxLength(256).IsRequired();
             entity.Property(x => x.MailboxUserId).HasMaxLength(128);
             entity.Property(x => x.HomePostcode).HasMaxLength(32);

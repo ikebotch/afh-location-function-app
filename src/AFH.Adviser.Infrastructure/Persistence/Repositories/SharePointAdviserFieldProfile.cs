@@ -12,6 +12,7 @@ internal sealed class SharePointAdviserFieldProfile : ISharePointMappingProfile
         Fields =
         [
             Map(nameof(SharePointAdviserFieldNames.AdviserId), options.AdviserIdField),
+            Map(nameof(SharePointAdviserFieldNames.XPlanAdviserId), options.XPlanAdviserIdField),
             Map(nameof(SharePointAdviserFieldNames.DisplayName), options.DisplayNameField),
             Map(nameof(SharePointAdviserFieldNames.Name), options.NameField),
             Map(nameof(SharePointAdviserFieldNames.Email), options.EmailField),
@@ -39,6 +40,7 @@ internal sealed class SharePointAdviserFieldProfile : ISharePointMappingProfile
 internal static class SharePointAdviserFieldNames
 {
     public const string AdviserId = nameof(AdviserId);
+    public const string XPlanAdviserId = nameof(XPlanAdviserId);
     public const string DisplayName = nameof(DisplayName);
     public const string Name = nameof(Name);
     public const string Email = nameof(Email);

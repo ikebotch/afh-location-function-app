@@ -19,6 +19,7 @@ public static class AdviserCoverageContractMapper
         return new AdviserCoveragePointV1
         {
             Id = adviser.Id,
+            XPlanAdviserId = adviser.XPlanAdviserId,
             Name = adviser.Name,
             MailboxUserId = adviser.MailboxUserId,
             Region = adviser.Region,

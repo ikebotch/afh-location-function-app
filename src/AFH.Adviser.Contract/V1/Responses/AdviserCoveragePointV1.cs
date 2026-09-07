@@ -3,6 +3,7 @@ namespace AFH.Adviser.Contract.V1.Responses;
 public sealed class AdviserCoveragePointV1
 {
     public string Id { get; init; } = default!;
+    public string? XPlanAdviserId { get; init; }
     public string Name { get; init; } = default!;
     public string MailboxUserId { get; init; } = string.Empty;
     public string? Region { get; init; }

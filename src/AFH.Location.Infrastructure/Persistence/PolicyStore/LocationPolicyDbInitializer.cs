@@ -35,6 +35,7 @@ public sealed class LocationPolicyDbInitializer : IHostedService
         var db = scope.ServiceProvider.GetRequiredService<LocationPolicyDbContext>();
 
         await db.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureXPlanAdviserIdColumnAsync(db, cancellationToken);
         await EnsurePolicySettingsTableAsync(db, cancellationToken);
         await SeedIfEmptyAsync(db, cancellationToken);
     }
@@ -192,6 +193,23 @@ public sealed class LocationPolicyDbInitializer : IHostedService
                     [UpdatedUtc] datetime2 NOT NULL,
                     CONSTRAINT [PK_LocationPolicySettings] PRIMARY KEY ([Key])
                 );
+            END
+            """,
+            ct);
+    }
+
+    private static async Task EnsureXPlanAdviserIdColumnAsync(LocationPolicyDbContext db, CancellationToken ct)
+    {
+        if (!string.Equals(db.Database.ProviderName, "Microsoft.EntityFrameworkCore.SqlServer", StringComparison.Ordinal))
+            return;
+
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            IF OBJECT_ID(N'[AdviserReferenceCache]', N'U') IS NOT NULL
+               AND COL_LENGTH(N'AdviserReferenceCache', N'XPlanAdviserId') IS NULL
+            BEGIN
+                ALTER TABLE [AdviserReferenceCache]
+                    ADD [XPlanAdviserId] nvarchar(100) NULL;
             END
             """,
             ct);

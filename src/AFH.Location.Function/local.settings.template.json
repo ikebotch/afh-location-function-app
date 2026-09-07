@@ -38,6 +38,7 @@
     "SharePoint:Advisers:SiteId": "<sharepoint-site-id>",
     "SharePoint:Advisers:ListId": "<sharepoint-advisers-list-id>",
     "SharePoint:Advisers:AdviserIdField": "field_3",
+    "SharePoint:Advisers:XPlanAdviserIdField": "Adviser Commpay",
     "SharePoint:Advisers:DisplayNameField": "LinkTitle",
     "SharePoint:Advisers:NameField": "Title",
     "SharePoint:Advisers:EmailField": "field_3",

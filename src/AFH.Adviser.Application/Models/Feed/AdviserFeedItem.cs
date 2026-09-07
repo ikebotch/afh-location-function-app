@@ -3,6 +3,7 @@ namespace AFH.Adviser.Application.Models.Feed;
 public sealed class AdviserFeedItem
 {
     public string Id { get; init; } = default!;
+    public string? XPlanAdviserId { get; init; }
     public string Name { get; init; } = default!;
     public string MailboxUserId { get; init; } = string.Empty;
     public string? Region { get; init; }
